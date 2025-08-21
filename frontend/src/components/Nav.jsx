@@ -1,23 +1,22 @@
 import React from 'react';
+import { Link } from 'react-router-dom'; // Importáljuk a Link-et
 
-// A komponens most már megkapja a "props"-ként átadott theme és toggleTheme értékeket
 function Nav({ theme, toggleTheme }) {
   return (
     <nav className="nav">
       <div className="nav-container">
-        <div className="logo">
+        <Link to="/" className="logo"> {/* Link a főoldalra */}
           <span>🏠</span>
           <span>FamilyHub</span>
-        </div>
+        </Link>
         <div className="nav-menu">
-          <a href="#" className="nav-item">Áttekintés</a>
-          <a href="#" className="nav-item">Pénzügyek</a>
-          <a href="#" className="nav-item">Feladatok</a>
-          <a href="#" className="nav-item">Bevásárlás</a>
-          <a href="#" className="nav-item">Célok</a>
-          {/* A gombra kattintva meghívjuk a "toggleTheme" funkciót */}
+          {/* A href="#" helyett a to="/" és to="/tasks" attribútumokat használjuk */}
+          <Link to="/" className="nav-item">Áttekintés</Link>
+          <Link to="#" className="nav-item">Pénzügyek</Link>
+          <Link to="/tasks" className="nav-item">Feladatok</Link>
+          <Link to="#" className="nav-item">Bevásárlás</Link>
+          <Link to="#" className="nav-item">Célok</Link>
           <button className="theme-toggle" onClick={toggleTheme}>
-            {/* Az ikon attól függ, hogy mi az aktuális téma */}
             <span id="theme-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
           </button>
         </div>

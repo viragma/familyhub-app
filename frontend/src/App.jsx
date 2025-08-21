@@ -1,40 +1,31 @@
-import React, { useState, useEffect } from 'react'; // useState és useEffect importálása
+import React, { useState, useEffect } from 'react';
+import { Outlet } from 'react-router-dom'; // Új import!
 import './index.css';
 import Nav from './components/Nav';
-import Header from './components/Header';
-import BentoGrid from './components/BentoGrid';
 import MobileNav from './components/MobileNav';
+// A Header, BentoGrid, FAB, TaskModal már nem kellenek ide közvetlenül
 
 function App() {
-  // 1. ÁLLAPOT LÉTREHOZÁSA
-  // A useState hook létrehoz egy 'theme' nevű állapotváltozót és egy 'setTheme'
-  // funkciót a módosítására. Kezdőértéket a localStorage-ből olvasunk,
-  // ha nincs, akkor 'light' lesz az alapértelmezett.
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-
-  // A funkció, ami vált a témák között
+  
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+  
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
+    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
-  // 2. MELLÉKHATÁS KEZELÉSE
-  // Az useEffect hook lefut minden alkalommal, amikor a 'theme' változó
-  // értéke megváltozik.
-  useEffect(() => {
-    // Elmentjük az új témát a böngésző tárolójába
-    localStorage.setItem('theme', theme);
-    // Beállítjuk a data-theme attribútumot a <html> elemen
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]); // A [theme] miatt csak akkor fut le, ha a téma változik
-return (
+  return (
     <div>
       <Nav theme={theme} toggleTheme={toggleTheme} />
       <div className="container">
-        <Header />
-        <BentoGrid />
+        {/* Az Outlet komponens helyére tölti be a router az aktuális oldalt
+            (pl. a DashboardPage-t vagy a TasksPage-t) */}
+        <Outlet /> 
       </div>
-      <MobileNav /> {/* 2. Hozzáadás a lap aljához */}
+      <MobileNav />
     </div>
   );
 }
