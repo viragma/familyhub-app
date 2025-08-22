@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import BentoGrid from '../components/BentoGrid';
+import { useAuth } from '../context/AuthContext'; // Fontos import
 
 function DashboardPage() {
   const [dashboardData, setDashboardData] = useState(null);
+  const { token } = useAuth(); // A tokent a contextből vesszük
 
-  // Ez a funkció felel az adatok lekéréséért a backendtől
-  const fetchData = async () => {
-    try {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL;
-      const response = await fetch(`${apiUrl}/api/dashboard`);
-      const data = await response.json();
-      setDashboardData(data);
-    } catch (error) {
-      console.error("Hiba a dashboard adatok lekérésekor:", error);
-    }
-  };
-
-  // Az useEffect hook biztosítja, hogy az adatok betöltődjenek az oldal megjelenésekor
   useEffect(() => {
+    const fetchData = async () => {
+      if (!token) return; // Ne fusson le, amíg nincs token
+      try {
+        // JAVÍTÁS: Hozzáadjuk a hiányzó 'headers' részt
+        const response = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/api/dashboard`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        if (!response.ok) {
+            throw new Error('A dashboard adatok lekérése sikertelen.');
+        }
+        const data = await response.json();
+        setDashboardData(data);
+      } catch (error) {
+        console.error("Hiba a dashboard adatok lekérésekor:", error);
+      }
+    };
     fetchData();
-  }, []);
-
-  // Amíg az adatok töltődnek, egy üzenetet jelenítünk meg
-  if (!dashboardData) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Adatok betöltése...</div>;
-  }
+  }, [token]); // A useEffect fusson le, ha a token megváltozik
 
   return (
     <>

@@ -6,10 +6,11 @@ function TasksPage() {
   const [tasks, setTasks] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
-  // Adatok lekérése csak a feladatokhoz
+
   const fetchTasks = async () => {
     try {
-      const response = await fetch('${apiUrl}/api/tasks');
+      // JAVÍTVA: Backtick (`) használata
+      const response = await fetch(`${apiUrl}/api/tasks`);
       const data = await response.json();
       setTasks(data);
     } catch (error) {
@@ -21,32 +22,29 @@ function TasksPage() {
     fetchTasks();
   }, []);
 
-  // === Ide másoljuk az összes feladatkezelő funkciót ===
-
   const handleTaskToggle = async (taskId) => {
-    // Optimistic update
     setTasks(prevTasks => prevTasks.map(task => 
       task.id === taskId ? { ...task, done: !task.done } : task
     ));
-    // API hívás
     try {
       await fetch(`${apiUrl}/api/tasks/${taskId}/toggle`, { method: 'POST' });
     } catch (error) {
       console.error("Hiba a feladat állapotának frissítésekor:", error);
-      fetchTasks(); // Hiba esetén szinkronizáljuk újra
+      fetchTasks();
     }
   };
   
   const handleSaveTask = async (taskData) => {
     try {
-      const response = await fetch('${apiUrl}/api/tasks/', {
+      // JAVÍTVA: Backtick (`) használata
+      const response = await fetch(`${apiUrl}/api/tasks/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(taskData),
       });
       if (response.ok) {
         setIsModalOpen(false);
-        fetchTasks(); // Frissítjük a listát
+        fetchTasks();
       } else {
         alert('Hiba a mentés során!');
       }
@@ -61,7 +59,7 @@ function TasksPage() {
     try {
       const response = await fetch(`${apiUrl}/api/tasks/${taskId}`, { method: 'DELETE' });
       if (response.ok) {
-        fetchTasks(); // Frissítjük a listát
+        fetchTasks();
       } else {
         alert('Hiba a törlés során!');
       }
@@ -74,7 +72,6 @@ function TasksPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h1>Feladatok</h1>
-        {/* A jövőben ide jöhetnek szűrők vagy egyéb vezérlők */}
       </div>
       
       <div className="task-list">
