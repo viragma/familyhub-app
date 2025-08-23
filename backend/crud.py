@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from . import models, schemas
 from fastapi import HTTPException,status
-# JAVÍTÁS: Itt importáljuk az összes szükséges sémát
 from .schemas import (
     Task as TaskSchema, TaskCreate,
     Family, FamilyCreate,
@@ -30,34 +29,26 @@ def get_user(db: Session, user_id: int):
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_pin = get_pin_hash(user.pin)
     db_user = models.User(
-        name=user.name,
-        display_name=user.display_name,
-        birth_date=user.birth_date,
-        avatar_url=user.avatar_url,
-        role=user.role,
-        pin_hash=hashed_pin,
+        name=user.name, display_name=user.display_name, birth_date=user.birth_date,
+        avatar_url=user.avatar_url, role=user.role, pin_hash=hashed_pin,
         family_id=user.family_id
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-
-    # Létrehozzuk a személyes kasszáját is
+    
     personal_account_schema = schemas.AccountCreate(
-        name=f"{db_user.display_name} kasszája",
-        type="személyes"
+        name=f"{db_user.display_name} kasszája", type="személyes"
     )
-    # JAVÍTÁS: Itt már a teljes 'user' objektumot adjuk át, nem csak az ID-t
     create_family_account(
-        db=db, 
-        account=personal_account_schema, 
-        family_id=db_user.family_id,
-        owner_user=db_user
+        db=db, account=personal_account_schema, 
+        family_id=db_user.family_id, owner_user=db_user
     )
+    return db_user
     
     return db_user
 # --- Family CRUD Műveletek ---
-def create_family(db: Session, family: FamilyCreate):
+def create_family(db: Session, family: schemas.FamilyCreate):
     db_family = models.Family(name=family.name)
     db.add(db_family)
     db.commit()
@@ -110,17 +101,16 @@ def get_users_by_family(db: Session, family_id: int):
     return db.query(models.User).filter(models.User.family_id == family_id).all()
 
 
-def update_user(db: Session, user_id: int, user_data: UserCreate):
+def update_user(db: Session, user_id: int, user_data: schemas.UserCreate):
     db_user = get_user(db, user_id)
     if db_user:
-        # Frissítjük az adatokat
         db_user.name = user_data.name
         db_user.display_name = user_data.display_name
         db_user.role = user_data.role
-        # Itt lehetne emailt, avatart, stb. is frissíteni
         db.commit()
         db.refresh(db_user)
     return db_user
+
 
 def delete_user(db: Session, user_id: int):
     db_user = get_user(db, user_id)
@@ -129,85 +119,105 @@ def delete_user(db: Session, user_id: int):
         db.commit()
     return db_user
 
-def get_account(db: Session, account_id: int):
-    return db.query(models.Account).filter(models.Account.id == account_id).first()
+def get_account(db: Session, account_id: int, user: models.User):
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if account:
+        visible_accounts = get_accounts_by_family(db, user=user)
+        if account not in visible_accounts:
+            raise HTTPException(status_code=403, detail="Nincs jogosultságod megtekinteni ezt a kasszát.")
+    return account
 
 def get_accounts_by_family(db: Session, user: models.User):
-    # JAVÍTÁS: A logika most már helyesen kezeli a közös kasszákat is
-    if user.role in ["Családfő", "Szülő"]:
-        # A szülők látják az összes nem-személyes kasszát ÉS azokat a személyes kasszákat,
-        # amikhez expliciten hozzá lettek rendelve (a sajátjukat és a gyerekekét).
-        common_accounts = db.query(models.Account).filter(models.Account.family_id == user.family_id, models.Account.type != 'személyes').all()
-        visible_personal_accounts = [acc for acc in user.visible_accounts if acc.type == 'személyes']
-        return common_accounts + visible_personal_accounts
-    else:
-        # A gyerekek továbbra is csak azokat látják, amikhez joguk van (jellemzően a sajátjukat)
-        return user.visible_accounts
+    # JAVÍTÁS: Sokkal tisztább és megbízhatóbb logika
+    # A felhasználó mindenképp látja azokat a kasszákat, amikhez hozzá van rendelve a 'visible_accounts' listájában.
+    accounts = user.visible_accounts
 
+    # A szülők ezen felül látják az összes közös, cél- és vészkasszát is,
+    # még akkor is, ha azokhoz nincsenek expliciten hozzárendelve.
+    if user.role in ["Családfő", "Szülő"]:
+        other_accounts = db.query(models.Account).filter(
+            models.Account.family_id == user.family_id,
+            models.Account.type != 'személyes'
+        ).all()
+        # Összefűzzük a két listát, elkerülve a duplikációkat
+        account_ids = {acc.id for acc in accounts}
+        for acc in other_accounts:
+            if acc.id not in account_ids:
+                accounts.append(acc)
+
+    # A közös kassza egyenlegének valós idejű kiszámítása (ez a logika helyes volt)
+    common_account = next((acc for acc in accounts if acc.type == 'közös'), None)
+    if common_account and user.role in ["Családfő", "Szülő"]:
+        all_family_accounts = db.query(models.Account).filter(models.Account.family_id == user.family_id).all()
+        parent_personal_accounts = [acc for acc in all_family_accounts if acc.owner_user and acc.owner_user.role in ['Családfő', 'Szülő'] and acc.type == 'személyes']
+        common_account.balance = sum(acc.balance for acc in parent_personal_accounts)
+        
+    # Betöltjük a tulajdonosokat a frontend számára
+    for acc in accounts:
+        if acc.owner_user:
+            _ = acc.owner_user.display_name 
+
+    return accounts
 
 
 def create_family_account(db: Session, account: schemas.AccountCreate, family_id: int, owner_user: models.User):
     db_account = models.Account(
         name=account.name, type=account.type, goal_amount=account.goal_amount,
-        goal_date=account.goal_date, family_id=family_id,
-        owner_user_id=owner_user.id if account.type == 'személyes' else None
+        goal_date=account.goal_date, show_on_dashboard=account.show_on_dashboard,
+        family_id=family_id,
+        owner_user_id=owner_user.id if account.type != 'közös' else None
     )
     
-    # Hozzáadjuk a létrehozót, mint alapértelmezett "látót"
     db_account.viewers.append(owner_user)
+
+    if owner_user.role in ['Gyerek', 'Tizenéves']:
+        parents = db.query(models.User).filter(
+            models.User.family_id == family_id,
+            models.User.role.in_(['Szülő', 'Családfő'])
+        ).all()
+        for parent in parents:
+            if parent not in db_account.viewers:
+                db_account.viewers.append(parent)
     
-    # Ha a frontend küldött extra "látókat", azokat is hozzáadjuk
     if account.viewer_ids:
         viewers = db.query(models.User).filter(models.User.id.in_(account.viewer_ids)).all()
         for viewer in viewers:
             if viewer not in db_account.viewers:
                 db_account.viewers.append(viewer)
-
+                
     db.add(db_account)
     db.commit()
     db.refresh(db_account)
     return db_account
 
 def create_account_transaction(db: Session, transaction: schemas.TransactionCreate, account_id: int, user: models.User):
-    db_account = get_account(db=db, account_id=account_id)
-    if not db_account:
-        return None
+    db_account = get_account(db=db, account_id=account_id, user=user)
+    if not db_account: raise HTTPException(status_code=404, detail="Kassza nem található.")
 
-    if db_account.type == 'közös':
-        raise HTTPException(status_code=400, detail="A Közös kasszához nem lehet közvetlenül tranzakciót rögzíteni.")
+    if db_account.type in ['közös', 'cél']:
+        raise HTTPException(status_code=400, detail="Ehhez a kasszához csak utalással lehet pénzt mozgatni.")
 
-    can_add_transaction = False
-    if user.role in ["Családfő", "Szülő"]:
-        can_add_transaction = True
-    elif user.role in ["Tizenéves", "Gyerek"] and db_account.owner_user_id == user.id:
-        can_add_transaction = True
+    can_add = False
+    is_parent_managing_child = user.role in ["Családfő", "Szülő"] and db_account.owner_user and db_account.owner_user.role in ["Gyerek", "Tizenéves"]
     
-    if not can_add_transaction:
-        raise HTTPException(status_code=403, detail="Nincs jogosultságod tranzakciót hozzáadni ehhez a kasszához.")
-
-    # JAVÍTÁS: Itt 'user_id=user.id' helyett a 'creator=user' kapcsolatot állítjuk be.
-    db_transaction = models.Transaction(
-        description=transaction.description,
-        amount=transaction.amount,
-        type=transaction.type,
-        category_id=transaction.category_id,
-        account_id=account_id,
-        creator=user  # <-- EZ A LÉNYEG
-    )
+    if user.role in ["Családfő", "Szülő"] and (db_account.owner_user_id == user.id or is_parent_managing_child):
+        can_add = True
+    elif user.role in ["Tizenéves", "Gyerek"] and db_account.owner_user_id == user.id:
+        can_add = True
+        
+    if not can_add: raise HTTPException(status_code=403, detail="Nincs jogosultságod tranzakciót hozzáadni ehhez a kasszához.")
+    
+    db_transaction = models.Transaction(creator=user, **transaction.model_dump(), account_id=account_id)
     
     if db_transaction.type == 'bevétel':
         db_account.balance += db_transaction.amount
     elif db_transaction.type == 'kiadás':
         db_account.balance -= db_transaction.amount
         
-    db.add(db_transaction)
-    db.add(db_account)
+    db.add_all([db_transaction, db_account])
     db.commit()
     db.refresh(db_transaction)
     return db_transaction
-def get_category(db: Session, category_id: int):
-    return db.query(models.Category).filter(models.Category.id == category_id).first()
-
 def get_categories(db: Session):
     """
     Lekérdezi az összes kategóriát, és egy fába rendezi őket
@@ -342,53 +352,53 @@ def delete_transaction(db: Session, transaction_id: int, user: models.User):
 def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: models.User):
     if transfer_data.from_account_id == transfer_data.to_account_id:
         raise HTTPException(status_code=400, detail="A forrás és cél kassza nem lehet ugyanaz.")
-
-    from_account = get_account(db, transfer_data.from_account_id)
-    to_account = get_account(db, transfer_data.to_account_id)
+        
+    from_account = get_account(db, transfer_data.from_account_id, user=user) 
+    to_account = get_account_by_id_simple(db, transfer_data.to_account_id)
 
     if not from_account or not to_account:
-        raise HTTPException(status_code=404, detail="Egyik vagy mindkét kassza nem található.")
-
+        raise HTTPException(status_code=404, detail="A forrás vagy a cél kassza nem található.")
+        
+    # === JAVÍTOTT JOGOSULTSÁGI SZABÁLY ===
     can_transfer = False
-    if user.role in ["Családfő", "Szülő"] or from_account.owner_user_id == user.id:
+    is_owner = from_account.owner_user_id == user.id
+    is_parent = user.role in ["Családfő", "Szülő"]
+
+    # Utalhatsz, ha szülő vagy, VAGY ha a tiéd a kassza (legyen az személyes vagy cél).
+    if is_parent or is_owner:
         can_transfer = True
     
     if not can_transfer:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod ebből a kasszából utalni.")
-
+        
     if from_account.balance < transfer_data.amount:
         raise HTTPException(status_code=400, detail="Nincs elég fedezet a forrás kasszán.")
-
+        
     transfer_id = uuid.uuid4()
-    
     is_pocket_money = False
-    from_owner = from_account.owner_user
-    to_owner = to_account.owner_user
-    if from_owner and to_owner:
-        if from_owner.role in ["Családfő", "Szülő"] and to_owner.role in ["Gyerek", "Tizenéves"]:
+    if from_account.owner_user and to_account.owner_user:
+        if from_account.owner_user.role in ["Családfő", "Szülő"] and to_account.owner_user.role in ["Gyerek", "Tizenéves"]:
             is_pocket_money = True
+            
     try:
-        # Kiadás tranzakció
         db_expense = models.Transaction(
-            description=f"Átutalás -> {to_account.name}: {transfer_data.description}",
+            description=f"Átutalás -> {to_account.name}: {transfer_data.description}", 
             amount=transfer_data.amount,
-            type='kiadás',
-            account_id=from_account.id,
-            creator=user,
-            transfer_id=transfer_id,
-            is_family_expense=is_pocket_money # Itt állítjuk be a zászlót
+            type='kiadás', 
+            account_id=from_account.id, 
+            creator=user, 
+            transfer_id=transfer_id, 
+            is_family_expense=is_pocket_money
         )
         from_account.balance -= transfer_data.amount
 
-        # Bevétel tranzakció
         db_income = models.Transaction(
-            description=f"Átutalás <- {from_account.name}: {transfer_data.description}",
+            description=f"Átutalás <- {from_account.name}: {transfer_data.description}", 
             amount=transfer_data.amount,
-            type='bevétel',
-            account_id=to_account.id,
-            creator=user,
+            type='bevétel', 
+            account_id=to_account.id, 
+            creator=user, 
             transfer_id=transfer_id
-            # A bevételi oldal sosem családi kiadás
         )
         to_account.balance += transfer_data.amount
         
@@ -400,15 +410,11 @@ def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: mo
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Adatbázis hiba történt: {e}")
 
-
-
 def get_all_personal_accounts(db: Session, family_id: int):
-    """ Visszaadja egy család összes 'személyes' típusú kasszáját. """
     return db.query(models.Account).filter(
         models.Account.family_id == family_id,
-        models.Account.type == 'személyes'
+        models.Account.type != 'közös'
     ).all()
-
 def get_financial_summary(db: Session, user: models.User):
     family_id = user.family_id
     current_month = datetime.now().month
@@ -501,3 +507,69 @@ def delete_category(db: Session, category_id: int):
         db.delete(db_category)
         db.commit()
     return db_category
+
+# ... (a meglévő importok és függvények)
+
+def update_account(db: Session, account_id: int, account_data: schemas.AccountCreate, user: models.User):
+    db_account = get_account_by_id_simple(db, account_id)
+    if not db_account: return None
+    if user.role not in ["Családfő", "Szülő"] and user.id != db_account.owner_user_id:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kassza módosításához.")
+    if db_account.type in ['személyes', 'közös']:
+        raise HTTPException(status_code=403, detail="Személyes és közös kasszák nem módosíthatók.")
+    
+    db_account.name = account_data.name
+    db_account.goal_amount = account_data.goal_amount
+    db_account.goal_date = account_data.goal_date
+    db_account.show_on_dashboard = account_data.show_on_dashboard
+    
+    db_account.viewers = [viewer for viewer in db_account.viewers if viewer.id == db_account.owner_user_id]
+    if account_data.viewer_ids:
+        viewers = db.query(models.User).filter(models.User.id.in_(account_data.viewer_ids)).all()
+        for viewer in viewers:
+            if viewer not in db_account.viewers:
+                db_account.viewers.append(viewer)
+    db.commit()
+    db.refresh(db_account)
+    return db_account
+
+def delete_account(db: Session, account_id: int, user: models.User):
+    db_account = get_account_by_id_simple(db, account_id)
+    if not db_account: return None
+    if db_account.type in ['személyes', 'közös']:
+        raise HTTPException(status_code=403, detail="Személyes és közös kasszák nem törölhetők.")
+    if user.role not in ["Családfő", "Szülő"] and user.id != db_account.owner_user_id:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kassza törléséhez.")
+    if db_account.balance != 0:
+        raise HTTPException(status_code=400, detail="A kassza csak akkor törölhető, ha az egyenlege 0 Ft.")
+    db.delete(db_account)
+    db.commit()
+    return db_account
+
+def get_account_by_id_simple(db: Session, account_id: int):
+    return db.query(models.Account).filter(models.Account.id == account_id).first()
+
+def update_account_viewer(db: Session, account_id: int, viewer_id: int, owner: models.User, add: bool):
+    # Ellenőrizzük, hogy a kassza létezik-e és a kérést küldő felhasználó-e a tulajdonosa
+    db_account = db.query(models.Account).filter(models.Account.id == account_id, models.Account.owner_user_id == owner.id).first()
+    if not db_account:
+        raise HTTPException(status_code=404, detail="Saját kassza nem található, vagy nincs jogosultságod a módosításhoz.")
+
+    # Ellenőrizzük, hogy a megosztani kívánt felhasználó létezik-e
+    viewer_user = get_user(db, viewer_id)
+    if not viewer_user:
+        raise HTTPException(status_code=404, detail="A megosztani kívánt felhasználó nem található.")
+
+    if add:
+        # Hozzáadás: csak akkor adjuk hozzá, ha még nincs a listán
+        if viewer_user not in db_account.viewers:
+            db_account.viewers.append(viewer_user)
+            print(f"Adding {viewer_user.name} to viewers of account {db_account.name}")
+    else:
+        # Eltávolítás: csak akkor vesszük el, ha már a listán van
+        if viewer_user in db_account.viewers:
+            db_account.viewers.remove(viewer_user)
+            print(f"Removing {viewer_user.name} from viewers of account {db_account.name}")
+    
+    db.commit()
+    return db_account

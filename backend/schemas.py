@@ -111,12 +111,12 @@ class AccountBase(BaseModel):
     type: str
     goal_amount: Optional[Decimal] = None
     goal_date: Optional[date] = None
-
+    # Az 'is_family_wide' mezőt ELTÁVOLÍTJUK
 
 class AccountCreate(AccountBase):
-    # Létrehozáskor megadhatunk egy listát azokról a felhasználókról, akik láthatják
     viewer_ids: list[int] = []
-    
+    show_on_dashboard: bool = False # Hozzáadjuk az új mezőt
+
 class Account(AccountBase):
     id: int
     balance: Decimal
@@ -125,6 +125,6 @@ class Account(AccountBase):
     transactions: list[Transaction] = []
     # A válaszban is visszaküldhetjük, kik láthatják
     viewers: list[UserProfile] = []
-
+    owner_user: Optional[UserProfile] = None
     class Config:
         from_attributes = True

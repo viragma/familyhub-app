@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TransactionModal from '../components/TransactionModal';
-import TransferModal from '../components/TransferModal'; 
+import TransferModal from '../components/TransferModal';
 import AccountModal from '../components/AccountModal';
 
 function FinancesPage() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -44,20 +46,6 @@ function FinancesPage() {
       const accData = await accRes.json();
       const catData = await catRes.json();
       const transData = await transRes.json();
-
-      const getSortOrder = (account) => {
-        if (account.owner_user_id === user.id) return 0;
-        if (account.type === 'közös') return 1;
-        if (account.type === 'személyes') return 2;
-        return 3;
-      };
-
-      accData.sort((a, b) => {
-        const orderA = getSortOrder(a);
-        const orderB = getSortOrder(b);
-        if (orderA !== orderB) return orderA - orderB;
-        return a.name.localeCompare(b.name);
-      });
       
       setAccounts(accData);
       setCategories(catData);
@@ -70,15 +58,68 @@ function FinancesPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+  
+  const groupedAccounts = useMemo(() => {
+    if (!user || accounts.length === 0) return [];
+
+    const getSortOrder = (account) => {
+        if (account.owner_user_id === user.id) return 0;
+        if (account.type === 'közös') return 1;
+        if (account.type === 'személyes') return 2;
+        return 3;
+    };
+
+    const sortedAccounts = [...accounts].sort((a, b) => {
+        const orderA = getSortOrder(a);
+        const orderB = getSortOrder(b);
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name);
+    });
+
+    const groups = [];
+    if (user.role === 'Családfő' || user.role === 'Szülő') {
+        const myAccounts = sortedAccounts.filter(acc => acc.owner_user_id === user.id);
+        const commonAccounts = sortedAccounts.filter(acc => acc.type === 'közös');
+        const goalAndEmergency = sortedAccounts.filter(acc => ['cél', 'vész'].includes(acc.type));
+        const childrenAccounts = sortedAccounts.filter(acc => acc.owner_user_id && acc.owner_user_id !== user.id);
+
+        if(myAccounts.length > 0) groups.push({ title: 'Saját Kasszáim', accounts: myAccounts });
+        if(commonAccounts.length > 0) groups.push({ title: 'Közös Kasszák', accounts: commonAccounts });
+        if(goalAndEmergency.length > 0) groups.push({ title: 'Cél- és Vészkasszák', accounts: goalAndEmergency });
+        
+        const childrenGrouped = childrenAccounts.reduce((acc, current) => {
+            const ownerName = current.owner_user?.display_name || 'Ismeretlen';
+            if(!acc[ownerName]) acc[ownerName] = [];
+            acc[ownerName].push(current);
+            return acc;
+        }, {});
+
+        for(const childName in childrenGrouped){
+            groups.push({ title: `${childName} Kasszái`, accounts: childrenGrouped[childName] });
+        }
+    } else {
+        const myOwnedAccounts = sortedAccounts.filter(acc => acc.owner_user_id === user.id);
+        const sharedWithMe = sortedAccounts.filter(acc => acc.owner_user_id !== user.id);
+
+        if(myOwnedAccounts.length > 0) groups.push({ title: 'Saját Kasszáim', accounts: myOwnedAccounts });
+        if(sharedWithMe.length > 0) groups.push({ title: 'Velem Megosztott Kasszák', accounts: sharedWithMe });
+    }
+    return groups;
+  }, [accounts, user]);
+
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prevFilters => ({...prevFilters, [filterName]: value}));
   };
 
   const handleAccountCardClick = (accountId) => {
-    handleFilterChange('accountId', filters.accountId === accountId ? 'all' : accountId);
+    if (filters.accountId === accountId) {
+      navigate(`/finances/account/${accountId}`);
+    } else {
+      handleFilterChange('accountId', accountId);
+    }
   };
-  
+
   const openModalForNew = (type, accountId, accountName) => {
     setEditingTransaction(null);
     setModalConfig({ type, accountId, accountName });
@@ -97,7 +138,6 @@ function FinancesPage() {
     const endpoint = editingTransaction 
       ? `${apiUrl}/api/transactions/${editingTransaction.id}`
       : `${apiUrl}/api/accounts/${modalConfig.accountId}/transactions`;
-
     try {
       const response = await fetch(endpoint, {
         method,
@@ -150,8 +190,7 @@ function FinancesPage() {
       console.error("Hiba az átutaláskor:", error);
     }
   };
-
-    // Új függvény a transzfer ablak megnyitásához
+  
   const openTransferModal = (fromAccount) => {
     setTransferFromAccount(fromAccount);
     setIsTransferModalOpen(true);
@@ -159,7 +198,6 @@ function FinancesPage() {
 
   const handleSaveAccount = async (accountData) => {
     try {
-      // Az 'accountData' most már tartalmazza a 'viewer_ids' listát is
       const response = await fetch(`${apiUrl}/api/accounts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -176,54 +214,73 @@ function FinancesPage() {
     }
   };
 
-
-
   return (
     <div>
       <div className="page-header">
         <h1>Pénzügyek</h1>
         <div>
-             {user && user.role === 'Családfő' && (
-            <button className="btn btn-primary" onClick={() => setIsAccountModalOpen(true)}>+ Új Kassza</button>
-          )}
+          <button className="btn btn-secondary" onClick={() => setIsTransferModalOpen(true)} style={{marginRight: '1rem'}}>Átutalás</button>
+          <button className="btn btn-primary" onClick={() => setIsAccountModalOpen(true)}>+ Új Kassza</button>
         </div>
       </div>
       
-    <div className="accounts-grid">
-        {accounts.map(account => {
-          // Meghatározzuk, hogy az adott felhasználó utalhat-e ebből a kasszából
-          const canTransferFrom = user && (user.role === 'Családfő' || user.role === 'Szülő' || user.id === account.owner_user_id);
+      {groupedAccounts.map(group => (
+        <div key={group.title}>
+            <h2 className="account-group-header">{group.title}</h2>
+            <div className="accounts-grid">
+                {group.accounts.map(account => {
+                    const isGoal = account.type === 'cél';
+                    const progress = isGoal && account.goal_amount > 0 
+                        ? (parseFloat(account.balance) / parseFloat(account.goal_amount)) * 100 
+                        : 0;
+                    const canTransferFrom = user && (user.role === 'Családfő' || user.role === 'Szülő' || user.id === account.owner_user_id);
 
-          return (
-              <div 
-            className={`account-card ${filters.accountId === account.id ? 'active' : ''} ${account.type === 'cél' ? 'goal-type' : ''}`} 
-            key={account.id}
-              onClick={() => handleAccountCardClick(account.id)}
-              style={{cursor: 'pointer'}}
-            >
-              <div className="account-card-header">
-                <span className="account-card-name">{account.name}</span>
-                <span className="account-card-type">{account.type}</span>
-              </div>
-              <div className="account-card-balance">{parseFloat(account.balance).toLocaleString('hu-HU')} Ft</div>
-              
-              <div className="account-card-actions">
-                {/* A Bevétel/Kiadás gombok csak nem-közös kasszákon jelennek meg */}
-                {account.type !== 'közös' && (
-                  <>
-                    <button className="btn btn-primary" style={{flex: 1}} onClick={(e) => { e.stopPropagation(); openModalForNew('bevétel', account.id, account.name); }}>+ Bevétel</button>
-                    <button className="btn btn-secondary" style={{flex: 1}} onClick={(e) => { e.stopPropagation(); openModalForNew('kiadás', account.id, account.name); }}>- Kiadás</button>
-                  </>
-                )}
-                {/* Az Átutalás gomb is csak a megfelelő kasszákon jelenik meg */}
-                {account.type !== 'közös' && canTransferFrom && (
-                  <button className="btn btn-secondary" style={{flex: 1}} onClick={(e) => { e.stopPropagation(); openTransferModal(account); }}>Átutalás</button>
-                )}
-              </div>
+                    return (
+                        <div 
+                            className={`account-card ${filters.accountId === account.id ? 'active' : ''} ${isGoal ? 'goal-type' : ''}`} 
+                            key={account.id}
+                            onClick={() => handleAccountCardClick(account.id)}
+                            style={{cursor: 'pointer'}}
+                        >
+                            <div className="account-card-header">
+                                <span className="account-card-name">{account.name}</span>
+                                <span className="account-card-type">{account.type}</span>
+                            </div>
+                            <div className="account-card-balance">{parseFloat(account.balance).toLocaleString('hu-HU')} Ft</div>
+                            
+                            {isGoal && account.goal_amount && (
+                                <>
+                                    <div className="progress-bar-large">
+                                        <div className="progress-fill" style={{ width: `${Math.min(progress, 100)}%` }}></div>
+                                    </div>
+                                    <div className="summary-goal-details">
+                                        <span>Cél: {parseFloat(account.goal_amount).toLocaleString('hu-HU')} Ft</span>
+                                        <span>{progress.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="summary-goal-details" style={{fontSize: '0.75rem'}}>
+                                        <span>Létrehozta: {account.owner_user?.display_name || 'Ismeretlen'}</span>
+                                    </div>
+                                </>
+                            )}
+                            
+                            <div className="account-card-actions">
+                                {account.type !== 'közös' && account.type !== 'cél' && (
+                                    <>
+                                        <button className="btn btn-primary" style={{flex: 1}} onClick={(e) => { e.stopPropagation(); openModalForNew('bevétel', account.id, account.name); }}>+ Bevétel</button>
+                                        <button className="btn btn-secondary" style={{flex: 1}} onClick={(e) => { e.stopPropagation(); openModalForNew('kiadás', account.id, account.name); }}>- Kiadás</button>
+                                    </>
+                                )}
+                                {account.type !== 'közös' && canTransferFrom && (
+                                    <button className="btn btn-secondary" style={{flex: 1}} onClick={(e) => { e.stopPropagation(); openTransferModal(account); }}>Átutalás</button>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })}
             </div>
-          )
-        })}
-      </div>
+        </div>
+      ))}
+      
       <div className="transactions-section">
         <h2>Tranzakciók</h2>
         <div className="filters">
@@ -286,8 +343,7 @@ function FinancesPage() {
         </div>
       </div>
 
-
-  <AccountModal
+      <AccountModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
         onSave={handleSaveAccount}
@@ -301,13 +357,11 @@ function FinancesPage() {
         categories={categories}
         transactionData={editingTransaction}
       />
-      
-       <TransferModal
+      <TransferModal
         isOpen={isTransferModalOpen}
         onClose={() => setIsTransferModalOpen(false)}
         onSave={handleSaveTransfer}
         fromAccount={transferFromAccount}
-
       />
     </div>
   );

@@ -1141,3 +1141,234 @@ body {
   text-align: center;
   color: var(--text-secondary);
 }
+
+.token-input-container {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  cursor: text;
+}
+.token-input-container:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+.tokens-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.token {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent-gradient);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.token-remove-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.token-remove-btn:hover {
+  opacity: 1;
+}
+
+.token-input {
+  border: none;
+  background: none;
+  outline: none;
+  width: 100%;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.suggestions-list {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+.suggestion-item:hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+
+
+
+
+
+.progress-bar-large {
+  height: 20px;
+  background: var(--bg-primary);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.progress-bar-large .progress-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: 20px;
+  transition: width 0.5s ease;
+}
+.account-detail-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr; /* Bal oldali oszlop | Jobb oldali oszlop */
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.account-summary-card {
+  position: sticky; /* Az összegző kártya görgetéskor a helyén marad */
+  top: 6rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.summary-balance {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-goal-details {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.summary-actions {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Mobilos tördelés */
+@media (max-width: 960px) {
+  .account-detail-layout {
+    grid-template-columns: 1fr; /* Egyetlen oszlop mobilon */
+  }
+  .account-summary-card {
+    position: static; /* Mobilon nem ragadós */
+  }
+}
+.progress-bar-large {
+  height: 20px;
+  background: var(--bg-primary);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-top: 1rem;
+}
+
+.progress-bar-large .progress-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: 20px;
+  transition: width 0.5s ease;
+}
+
+.summary-goal-details {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+/* Egy kis extra tér a gomboknak a célkártyákon */
+.account-card.goal-type .account-card-actions {
+    margin-top: 1rem;
+}
+
+.account-group-header {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+
+.sharing-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.sharing-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+/* Egyszerű Toggle Switch stílus */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 24px;
+}
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 24px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: var(--accent-primary);
+}
+input:checked + .slider:before {
+  transform: translateX(16px);
+}

@@ -8,7 +8,7 @@ from .crud import (
     delete_user as crud_delete_user, get_users_by_family,
     create_family_account, get_accounts_by_family, create_account_transaction,
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
-    create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category
+    create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category,update_account, delete_account,get_account
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -243,7 +243,59 @@ def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = 
 def create_new_account(
     account: AccountCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user) # A létrehozó felhasználó
+    current_user: UserModel = Depends(get_current_user)
 ):
     """ Létrehoz egy új kasszát, és beállítja a láthatóságát. """
+    # Biztonsági ellenőrzés: csak szülők állíthatják be a dashboard megjelenést
+    if account.show_on_dashboard and current_user.role not in ['Családfő', 'Szülő']:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kasszát a dashboardon megjeleníteni.")
+        
     return create_family_account(db=db, account=account, family_id=current_user.family_id, owner_user=current_user)
+
+
+@app.get("/api/accounts/{account_id}", response_model=Account)
+def read_account_details(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """ Visszaadja egyetlen kassza részletes adatait, jogosultsággal ellenőrizve. """
+    db_account = get_account(db=db, account_id=account_id, user=current_user)
+    if db_account is None:
+        raise HTTPException(status_code=404, detail="Kassza nem található.")
+    return db_account
+
+@app.post("/api/accounts", response_model=Account)
+def create_new_account(
+    account: AccountCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """ Létrehoz egy új kasszát, és beállítja a láthatóságát. """
+    # JAVÍTÁS: Szerver-oldali dátum validáció
+    if account.type == 'cél' and account.goal_date and account.goal_date < date.today():
+        raise HTTPException(status_code=400, detail="A cél dátuma nem lehet a múltban.")
+
+    if account.show_on_dashboard and current_user.role not in ['Családfő', 'Szülő']:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kasszát a dashboardon megjeleníteni.")
+        
+    return create_family_account(db=db, account=account, family_id=current_user.family_id, owner_user=current_user)
+
+@app.delete("/api/accounts/{account_id}", response_model=Account)
+def remove_account(
+    account_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: UserModel = Depends(get_current_user) # JAVÍTÁS: Átállás admin-ról sima user-re
+):
+    """ Töröl egy kasszát a tulajdonos vagy egy szülő. """
+    return delete_account(db=db, account_id=account_id, user=current_user)
+@app.post("/api/accounts/{account_id}/share", response_model=Account)
+def toggle_account_sharing(
+    account_id: int, 
+    viewer_id: int,
+    share: bool, # true = megosztás, false = megosztás visszavonása
+    db: Session = Depends(get_db), 
+    current_user: UserModel = Depends(get_current_user)
+):
+    """ Módosítja egy kassza láthatóságát egy másik felhasználó számára (csak a tulajdonos). """
+    return update_account_viewer(db=db, account_id=account_id, viewer_id=viewer_id, owner=current_user, add=share)

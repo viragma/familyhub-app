@@ -15,6 +15,7 @@ import UserManagementPage from './pages/UserManagementPage.jsx';
 import FinancesPage from './pages/FinancesPage.jsx';
 import ParentRoute from './components/ParentRoute.jsx'
 import CategoryManagementPage from './pages/CategoryManagementPage.jsx';
+import AccountDetailPage from './pages/AccountDetailPage.jsx';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
             ]
           },
            { path: "finances", element: <FinancesPage /> },
+           { path: "finances/account/:accountId", element: <AccountDetailPage /> },
             {
             element: <ParentRoute />,
             children: [ { path: "finances", element: <FinancesPage /> } ]
