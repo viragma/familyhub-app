@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import UserManagementPage from './pages/UserManagementPage.jsx';
 import FinancesPage from './pages/FinancesPage.jsx';
 import ParentRoute from './components/ParentRoute.jsx'
+import CategoryManagementPage from './pages/CategoryManagementPage.jsx';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
             element: <AdminRoute />, // Ez a komponens csak az alatta lévőket védi
             children: [
               { path: "manage-family", element: <UserManagementPage /> },
+              { path: "manage-categories", element: <CategoryManagementPage /> },
             ]
           },
            { path: "finances", element: <FinancesPage /> },

@@ -21,11 +21,10 @@ function App() {
     <div>
       <Nav theme={theme} toggleTheme={toggleTheme} />
       <div className="container">
-        {/* Az Outlet komponens helyére tölti be a router az aktuális oldalt
-            (pl. a DashboardPage-t vagy a TasksPage-t) */}
         <Outlet /> 
       </div>
-      <MobileNav />
+      {/* JAVÍTÁS: Átadjuk a 'theme' és 'toggleTheme' prop-okat */}
+      <MobileNav theme={theme} toggleTheme={toggleTheme} />
     </div>
   );
 }

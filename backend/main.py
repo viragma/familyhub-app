@@ -8,9 +8,10 @@ from .crud import (
     delete_user as crud_delete_user, get_users_by_family,
     create_family_account, get_accounts_by_family, create_account_transaction,
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
-    create_transfer,get_all_personal_accounts,get_financial_summary
+    create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
+from . import models
 from .schemas import (
     Task as TaskSchema, TaskCreate,
     Family, FamilyCreate,
@@ -61,10 +62,19 @@ def add_family(family: FamilyCreate, db: Session = Depends(get_db)):
 
 @app.post("/api/users/setup-admin", response_model=User)
 def setup_admin_user(user: UserCreate, db: Session = Depends(get_db)):
+    # Ellenőrizzük, hogy létezik-e a család
+    existing_family = db.query(models.Family).filter(models.Family.id == user.family_id).first()
+    if not existing_family:
+        raise HTTPException(status_code=400, detail="Family not found")
+    
+    # Létrehozzuk az admin felhasználót
     new_user = create_user(db=db, user=user)
+    
     if new_user:
+        # Létrehozzuk a "Közös Kasszát"
         account_schema = AccountCreate(name="Közös Kassza", type="közös")
-        create_family_account(db=db, account=account_schema, family_id=new_user.family_id)
+        create_family_account(db=db, account=account_schema, family_id=new_user.family_id, owner_user=new_user)
+        
     return new_user
 
 @app.post("/api/login")
@@ -139,6 +149,25 @@ def read_categories(db: Session = Depends(get_db)):
 def add_category(category: CategoryCreate, db: Session = Depends(get_db), admin: UserModel = Depends(get_current_admin_user)):
     return create_category(db=db, category=category)
 
+@app.put("/api/categories/{category_id}", response_model=CategorySchema)
+def update_category_details(
+    category_id: int,
+    category_data: CategoryCreate,
+    db: Session = Depends(get_db),
+    admin: UserModel = Depends(get_current_admin_user)
+):
+    """ Módosít egy kategóriát (csak Családfő). """
+    return update_category(db=db, category_id=category_id, category_data=category_data)
+
+@app.delete("/api/categories/{category_id}", response_model=CategorySchema)
+def remove_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    admin: UserModel = Depends(get_current_admin_user)
+):
+    """ Töröl egy kategóriát (csak Családfő). """
+    return delete_category(db=db, category_id=category_id)
+
 @app.get("/api/transactions", response_model=list[Transaction])
 def read_transactions(
     account_id: int | None = None,
@@ -210,3 +239,11 @@ def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = 
          "family": [ { "id": 1, "name": 'Apa', "initial": 'A', "online": True, "color": '...' } ],
          "shopping_list": { "items": ['Tej (2 liter)','Kenyér'], "estimated_cost": 8500 }
     }
+@app.post("/api/accounts", response_model=Account)
+def create_new_account(
+    account: AccountCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user) # A létrehozó felhasználó
+):
+    """ Létrehoz egy új kasszát, és beállítja a láthatóságát. """
+    return create_family_account(db=db, account=account, family_id=current_user.family_id, owner_user=current_user)

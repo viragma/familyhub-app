@@ -5,6 +5,19 @@ import uuid
 from sqlalchemy.sql import func
 from .database import Base
 
+from sqlalchemy import Boolean, Column, Integer, String, Date, ForeignKey, Numeric, DateTime, Table
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from .database import Base
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
+account_visibility_association = Table('account_visibility', Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
+    Column('account_id', Integer, ForeignKey('accounts.id'), primary_key=True)
+)
+
+
 class Family(Base):
     __tablename__ = "families"
     id = Column(Integer, primary_key=True, index=True)
@@ -17,9 +30,11 @@ class Category(Base):
     __tablename__ = "categories"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    
-    # A hierarchia kulcsa: egy kategóriának lehet szülője ugyanabból a táblából
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    
+    # === ÚJ OSZLOPOK ===
+    color = Column(String, nullable=True) # Pl. egy hexadecimális színkód, mint #FF5733
+    icon = Column(String, nullable=True)  # Pl. egy emoji (🚗) vagy egy ikon neve (car)
     
     transactions = relationship("Transaction", back_populates="category")
 
@@ -38,6 +53,7 @@ class User(Base):
 
     family_id = Column(Integer, ForeignKey("families.id"))
     family = relationship("Family", back_populates="members")
+    visible_accounts = relationship("Account", secondary=account_visibility_association, back_populates="viewers")
     
     tasks = relationship("Task", back_populates="owner")
     personal_account = relationship("Account", uselist=False, back_populates="owner_user")
@@ -60,17 +76,22 @@ class Account(Base):
     __tablename__ = "accounts"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    type = Column(String) # 'közös', 'személyes', 'cél', 'vész'
+    type = Column(String)
     balance = Column(Numeric(10, 2), default=0.00)
-    
+    goal_amount = Column(Numeric(10, 2), nullable=True)
+    goal_date = Column(Date, nullable=True) # <-- ÚJ OSZLOP
+
     family_id = Column(Integer, ForeignKey("families.id"))
     family = relationship("Family", back_populates="accounts")
 
-    # A 'személyes' kassza egy konkrét userhez tartozik
     owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     owner_user = relationship("User", back_populates="personal_account")
     
     transactions = relationship("Transaction", back_populates="account")
+    
+    # ÚJ KAPCSOLAT: Mely felhasználók láthatják ezt a kasszát
+    viewers = relationship("User", secondary=account_visibility_association, back_populates="visible_accounts")
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -85,10 +106,9 @@ class Transaction(Base):
     creator = relationship("User", back_populates="transactions")
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     category = relationship("Category", back_populates="transactions")
-      # === ÚJ OSZLOP ===
-    # Ez az azonosító fogja összekötni az átutalás két tranzakcióját.
     transfer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-
+    is_family_expense = Column(Boolean, default=False)
+    
 class Debt(Base):
     __tablename__ = "debts"
     id = Column(Integer, primary_key=True, index=True)

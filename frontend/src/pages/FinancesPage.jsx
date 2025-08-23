@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import TransactionModal from '../components/TransactionModal';
-import TransferModal from '../components/TransferModal'; // <- EZ A SOR HIÁNYZOTT
+import TransferModal from '../components/TransferModal'; 
+import AccountModal from '../components/AccountModal';
 
 function FinancesPage() {
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
-  
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [transferFromAccount, setTransferFromAccount] = useState(null);
@@ -155,10 +156,37 @@ function FinancesPage() {
     setTransferFromAccount(fromAccount);
     setIsTransferModalOpen(true);
   };
+
+  const handleSaveAccount = async (accountData) => {
+    try {
+      // Az 'accountData' most már tartalmazza a 'viewer_ids' listát is
+      const response = await fetch(`${apiUrl}/api/accounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(accountData),
+      });
+      if (response.ok) {
+        setIsAccountModalOpen(false);
+        fetchData();
+      } else {
+        alert('Hiba a kassza létrehozásakor!');
+      }
+    } catch (error) {
+      console.error("Hiba a kassza mentésekor:", error);
+    }
+  };
+
+
+
   return (
     <div>
       <div className="page-header">
         <h1>Pénzügyek</h1>
+        <div>
+             {user && user.role === 'Családfő' && (
+            <button className="btn btn-primary" onClick={() => setIsAccountModalOpen(true)}>+ Új Kassza</button>
+          )}
+        </div>
       </div>
       
     <div className="accounts-grid">
@@ -167,9 +195,9 @@ function FinancesPage() {
           const canTransferFrom = user && (user.role === 'Családfő' || user.role === 'Szülő' || user.id === account.owner_user_id);
 
           return (
-            <div 
-              className={`account-card ${filters.accountId === account.id ? 'active' : ''}`} 
-              key={account.id}
+              <div 
+            className={`account-card ${filters.accountId === account.id ? 'active' : ''} ${account.type === 'cél' ? 'goal-type' : ''}`} 
+            key={account.id}
               onClick={() => handleAccountCardClick(account.id)}
               style={{cursor: 'pointer'}}
             >
@@ -258,6 +286,12 @@ function FinancesPage() {
         </div>
       </div>
 
+
+  <AccountModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        onSave={handleSaveAccount}
+      />
       <TransactionModal 
         isOpen={isTransactionModalOpen}
         onClose={() => setIsTransactionModalOpen(false)}

@@ -6,16 +6,19 @@ from typing import List, Optional
 from typing import Optional
 import uuid
 
+
 class CategoryBase(BaseModel):
     name: str
     parent_id: Optional[int] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
 
 class CategoryCreate(CategoryBase):
     pass
 
 class Category(CategoryBase):
     id: int
-    children: List['Category'] = [] # Hierarchia megjelenítéséhez
+    children: List['Category'] = []
 
     class Config:
         from_attributes = True
@@ -72,7 +75,7 @@ class FamilyCreate(FamilyBase):
 class Family(FamilyBase):
     id: int
     members: list[User] = []
-class Config:
+    class Config:
         from_attributes = True
 
 class TransactionBase(BaseModel):
@@ -102,20 +105,26 @@ class TransferCreate(BaseModel):
     to_account_id: int
     amount: Decimal
     description: str
-    
+
 class AccountBase(BaseModel):
     name: str
     type: str
+    goal_amount: Optional[Decimal] = None
+    goal_date: Optional[date] = None
+
 
 class AccountCreate(AccountBase):
-    pass
-
+    # Létrehozáskor megadhatunk egy listát azokról a felhasználókról, akik láthatják
+    viewer_ids: list[int] = []
+    
 class Account(AccountBase):
     id: int
-    balance: float
+    balance: Decimal
     family_id: int
     owner_user_id: int | None = None
     transactions: list[Transaction] = []
+    # A válaszban is visszaküldhetjük, kik láthatják
+    viewers: list[UserProfile] = []
 
     class Config:
         from_attributes = True

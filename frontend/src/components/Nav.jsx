@@ -19,12 +19,14 @@ function Nav({ theme, toggleTheme }) {
           {user && ['Szülő', 'Családfő','Gyerek','Tizenéves'].includes(user.role) && (
     <NavLink to="/finances" className="nav-item">Pénzügyek</NavLink>
 )}
+  {user && user.role === 'Családfő' && (
+            <>
+              <NavLink to="/manage-family" className="nav-item">Család Kezelése</NavLink>
+              <NavLink to="/manage-categories" className="nav-item">Kategóriák</NavLink>
+            </>
+          )}
           <NavLink to="/tasks" className="nav-item">Feladatok</NavLink>
           
-          {/* Ez a sor most már működni fog, mert a 'user' változó létezik */}
-          {user && user.role === 'Családfő' && (
-            <NavLink to="/manage-family" className="nav-item">Család Kezelése</NavLink>
-          )}
 
           {user && <button onClick={logout} className="nav-item" style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)'}}>Kijelentkezés</button>}
           

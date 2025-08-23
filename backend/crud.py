@@ -1,4 +1,6 @@
 from datetime import datetime
+from decimal import Decimal
+from sqlalchemy import func, extract
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from . import models, schemas
@@ -39,15 +41,18 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    # Létrehozzuk a személyes kasszáját is
     personal_account_schema = schemas.AccountCreate(
         name=f"{db_user.display_name} kasszája",
         type="személyes"
     )
+    # JAVÍTÁS: Itt már a teljes 'user' objektumot adjuk át, nem csak az ID-t
     create_family_account(
         db=db, 
         account=personal_account_schema, 
         family_id=db_user.family_id,
-        owner_user_id=db_user.id # Hozzárendeljük az új userhez
+        owner_user=db_user
     )
     
     return db_user
@@ -128,48 +133,36 @@ def get_account(db: Session, account_id: int):
     return db.query(models.Account).filter(models.Account.id == account_id).first()
 
 def get_accounts_by_family(db: Session, user: models.User):
-    family_id = user.family_id
-    
-    # Először lekérjük a család összes kasszáját
-    all_accounts = db.query(models.Account).filter(models.Account.family_id == family_id).all()
-    
-    # === ÚJ LOGIKA A KÖZÖS KASSZA KISZÁMÍTÁSÁHOZ ===
-    # Keressük meg a szülőket és a közös kasszát
-    parent_accounts = [acc for acc in all_accounts if acc.owner_user and acc.owner_user.role in ['Családfő', 'Szülő'] and acc.type == 'személyes']
-    common_account = next((acc for acc in all_accounts if acc.type == 'közös'), None)
-    
-    # Ha van közös kassza, felülírjuk az egyenlegét a szülők személyes kasszáinak összegével
-    if common_account:
-        common_account.balance = sum(acc.balance for acc in parent_accounts)
-
-    # A jogosultsági szűrés a már módosított adatokon történik
-    if user.role == "Családfő":
-        return all_accounts
-    
-    if user.role == "Szülő":
-        children_ids = [member.id for member in user.family.members if member.role in ["Gyerek", "Tizenéves"]]
-        
-        return [
-            acc for acc in all_accounts if 
-            acc.type != 'személyes' or 
-            acc.owner_user_id == user.id or 
-            acc.owner_user_id in children_ids
-        ]
-
-    if user.role in ["Tizenéves", "Gyerek"]:
-        return [acc for acc in all_accounts if acc.owner_user_id == user.id]
-    
-    return []
+    # JAVÍTÁS: A logika most már helyesen kezeli a közös kasszákat is
+    if user.role in ["Családfő", "Szülő"]:
+        # A szülők látják az összes nem-személyes kasszát ÉS azokat a személyes kasszákat,
+        # amikhez expliciten hozzá lettek rendelve (a sajátjukat és a gyerekekét).
+        common_accounts = db.query(models.Account).filter(models.Account.family_id == user.family_id, models.Account.type != 'személyes').all()
+        visible_personal_accounts = [acc for acc in user.visible_accounts if acc.type == 'személyes']
+        return common_accounts + visible_personal_accounts
+    else:
+        # A gyerekek továbbra is csak azokat látják, amikhez joguk van (jellemzően a sajátjukat)
+        return user.visible_accounts
 
 
 
-
-def create_family_account(db: Session, account: schemas.AccountCreate, family_id: int, owner_user_id: int | None = None):
+def create_family_account(db: Session, account: schemas.AccountCreate, family_id: int, owner_user: models.User):
     db_account = models.Account(
-        **account.model_dump(), 
-        family_id=family_id,
-        owner_user_id=owner_user_id
+        name=account.name, type=account.type, goal_amount=account.goal_amount,
+        goal_date=account.goal_date, family_id=family_id,
+        owner_user_id=owner_user.id if account.type == 'személyes' else None
     )
+    
+    # Hozzáadjuk a létrehozót, mint alapértelmezett "látót"
+    db_account.viewers.append(owner_user)
+    
+    # Ha a frontend küldött extra "látókat", azokat is hozzáadjuk
+    if account.viewer_ids:
+        viewers = db.query(models.User).filter(models.User.id.in_(account.viewer_ids)).all()
+        for viewer in viewers:
+            if viewer not in db_account.viewers:
+                db_account.viewers.append(viewer)
+
     db.add(db_account)
     db.commit()
     db.refresh(db_account)
@@ -216,8 +209,32 @@ def get_category(db: Session, category_id: int):
     return db.query(models.Category).filter(models.Category.id == category_id).first()
 
 def get_categories(db: Session):
-    # Lekérdezzük az összes kategóriát és a szülő-gyerek kapcsolatokat is betöltjük
-    return db.query(models.Category).filter(models.Category.parent_id == None).all()
+    """
+    Lekérdezi az összes kategóriát, és egy fába rendezi őket
+    a szülő-gyerek kapcsolatok alapján.
+    """
+    # 1. Lekérdezzük az ÖSSZES kategóriát egyszerre
+    all_categories = db.query(models.Category).all()
+    
+    # 2. Létrehozunk egy szótárat, hogy könnyen megtaláljuk őket ID alapján
+    category_map = {category.id: category for category in all_categories}
+
+    # 3. Összeállítjuk a fát
+    tree = []
+    for category in all_categories:
+        if category.parent_id:
+            # Ha van szülője, hozzáadjuk a szülő 'children' listájához
+            parent = category_map.get(category.parent_id)
+            if parent:
+                # Biztosítjuk, hogy a children lista létezzen
+                if not hasattr(parent, 'children'):
+                    parent.children = []
+                parent.children.append(category)
+        else:
+            # Ha nincs szülője, akkor a fa gyökereleme
+            tree.append(category)
+            
+    return tree
 
 def create_category(db: Session, category: schemas.CategoryCreate):
     db_category = models.Category(name=category.name, parent_id=category.parent_id)
@@ -344,10 +361,13 @@ def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: mo
 
     transfer_id = uuid.uuid4()
     
+    is_pocket_money = False
+    from_owner = from_account.owner_user
+    to_owner = to_account.owner_user
+    if from_owner and to_owner:
+        if from_owner.role in ["Családfő", "Szülő"] and to_owner.role in ["Gyerek", "Tizenéves"]:
+            is_pocket_money = True
     try:
-        # JAVÍTÁS: Kifejezetten, mezőnként hozzuk létre a tranzakciókat
-        # a **...dump() helyett.
-
         # Kiadás tranzakció
         db_expense = models.Transaction(
             description=f"Átutalás -> {to_account.name}: {transfer_data.description}",
@@ -355,7 +375,8 @@ def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: mo
             type='kiadás',
             account_id=from_account.id,
             creator=user,
-            transfer_id=transfer_id
+            transfer_id=transfer_id,
+            is_family_expense=is_pocket_money # Itt állítjuk be a zászlót
         )
         from_account.balance -= transfer_data.amount
 
@@ -367,6 +388,7 @@ def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: mo
             account_id=to_account.id,
             creator=user,
             transfer_id=transfer_id
+            # A bevételi oldal sosem családi kiadás
         )
         to_account.balance += transfer_data.amount
         
@@ -377,6 +399,8 @@ def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: mo
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Adatbázis hiba történt: {e}")
+
+
 
 def get_all_personal_accounts(db: Session, family_id: int):
     """ Visszaadja egy család összes 'személyes' típusú kasszáját. """
@@ -389,6 +413,8 @@ def get_financial_summary(db: Session, user: models.User):
     family_id = user.family_id
     current_month = datetime.now().month
     current_year = datetime.now().year
+    visible_accounts = get_accounts_by_family(db, user=user)
+    visible_account_ids = [acc.id for acc in visible_accounts]
 
     # --- Logika Szülőknek és Családfőnek ---
     if user.role in ["Családfő", "Szülő"]:
@@ -408,8 +434,22 @@ def get_financial_summary(db: Session, user: models.User):
 
         # A statisztika a család összes tranzakciójára vonatkozik
         all_account_ids = [acc.id for acc in all_family_accounts]
-        monthly_income = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.account_id.in_(all_account_ids), models.Transaction.type == 'bevétel', extract('year', models.Transaction.date) == current_year, extract('month', models.Transaction.date) == current_month).scalar() or 0.0
-        monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.account_id.in_(all_account_ids), models.Transaction.type == 'kiadás', extract('year', models.Transaction.date) == current_year, extract('month', models.Transaction.date) == current_month).scalar() or 0.0
+        monthly_income = db.query(func.sum(models.Transaction.amount)).\
+        filter(
+            models.Transaction.account_id.in_(visible_account_ids),
+            models.Transaction.type == 'bevétel',
+            models.Transaction.transfer_id == None,
+            # ... (dátum szűrők)
+        ).scalar() or Decimal(0)
+        monthly_expense = db.query(func.sum(models.Transaction.amount)).\
+        filter(
+            models.Transaction.account_id.in_(visible_account_ids),
+            models.Transaction.type == 'kiadás',
+            # JAVÍTÁS: VAGY sima kiadás, VAGY családi kiadásnak jelölt transzfer
+            ( (models.Transaction.transfer_id == None) | (models.Transaction.is_family_expense == True) ),
+            extract('year', models.Transaction.date) == current_year,
+            extract('month', models.Transaction.date) == current_month
+        ).scalar() or Decimal(0)
 
         return {
             "view_type": "parent",
@@ -429,8 +469,8 @@ def get_financial_summary(db: Session, user: models.User):
             return {"view_type": "child", "total_balance": 0, "monthly_income": 0, "monthly_expense": 0, "monthly_savings": 0}
 
         # A statisztika csak a saját tranzakcióikra vonatkozik
-        monthly_income = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.account_id == personal_account.id, models.Transaction.type == 'bevétel', extract('year', models.Transaction.date) == current_year, extract('month', models.Transaction.date) == current_month).scalar() or 0.0
-        monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.account_id == personal_account.id, models.Transaction.type == 'kiadás', extract('year', models.Transaction.date) == current_year, extract('month', models.Transaction.date) == current_month).scalar() or 0.0
+        monthly_income = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.account_id == personal_account.id, models.Transaction.type == 'bevétel', extract('year', models.Transaction.date) == current_year, extract('month', models.Transaction.date) == current_month).scalar() or Decimal(0)
+        monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.account_id == personal_account.id, models.Transaction.type == 'kiadás', extract('year', models.Transaction.date) == current_year, extract('month', models.Transaction.date) == current_month).scalar() or Decimal(0)
 
         return {
             "view_type": "child",
@@ -443,3 +483,21 @@ def get_financial_summary(db: Session, user: models.User):
         }
 
     return {}
+def update_category(db: Session, category_id: int, category_data: schemas.CategoryCreate):
+    db_category = get_category(db, category_id)
+    if db_category:
+        db_category.name = category_data.name
+        db_category.color = category_data.color
+        db_category.icon = category_data.icon
+        db.commit()
+        db.refresh(db_category)
+    return db_category
+
+def delete_category(db: Session, category_id: int):
+    db_category = get_category(db, category_id)
+    if db_category:
+        # Itt később lehetne logikát hozzáadni, mi történjen a tranzakciókkal,
+        # amik ehhez a kategóriához tartoztak (pl. null-ra állítani a category_id-t)
+        db.delete(db_category)
+        db.commit()
+    return db_category
