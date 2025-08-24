@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TransactionModal from '../components/TransactionModal';
-import TransferModal from '../components/TransferModal';
+import TransferModal from '../components/TransferModal'; 
 import AccountModal from '../components/AccountModal';
 
 function FinancesPage() {
@@ -214,6 +214,28 @@ function FinancesPage() {
     }
   };
 
+  const handleSaveRecurringRule = async (ruleData) => {
+    const fullRuleData = {
+      ...ruleData,
+      to_account_id: modalConfig.accountId,
+    };
+    try {
+      const response = await fetch(`${apiUrl}/api/recurring-rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(fullRuleData),
+      });
+      if (response.ok) {
+        setIsTransactionModalOpen(false);
+        alert('Ismétlődő szabály sikeresen elmentve!');
+      } else {
+        alert('Hiba a szabály mentése során!');
+      }
+    } catch (error) {
+      console.error("Hiba az ismétlődő szabály mentésekor:", error);
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -352,6 +374,7 @@ function FinancesPage() {
         isOpen={isTransactionModalOpen}
         onClose={() => setIsTransactionModalOpen(false)}
         onSave={handleSaveTransaction}
+        onSaveRecurring={handleSaveRecurringRule}
         transactionType={modalConfig.type}
         accountName={modalConfig.accountName}
         categories={categories}

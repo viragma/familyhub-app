@@ -112,3 +112,30 @@ class WishlistItem(Base):
     url = Column(String, nullable=True)
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="wishlist_items")
+
+    # ... (a többi modell osztály változatlan)
+
+class RecurringRule(Base):
+    __tablename__ = "recurring_rules"
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # A tranzakció adatai
+    description = Column(String)
+    amount = Column(Numeric(10, 2))
+    type = Column(String) # 'bevétel', 'kiadás', 'átutalás'
+    
+    # Kapcsolatok
+    from_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
+    to_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    
+    # Ismétlődési szabályok
+    frequency = Column(String) # pl. 'havi', 'heti'
+    day_of_month = Column(Integer, nullable=True) # 1-31, vagy speciális érték (pl. 99 az utolsó napra)
+    
+    # Érvényesség és állapot
+    start_date = Column(Date, default=func.now())
+    end_date = Column(Date, nullable=True)
+    next_run_date = Column(Date)
+    is_active = Column(Boolean, default=True) # A szüneteltetéshez

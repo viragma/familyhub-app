@@ -7,7 +7,7 @@ function AdminSetupPage() {
   const [displayName, setDisplayName] = useState('Apa');
   const [pin, setPin] = useState('');
   const navigate = useNavigate();
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  const { token, user, apiUrl } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();

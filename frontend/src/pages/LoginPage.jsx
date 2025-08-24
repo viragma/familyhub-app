@@ -7,10 +7,8 @@ function LoginPage() {
   const [profiles, setProfiles] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [pin, setPin] = useState('');
-  const { login } = useAuth();
   const navigate = useNavigate();
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
-
+  const { token, user, apiUrl,login } = useAuth();
   // Profilok lekérése a backendtől, amint az oldal betöltődik
   useEffect(() => {
     const fetchProfiles = async () => {

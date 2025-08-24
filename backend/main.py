@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from .scheduler import scheduler
+from contextlib import asynccontextmanager
 
 from .crud import (
     get_tasks, create_task, toggle_task_status, delete_task,
@@ -8,7 +10,8 @@ from .crud import (
     delete_user as crud_delete_user, get_users_by_family,
     create_family_account, get_accounts_by_family, create_account_transaction,
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
-    create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category,update_account, delete_account,get_account
+    create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category,update_account, delete_account,get_account,
+    update_account_viewer,create_recurring_rule
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -17,15 +20,24 @@ from .schemas import (
     Family, FamilyCreate,
     User, UserCreate, UserProfile,
     Account, Transaction, TransactionCreate, AccountCreate,
-    Category as CategorySchema, CategoryCreate,TransferCreate
+    Category as CategorySchema, CategoryCreate,TransferCreate,
+    RecurringRule, RecurringRuleCreate 
 )
 from .database import SessionLocal, engine
 from .security import create_access_token, verify_pin, oauth2_scheme, SECRET_KEY, ALGORITHM
 from jose import JWTError, jwt
 
 # Base.metadata.create_all(bind=engine) # Handled by Alembic
-
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Induláskor
+    print("Időzítő indítása...")
+    scheduler.start()
+    yield
+    # Leálláskor
+    print("Időzítő leállítása...")
+    scheduler.shutdown()
+app = FastAPI(lifespan=lifespan)
 
 origins = ["*"]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -36,6 +48,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 
 
@@ -299,3 +312,12 @@ def toggle_account_sharing(
 ):
     """ Módosítja egy kassza láthatóságát egy másik felhasználó számára (csak a tulajdonos). """
     return update_account_viewer(db=db, account_id=account_id, viewer_id=viewer_id, owner=current_user, add=share)
+
+@app.post("/api/recurring-rules", response_model=RecurringRule)
+def add_recurring_rule(
+    rule: RecurringRuleCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """ Létrehoz egy új ismétlődő tranzakciós szabályt. """
+    return create_recurring_rule(db=db, rule=rule, user=current_user)

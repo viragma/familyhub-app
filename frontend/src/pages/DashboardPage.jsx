@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'; // Fontos import
 
 function DashboardPage() {
   const [dashboardData, setDashboardData] = useState(null);
-  const { token } = useAuth(); // A tokent a contextből vesszük
+  const { token, user, apiUrl } = useAuth(); // A tokent a contextből vesszük
 
   useEffect(() => {
     const fetchData = async () => {
@@ -13,7 +13,7 @@ function DashboardPage() {
       try {
         // JAVÍTÁS: Hozzáadjuk a hiányzó 'headers' részt
         const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/api/dashboard`, {
+          `${apiUrl}/api/dashboard`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

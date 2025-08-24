@@ -5,12 +5,16 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('authToken'));
   const [user, setUser] = useState(null);
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  
+  // === ÚJ DINAMIKUS LOGIKA ===
+  // A böngésző címsorából vesszük az IP címet, a port pedig fixen 8000.
+  const apiUrl = `http://${window.location.hostname}:8000`;
 
   useEffect(() => {
     const fetchUser = async () => {
       if (token) {
         try {
+          // Itt már az új, dinamikus apiUrl-t használjuk
           const response = await fetch(`${apiUrl}/api/users/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -18,7 +22,6 @@ export const AuthProvider = ({ children }) => {
             const userData = await response.json();
             setUser(userData);
           } else {
-            // Ha a token érvénytelen, töröljük
             logout();
           }
         } catch (error) {
@@ -28,10 +31,11 @@ export const AuthProvider = ({ children }) => {
       }
     };
     fetchUser();
-  }, [token, apiUrl]);
+  }, [token, apiUrl]); // Az apiUrl-t is felvesszük a függőségek közé
 
   const login = async (userId, pin) => {
     try {
+      // Itt is az új, dinamikus apiUrl-t használjuk
       const response = await fetch(`${apiUrl}/api/login?user_id=${userId}&pin=${pin}`, {
         method: 'POST',
       });
@@ -39,7 +43,7 @@ export const AuthProvider = ({ children }) => {
       
       const data = await response.json();
       localStorage.setItem('authToken', data.access_token);
-      setToken(data.access_token); // Ez újra lefuttatja az useEffect-et, ami betölti a felhasználót
+      setToken(data.access_token);
       return true;
     } catch (error) {
       console.error("Bejelentkezési hiba:", error);
@@ -54,8 +58,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    // Most már a 'user'-t is elérhetővé tesszük
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    // Most már az 'apiUrl'-t is elérhetővé tesszük az egész alkalmazás számára
+    <AuthContext.Provider value={{ token, user, login, logout, apiUrl }}>
       {children}
     </AuthContext.Provider>
   );

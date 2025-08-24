@@ -128,3 +128,28 @@ class Account(AccountBase):
     owner_user: Optional[UserProfile] = None
     class Config:
         from_attributes = True
+
+
+class RecurringRuleBase(BaseModel):
+    description: str
+    amount: Decimal
+    type: str
+    from_account_id: Optional[int] = None
+    to_account_id: Optional[int] = None
+    category_id: Optional[int] = None
+    frequency: str
+    day_of_month: Optional[int] = None
+    start_date: date
+    end_date: Optional[date] = None
+
+class RecurringRuleCreate(RecurringRuleBase):
+    pass
+
+class RecurringRule(RecurringRuleBase):
+    id: int
+    owner_id: int
+    next_run_date: date
+    is_active: bool
+
+    class Config:
+        from_attributes = True

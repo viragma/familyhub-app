@@ -5,7 +5,7 @@ import TaskModal from '../components/TaskModal';
 function TasksPage() {
   const [tasks, setTasks] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  const { token, user, apiUrl } = useAuth();
 
   const fetchTasks = async () => {
     try {

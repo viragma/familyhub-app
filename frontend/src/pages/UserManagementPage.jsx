@@ -6,8 +6,7 @@ function UserManagementPage() {
   const [members, setMembers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const { user, token } = useAuth();
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  const { token, user, apiUrl } = useAuth();
 
   const fetchMembers = useCallback(async () => {
     if (user && user.family_id) {

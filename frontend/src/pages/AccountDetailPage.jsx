@@ -9,9 +9,8 @@ function AccountDetailPage() {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { accountId } = useParams();
-  const { user, token } = useAuth();
   const navigate = useNavigate();
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  const { token, user, apiUrl } = useAuth();
 
   const fetchData = useCallback(async () => {
     if (!token || !user) return;

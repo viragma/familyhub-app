@@ -8,8 +8,7 @@ function CategoryManagementPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
     const [parentCategoryId, setParentCategoryId] = useState(null);
-    const { token } = useAuth();
-    const apiUrl = import.meta.env.VITE_API_BASE_URL;
+    const { token, user, apiUrl } = useAuth();
 
     const fetchCategories = useCallback(async () => {
         if (!token) return;
