@@ -14,7 +14,7 @@ from .security import get_pin_hash
 from . import models
 import uuid
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload,selectinload
 # JAVÍTÁS: Hozzáadjuk a hiányzó 'func' és 'extract' importokat
 from sqlalchemy import func, extract
 from datetime import datetime
@@ -24,7 +24,11 @@ from .security import get_pin_hash
 
 # --- User CRUD Műveletek ---
 def get_user(db: Session, user_id: int):
-    return db.query(models.User).filter(models.User.id == user_id).first()
+    # Eagerly load relationships needed for permissions
+    return db.query(models.User).options(
+        selectinload(models.User.family).selectinload(models.Family.members),
+        selectinload(models.User.visible_accounts)
+    ).filter(models.User.id == user_id).first()
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_pin = get_pin_hash(user.pin)
@@ -134,32 +138,31 @@ def get_account(db: Session, account_id: int, user: models.User):
     return account
 
 def get_accounts_by_family(db: Session, user: models.User):
-    # JAVÍTÁS: Sokkal tisztább és megbízhatóbb logika
-    
-    # Először betöltjük a tulajdonos adatait is a kasszákkal együtt
     query_options = joinedload(models.Account.owner_user)
     
-    # A Családfő a családon belül MINDEN kasszát lát
     if user.role == "Családfő":
         accounts = db.query(models.Account).options(query_options).filter(models.Account.family_id == user.family_id).all()
-    # A Szülő látja a sajátját, a gyerekekét, és a vele megosztottakat, plusz a nem-személyeseket
     elif user.role == "Szülő":
-        accounts = list(user.visible_accounts)
+        children_ids = [
+            member.id for member in user.family.members 
+            if member.role in ["Gyerek", "Tizenéves"]
+        ]
         
-        other_accounts = db.query(models.Account).options(query_options).filter(
+        accounts = db.query(models.Account).options(query_options).filter(
             models.Account.family_id == user.family_id,
-            models.Account.type != 'személyes'
+            (
+                (models.Account.type != 'személyes') |
+                (models.Account.owner_user_id == user.id) |
+                (models.Account.owner_user_id.in_(children_ids))
+            )
         ).all()
         
-        account_ids = {acc.id for acc in accounts}
-        for acc in other_accounts:
-            if acc.id not in account_ids:
-                accounts.append(acc)
-    # A Gyerekek csak azt látják, amihez expliciten joguk van
-    else: 
+        shared_with_me = [acc for acc in user.visible_accounts if acc not in accounts]
+        accounts.extend(shared_with_me)
+
+    else: # Gyerek vagy Tizenéves nézet
         accounts = list(user.visible_accounts)
     
-    # A közös kassza egyenlegének valós idejű kiszámítása
     common_account = next((acc for acc in accounts if acc.type == 'közös'), None)
     if common_account and user.role in ["Családfő", "Szülő"]:
         all_family_accounts = db.query(models.Account).filter(models.Account.family_id == user.family_id).all()
@@ -671,4 +674,70 @@ def create_recurring_rule(db: Session, rule: schemas.RecurringRuleCreate, user: 
     db.add(db_rule)
     db.commit()
     db.refresh(db_rule)
+    return db_rule
+
+def get_all_transfer_targets(db: Session, family_id: int):
+    """ 
+    Visszaadja egy család összes olyan kasszáját, ami lehet egy átutalás célpontja
+    (vagyis minden, ami NEM a "Közös Kassza").
+    """
+    return db.query(models.Account).filter(
+        models.Account.family_id == family_id,
+        models.Account.type != 'közös'
+    ).all()
+
+def get_valid_transfer_targets(db: Session, user: models.User):
+    """
+    Visszaadja azokat a kasszákat, amik egy adott felhasználó számára
+    érvényes átutalási célpontok lehetnek.
+    """
+    # 1. A család összes SZEMÉLYES kasszája mindig célpont lehet.
+    all_personal_accounts = db.query(models.Account).filter(
+        models.Account.family_id == user.family_id,
+        models.Account.type == 'személyes'
+    ).all()
+
+    # 2. Ezen felül a felhasználó által LÁTHATÓ összes Cél- és Vészkassza.
+    visible_other_accounts = [
+        acc for acc in user.visible_accounts 
+        if acc.type in ['cél', 'vész']
+    ]
+    
+    # 3. Összefűzzük a két listát, elkerülve a duplikációkat.
+    combined_list = list(all_personal_accounts)
+    account_ids = {acc.id for acc in combined_list}
+
+    for acc in visible_other_accounts:
+        if acc.id not in account_ids:
+            combined_list.append(acc)
+            
+    return combined_list
+
+def get_recurring_rules(db: Session, user: models.User):
+    # A felhasználó a saját szabályait, a szülők pedig a család összes szabályát láthatják
+    if user.role in ["Családfő", "Szülő"]:
+        family_members_ids = [member.id for member in user.family.members]
+        return db.query(models.RecurringRule).filter(models.RecurringRule.owner_id.in_(family_members_ids)).all()
+    else:
+        return db.query(models.RecurringRule).filter(models.RecurringRule.owner_id == user.id).all()
+
+def update_recurring_rule(db: Session, rule_id: int, rule_data: schemas.RecurringRuleCreate, user: models.User):
+    db_rule = db.query(models.RecurringRule).filter(models.RecurringRule.id == rule_id).first()
+    # Jogosultság ellenőrzése (csak a tulajdonos vagy szülő módosíthat)
+    if not db_rule or (db_rule.owner_id != user.id and user.role not in ["Családfő", "Szülő"]):
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a szabály módosításához.")
+    
+    for key, value in rule_data.model_dump().items():
+        setattr(db_rule, key, value)
+    
+    db.commit()
+    db.refresh(db_rule)
+    return db_rule
+
+def delete_recurring_rule(db: Session, rule_id: int, user: models.User):
+    db_rule = db.query(models.RecurringRule).filter(models.RecurringRule.id == rule_id).first()
+    if not db_rule or (db_rule.owner_id != user.id and user.role not in ["Családfő", "Szülő"]):
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a szabály törléséhez.")
+    db.delete(db_rule)
+    db.commit()
     return db_rule

@@ -11,7 +11,8 @@ from .crud import (
     create_family_account, get_accounts_by_family, create_account_transaction,
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
     create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category,update_account, delete_account,get_account,
-    update_account_viewer,create_recurring_rule
+    update_account_viewer,create_recurring_rule,get_all_transfer_targets,get_valid_transfer_targets,get_recurring_rules, update_recurring_rule, delete_recurring_rule
+
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -236,15 +237,16 @@ def add_new_user_by_admin(user: UserCreate, db: Session = Depends(get_db), admin
 
 @app.get("/api/transfer-recipients", response_model=list[Account])
 def read_transfer_recipients(current_user: UserModel = Depends(get_current_user), db: Session = Depends(get_db)):
-    """ Visszaadja az összes lehetséges címzettet egy átutaláshoz (a család összes személyes kasszáját). """
-    return get_all_personal_accounts(db=db, family_id=current_user.family_id)
+    """ Visszaadja az összes lehetséges és jogosult címzettet egy átutaláshoz. """
+    return get_valid_transfer_targets(db=db, user=current_user)
+
 
 @app.get("/api/dashboard")
 def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    # JAVÍTÁS: Add the 'user' argument to the get_tasks call
     tasks_from_db = get_tasks(db, user=current_user)
     financials = get_financial_summary(db, user=current_user)
     
-    # JAVÍTÁS: Visszatesszük a hiányzó statikus adatokat a dinamikusok mellé
     return {
          "financial_summary": financials,
          "tasks": tasks_from_db,
@@ -321,3 +323,15 @@ def add_recurring_rule(
 ):
     """ Létrehoz egy új ismétlődő tranzakciós szabályt. """
     return create_recurring_rule(db=db, rule=rule, user=current_user)
+
+@app.get("/api/recurring-rules", response_model=list[RecurringRule])
+def read_recurring_rules(db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    return get_recurring_rules(db=db, user=current_user)
+
+@app.put("/api/recurring-rules/{rule_id}", response_model=RecurringRule)
+def update_rule(rule_id: int, rule: RecurringRuleCreate, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    return update_recurring_rule(db=db, rule_id=rule_id, rule_data=rule, user=current_user)
+
+@app.delete("/api/recurring-rules/{rule_id}", response_model=RecurringRule)
+def delete_rule(rule_id: int, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    return delete_recurring_rule(db=db, rule_id=rule_id, user=current_user)

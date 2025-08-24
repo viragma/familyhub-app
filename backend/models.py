@@ -133,7 +133,8 @@ class RecurringRule(Base):
     # Ismétlődési szabályok
     frequency = Column(String) # pl. 'havi', 'heti'
     day_of_month = Column(Integer, nullable=True) # 1-31, vagy speciális érték (pl. 99 az utolsó napra)
-    
+    day_of_week = Column(Integer, nullable=True) # 1 a hétfő, 7 a vasárnap
+    month_of_year = Column(Integer, nullable=True) # 1-12
     # Érvényesség és állapot
     start_date = Column(Date, default=func.now())
     end_date = Column(Date, nullable=True)

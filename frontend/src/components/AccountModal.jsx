@@ -7,8 +7,8 @@ function AccountModal({ isOpen, onClose, onSave, accountData = null }) {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [monthlySaving, setMonthlySaving] = useState(0);
-  const { user, token } = useAuth();
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+  const { user, token,apiUrl } = useAuth();
+
 
   // Mai dátum meghatározása a dátumválasztó korlátozásához
   const today = new Date().toISOString().split('T')[0];

@@ -133,12 +133,14 @@ class Account(AccountBase):
 class RecurringRuleBase(BaseModel):
     description: str
     amount: Decimal
-    type: str
-    from_account_id: Optional[int] = None
-    to_account_id: Optional[int] = None
+    type: str # 'bevétel', 'kiadás', vagy 'átutalás'
+    from_account_id: Optional[int] = None # Átutalásnál a forrás
+    to_account_id: Optional[int] = None # Átutalásnál a cél, B/K-nál a kassza
     category_id: Optional[int] = None
     frequency: str
     day_of_month: Optional[int] = None
+    day_of_week: Optional[int] = None # <-- Új
+    month_of_year: Optional[int] = None # 
     start_date: date
     end_date: Optional[date] = None
 
