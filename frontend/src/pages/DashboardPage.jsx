@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import '../components/Dashboard.css';
-
+import ForecastCard from '../components/ForecastCard';
 // Kategória költés kártya
 const CategorySpendingCard = ({ data, onClick }) => {
   if (!data || !data.length) {
@@ -306,12 +306,23 @@ const DashboardPage = () => {
             </div>
             
             <div className="financial-balance-row">
-              <span className="financial-balance-label">Jelenlegi egyenleg</span>
+              <span className="financial-balance-label">Családi egyenleg</span>
               <span className="financial-balance-amount">
                 {dashboardData.financial_summary.total_balance?.toLocaleString('hu-HU') || '0'} Ft
               </span>
             </div>
-            
+               {/* --- ÚJ RÉSZ KEZDETE --- */}
+            {dashboardData.financial_summary.view_type === 'parent' && (
+              <div className="balance-sub-list">
+                <div className="sub-list-item available">
+                  <span>Saját egyenleg</span>
+                  <strong className="available-amount">
+                    <strong>{dashboardData.financial_summary.personal_balance?.toLocaleString('hu-HU') || '0'} Ft</strong>
+                  </strong>
+                </div>
+              </div>
+            )}
+            {/* --- ÚJ RÉSZ VÉGE --- */}
             <div className="financial-stats-grid">
               <div className="financial-stat-item">
                 <span className="financial-stat-label">Havi bevétel</span>
@@ -334,13 +345,18 @@ const DashboardPage = () => {
                   ? 'financial-savings-positive' 
                   : 'financial-savings-negative'
               }`}>
+
                 {(dashboardData.financial_summary.monthly_savings || 0) >= 0 ? '+' : ''}
                 {dashboardData.financial_summary.monthly_savings?.toLocaleString('hu-HU') || '0'} Ft
               </p>
             </div>
           </div>
         )}
-
+                        {/* --- ÚJ RÉSZ KEZDETE --- */}
+        {dashboardData?.next_month_forecast && (
+          <ForecastCard forecastData={dashboardData.next_month_forecast} />
+        )}
+        {/* --- ÚJ RÉSZ VÉGE --- */}
         <CategorySpendingCard 
           data={analyticsData.categorySpending}
           onClick={handleCategoryAnalyticsClick}
@@ -350,7 +366,7 @@ const DashboardPage = () => {
           data={analyticsData.savingsTrend}
           onClick={handleSavingsAnalyticsClick}
         />
-        
+ 
         {dashboardData?.goals?.family_goals?.map(goal => {
           const balance = goal.balance || 0;
           const goalAmount = goal.goal_amount || 0;

@@ -510,6 +510,87 @@ def get_all_personal_accounts(db: Session, family_id: int):
         models.Account.family_id == family_id,
         models.Account.type != 'közös'
     ).all()
+
+def get_next_month_forecast(db: Session, user: models.User):
+    """
+    Kiszámolja a következő naptári hónap pénzügyi előrejelzését.
+    Szülők esetén külön számolja a személyes és a családi (csak szülői) előrejelzést.
+    """
+    today = date.today()
+    next_month_date = today + relativedelta(months=1)
+    next_month = next_month_date.month
+    next_month_year = next_month_date.year
+
+    # --- Segédfüggvény a számításokhoz, hogy ne ismételjük a kódot ---
+    def calculate_forecast_for_owners(owner_ids: list[int]):
+        if not isinstance(owner_ids, list):
+            owner_ids = [owner_ids] # Ha csak egy ID-t kap, listává alakítjuk
+
+        recurring_income = db.query(func.sum(models.RecurringRule.amount)).filter(
+            models.RecurringRule.owner_id.in_(owner_ids),
+            models.RecurringRule.is_active == True,
+            models.RecurringRule.type == 'bevétel',
+            extract('year', models.RecurringRule.next_run_date) == next_month_year,
+            extract('month', models.RecurringRule.next_run_date) == next_month
+        ).scalar() or Decimal(0)
+
+        recurring_expenses = db.query(func.sum(models.RecurringRule.amount)).filter(
+            models.RecurringRule.owner_id.in_(owner_ids),
+            models.RecurringRule.is_active == True,
+            models.RecurringRule.type == 'kiadás',
+            extract('year', models.RecurringRule.next_run_date) == next_month_year,
+            extract('month', models.RecurringRule.next_run_date) == next_month
+        ).scalar() or Decimal(0)
+
+        expected_expenses = db.query(func.sum(models.ExpectedExpense.estimated_amount)).filter(
+            models.ExpectedExpense.owner_id.in_(owner_ids),
+            models.ExpectedExpense.status == 'tervezett',
+            extract('year', models.ExpectedExpense.due_date) == next_month_year,
+            extract('month', models.ExpectedExpense.due_date) == next_month
+        ).scalar() or Decimal(0)
+
+        total_income = recurring_income
+        total_expenses = recurring_expenses + expected_expenses
+        savings = total_income - total_expenses
+
+        return {
+            "projected_income": float(total_income),
+            "projected_expenses": float(total_expenses),
+            "projected_savings": float(savings)
+        }
+
+    # --- Fő logika ---
+    if user.role in ["Családfő", "Szülő"]:
+        # Szülői nézet: Két kalkulációt végzünk
+        
+        # 1. Személyes előrejelzés (csak a bejelentkezett felhasználó)
+        personal_forecast = calculate_forecast_for_owners([user.id])
+
+        # 2. Családi előrejelzés (az összes szülő, a gyerekek NÉLKÜL)
+        parent_roles = ["Családfő", "Szülő"]
+        parent_ids = [
+            u.id for u in db.query(models.User.id)
+            .filter(models.User.family_id == user.family_id, models.User.role.in_(parent_roles))
+            .all()
+        ]
+        family_forecast = calculate_forecast_for_owners(parent_ids)
+
+        return {
+            "view_type": "parent",
+            "personal": personal_forecast,
+            "family": family_forecast,
+            "month_name": next_month_date.strftime("%B")
+        }
+    else:
+        # Gyerek nézet: Csak a sajátját számoljuk
+        personal_forecast = calculate_forecast_for_owners([user.id])
+        return {
+            "view_type": "child",
+            "personal": personal_forecast,
+            "family": None, # Gyereknek nincs családi nézete
+            "month_name": next_month_date.strftime("%B")
+        }
+
 def get_financial_summary(db: Session, user: models.User):
     """
     Kiszámolja a pénzügyi összegzést a Dashboard kártya számára a helyes, új logika alapján.
@@ -534,6 +615,14 @@ def get_financial_summary(db: Session, user: models.User):
             models.Account.owner_user_id.in_(parent_ids),
             models.Account.type == 'személyes'
         ).scalar() or Decimal(0)
+
+        # --- ÚJ RÉSZ KEZDETE ---
+        # A bejelentkezett szülő saját személyes egyenlegének lekérdezése
+        personal_balance = db.query(models.Account.balance).filter(
+            models.Account.owner_user_id == user.id,
+            models.Account.type == 'személyes'
+        ).scalar() or Decimal(0)
+        # --- ÚJ RÉSZ VÉGE ---
 
         # Havi bevétel: csak a külső forrásból származó
         monthly_income = db.query(func.sum(models.Transaction.amount)).filter(
@@ -563,6 +652,7 @@ def get_financial_summary(db: Session, user: models.User):
             "view_type": "parent", 
             "balance_title": "Szülők közös egyenlege",
             "total_balance": float(total_balance), 
+            "personal_balance": float(personal_balance),
             "monthly_income": float(monthly_income),
             "monthly_expense": float(monthly_expense), 
             "monthly_savings": float(monthly_income - monthly_expense),

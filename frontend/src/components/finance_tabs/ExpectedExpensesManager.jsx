@@ -81,15 +81,15 @@ const handleOpenEditModal = (expense = null) => {
         throw new Error(errData.detail || 'Hiba a mentés során.');
       }
       
-      handleCloseModal();
-      fetchExpenses(); // Lista frissítése
+      // JAVÍTÁS ITT: handleCloseModal -> handleCloseModals
+      handleCloseModals(); 
+      fetchData(); // Itt fetchData-t hívunk, hogy a kasszák is frissüljenek
 
     } catch (error) {
       console.error("Hiba a mentéskor:", error);
       alert(`Hiba: ${error.message}`);
     }
   };
-
  // ÚJ TÖRLÉSI FÜGGVÉNY
   const handleDelete = async (expenseId) => {
     if (!window.confirm("Biztosan törölni szeretnéd ezt a tervezett kiadást?")) return;

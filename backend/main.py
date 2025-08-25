@@ -20,7 +20,7 @@ from .crud import (
     # Új importok
     get_expected_expenses, create_expected_expense, update_expected_expense,
     delete_expected_expense, complete_expected_expense,
-    create_account_transaction
+    create_account_transaction,get_next_month_forecast
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -272,6 +272,9 @@ def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = 
         tasks_raw = get_tasks(db, user=current_user)
         financials = get_financial_summary(db, user=current_user)
         goals_raw = get_dashboard_goals(db, user=current_user)
+         # --- ÚJ RÉSZ KEZDETE ---
+        forecast = get_next_month_forecast(db, user=current_user) # Új függvény hívása
+        # --- ÚJ RÉSZ VÉGE ---
         
         # Tasks manual serialization
         tasks = [
@@ -317,7 +320,8 @@ def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = 
         return {
             "financial_summary": financials,
             "tasks": tasks,
-            "goals": goals
+            "goals": goals,
+            "next_month_forecast": forecast
         }
         
     except Exception as e:
