@@ -2,6 +2,10 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .scheduler import scheduler
+from sqlalchemy import func, extract, and_, or_
+from datetime import datetime, timedelta
+from typing import Optional
+from fastapi import Query
 from contextlib import asynccontextmanager
 
 from .crud import (
@@ -12,7 +16,8 @@ from .crud import (
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
     create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category,update_account, delete_account,get_account,
     update_account_viewer,create_recurring_rule,get_all_transfer_targets,get_valid_transfer_targets,get_recurring_rules, update_recurring_rule, delete_recurring_rule,
-    toggle_rule_status,get_dashboard_goals
+    toggle_rule_status,get_dashboard_goals,delete_account_with_dependencies,get_categories_tree,get_category_spending_analytics,get_savings_trend_analytics,get_detailed_category_analytics,get_detailed_savings_analytics
+
 
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
@@ -246,17 +251,75 @@ def read_transfer_recipients(current_user: UserModel = Depends(get_current_user)
     return get_valid_transfer_targets(db=db, user=current_user)
 
 
-@app.get("/api/dashboard")
+@app.get("/api/dashboard")  # ✅ NO response_model!
 def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
-    tasks_from_db = get_tasks(db, user=current_user)
-    financials = get_financial_summary(db, user=current_user)
-    goals = get_dashboard_goals(db, user=current_user) # Új hívás
-    
-    return {
-         "financial_summary": financials,
-         "tasks": tasks_from_db,
-         "goals": goals # A régi, statikus 'goal' helyett
-    }
+    try:
+        # Manual, biztonságos hívások
+        tasks_raw = get_tasks(db, user=current_user)
+        financials = get_financial_summary(db, user=current_user)
+        goals_raw = get_dashboard_goals(db, user=current_user)
+        
+        # Tasks manual serialization
+        tasks = [
+            {
+                "id": task.id,
+                "title": task.title,
+                "status": task.status,
+                "reward_type": task.reward_type,
+                "reward_value": task.reward_value,
+                "owner_id": task.owner_id,
+                # Owner info - safe loading
+                "owner": {
+                    "id": task.owner.id,
+                    "display_name": task.owner.display_name,
+                    "avatar_url": task.owner.avatar_url
+                } if task.owner else None
+            }
+            for task in tasks_raw
+        ]
+        
+        # Goals manual serialization
+        def serialize_account(acc):
+            return {
+                "id": acc.id,
+                "name": acc.name,
+                "type": acc.type,
+                "balance": float(acc.balance),
+                "goal_amount": float(acc.goal_amount) if acc.goal_amount else None,
+                "goal_date": acc.goal_date.isoformat() if acc.goal_date else None,
+                "show_on_dashboard": getattr(acc, 'show_on_dashboard', False),
+                "owner_user": {
+                    "id": acc.owner_user.id,
+                    "display_name": acc.owner_user.display_name,
+                    "avatar_url": acc.owner_user.avatar_url
+                } if acc.owner_user else None
+            }
+        
+        goals = {
+            "family_goals": [serialize_account(acc) for acc in goals_raw["family_goals"]],
+            "personal_goals": [serialize_account(acc) for acc in goals_raw["personal_goals"]]
+        }
+        
+        return {
+            "financial_summary": financials,
+            "tasks": tasks,
+            "goals": goals
+        }
+        
+    except Exception as e:
+        print(f"Dashboard error: {e}")  # Debug
+        # Fallback minimal response
+        return {
+            "financial_summary": {
+                "view_type": "error",
+                "total_balance": 0,
+                "monthly_income": 0,
+                "monthly_expense": 0,
+                "monthly_savings": 0
+            },
+            "tasks": [],
+            "goals": {"family_goals": [], "personal_goals": []}
+        }
 @app.post("/api/accounts", response_model=Account)
 def create_new_account(
     account: AccountCreate,
@@ -299,14 +362,32 @@ def create_new_account(
         
     return create_family_account(db=db, account=account, family_id=current_user.family_id, owner_user=current_user)
 
-@app.delete("/api/accounts/{account_id}", response_model=Account)
+@app.delete("/api/accounts/{account_id}")
 def remove_account(
     account_id: int, 
+    force: bool = False,  # ÚJ query parameter
     db: Session = Depends(get_db), 
-    current_user: UserModel = Depends(get_current_user) # JAVÍTÁS: Átállás admin-ról sima user-re
+    current_user: UserModel = Depends(get_current_user)
 ):
-    """ Töröl egy kasszát a tulajdonos vagy egy szülő. """
-    return delete_account(db=db, account_id=account_id, user=current_user)
+    """
+    Kassza törlése.
+    ?force=true esetén a függőségeket is törli.
+    """
+    if force:
+        return delete_account_with_dependencies(db=db, account_id=account_id, user=current_user, force=True)
+    else:
+        return delete_account(db=db, account_id=account_id, user=current_user)
+@app.get("/api/accounts/{account_id}/dependencies")
+def check_account_dependencies(
+    account_id: int,
+    db: Session = Depends(get_db), 
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Ellenőrzi, hogy egy kassza törölhető-e (milyen függőségei vannak)
+    """
+    return delete_account_with_dependencies(db=db, account_id=account_id, user=current_user, force=False)
+
 @app.post("/api/accounts/{account_id}/share", response_model=Account)
 def toggle_account_sharing(
     account_id: int, 
@@ -342,3 +423,109 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db), current_user: UserM
 def toggle_rule(rule_id: int, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
     """ Aktiválja vagy szünetelteti az ismétlődő szabályt. """
     return toggle_rule_status(db=db, rule_id=rule_id, user=current_user)
+
+@app.get("/api/debug/dashboard-parts")
+def debug_dashboard_parts(db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    """Debug endpoint - részekre bontva tesztelni"""
+    try:
+        # 1. Tasks tesztelés
+        tasks = get_tasks(db, user=current_user)
+        print(f"Tasks OK: {len(tasks)}")
+        
+        # 2. Financial tesztelés  
+        financials = get_financial_summary(db, user=current_user)
+        print(f"Financials OK: {financials}")
+        
+        # 3. Goals tesztelés
+        goals = get_dashboard_goals(db, user=current_user)
+        print(f"Goals OK: {len(goals['family_goals'])} family, {len(goals['personal_goals'])} personal")
+        
+        return {"status": "All parts working"}
+    except Exception as e:
+        return {"error": str(e)}
+    
+@app.get("/api/analytics/category-spending")
+def get_category_spending_endpoint(
+    month: Optional[int] = Query(None, description="Hónap (1-12)"),
+    year: Optional[int] = Query(None, description="Év"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Kategória költések lekérdezése dashboard kártyához
+    """
+    try:
+        data = get_category_spending_analytics(db, current_user, month, year)
+        return data
+    except Exception as e:
+        print(f"Category spending endpoint error: {e}")
+        return []
+
+@app.get("/api/analytics/savings-trend")
+def get_savings_trend_endpoint(
+    year: Optional[int] = Query(None, description="Év"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Havi megtakarítás trend lekérdezése dashboard kártyához
+    """
+    try:
+        data = get_savings_trend_analytics(db, current_user, year)
+        return data
+    except Exception as e:
+        print(f"Savings trend endpoint error: {e}")
+        return []
+
+@app.get("/api/analytics/category-detailed")
+def get_detailed_category_endpoint(
+    start_date: str = Query(..., description="Kezdő dátum (YYYY-MM-DD)", alias="startDate"),
+    end_date: str = Query(..., description="Befejező dátum (YYYY-MM-DD)", alias="endDate"),
+    categories: Optional[str] = Query(None, description="Kategória ID-k vesszővel elválasztva"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Részletes kategória analitika analytics oldalhoz
+    """
+    try:
+        print(f"Category detailed: {start_date} - {end_date}")
+        # Dummy data egyelőre
+        return {
+            "categories": [
+                {"name": "Élelmiszer", "amount": 85000, "transactionCount": 12},
+                {"name": "Közlekedés", "amount": 45000, "transactionCount": 8},
+                {"name": "Szórakozás", "amount": 25000, "transactionCount": 5}
+            ],
+            "subcategories": []
+        }
+    except Exception as e:
+        print(f"Detailed category endpoint error: {e}")
+        return {"categories": [], "subcategories": []}
+
+@app.get("/api/analytics/savings-detailed")
+def get_detailed_savings_endpoint(
+    start_date: str = Query(..., description="Kezdő dátum (YYYY-MM-DD)", alias="startDate"),
+    end_date: str = Query(..., description="Befejező dátum (YYYY-MM-DD)", alias="endDate"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Részletes megtakarítás analitika analytics oldalhoz
+    """
+    try:
+        print(f"Savings detailed: {start_date} - {end_date}")
+        # Dummy data egyelőre
+        return [
+            {"month": "2025.01", "savings": 25000, "income": 120000, "expenses": 95000},
+            {"month": "2025.02", "savings": 30000, "income": 125000, "expenses": 95000},
+            {"month": "2025.03", "savings": 15000, "income": 115000, "expenses": 100000},
+            {"month": "2025.04", "savings": 40000, "income": 130000, "expenses": 90000},
+            {"month": "2025.05", "savings": 35000, "income": 128000, "expenses": 93000},
+            {"month": "2025.06", "savings": 28000, "income": 122000, "expenses": 94000},
+            {"month": "2025.07", "savings": 22000, "income": 118000, "expenses": 96000},
+            {"month": "2025.08", "savings": 33000, "income": 127000, "expenses": 94000}
+        ]
+    except Exception as e:
+        print(f"Detailed savings endpoint error: {e}")
+        return []

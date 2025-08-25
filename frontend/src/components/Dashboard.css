@@ -1,0 +1,754 @@
+/* Dashboard.css - Frissített verzió analytics kártyákkal */
+
+/* === MEGLÉVŐ STÍLUSOK === */
+.dashboard-container {
+  min-height: 100vh;
+  background-color: #1a202c;
+  color: white;
+  padding: 1.5rem;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.dashboard-title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0;
+  color: white;
+}
+
+.dashboard-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dashboard-api-info {
+  font-size: 0.875rem;
+  color: #a0aec0;
+}
+
+.dashboard-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid #4a5568;
+  border-radius: 0.5rem;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.dashboard-refresh-btn:hover {
+  border-color: #718096;
+  color: white;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dashboard-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Card alapstílusok */
+.dashboard-card {
+  background-color: #2d3748;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #4a5568;
+  transition: all 0.2s ease;
+}
+
+.dashboard-card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.dashboard-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.dashboard-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  color: white;
+}
+
+.dashboard-card-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #68d391;
+}
+
+/* Financial Card */
+.financial-card-wide {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 1280px) {
+  .financial-card-wide {
+    grid-column: span 1;
+  }
+}
+
+.financial-balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.financial-balance-label {
+  color: #e2e8f0;
+}
+
+.financial-balance-amount {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #68d391;
+}
+
+.financial-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #4a5568;
+  margin-bottom: 1rem;
+}
+
+.financial-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.financial-stat-label {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  margin-bottom: 0.25rem;
+}
+
+.financial-stat-value {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.financial-income {
+  color: #68d391;
+}
+
+.financial-expense {
+  color: #fc8181;
+}
+
+.financial-savings {
+  font-size: 1.25rem;
+  font-weight: bold;
+  padding-top: 0.5rem;
+}
+
+.financial-savings-positive {
+  color: #68d391;
+}
+
+.financial-savings-negative {
+  color: #fc8181;
+}
+
+/* === ÚJ ANALYTICS KÁRTYA STÍLUSOK === */
+
+/* Analytics kártyák alapstílusok */
+.analytics-card {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.analytics-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.analytics-chart-container {
+  margin: 1rem 0;
+  position: relative;
+}
+
+.analytics-empty {
+  text-align: center;
+  padding: 2rem 0;
+  color: #a0aec0;
+}
+
+.analytics-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+/* Kategória kártya stílusok */
+.analytics-legend {
+  margin-top: 1rem;
+  space: 0.75rem 0;
+}
+
+.analytics-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #4a5568;
+}
+
+.analytics-legend-item:last-child {
+  border-bottom: none;
+}
+
+.analytics-legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.analytics-legend-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0.25rem;
+}
+
+.analytics-legend-name {
+  font-weight: 500;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.analytics-legend-amount {
+  font-weight: 600;
+  color: #68d391;
+  font-size: 0.875rem;
+}
+
+.analytics-legend-percent {
+  font-size: 0.75rem;
+  color: #a0aec0;
+}
+
+.analytics-legend-more {
+  text-align: center;
+  color: #a0aec0;
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid #4a5568;
+  margin-top: 0.5rem;
+}
+
+/* Megtakarítás trend kártya stílusok */
+.analytics-trend-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: rgba(66, 153, 225, 0.1);
+  border-radius: 8px;
+  border: 1px solid #4299e1;
+}
+
+.analytics-trend-current {
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-trend-label {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  margin-bottom: 0.25rem;
+}
+
+.analytics-trend-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.analytics-trend-value.positive {
+  color: #68d391;
+}
+
+.analytics-trend-value.negative {
+  color: #fc8181;
+}
+
+.analytics-trend-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.analytics-trend-indicator.up {
+  color: #68d391;
+}
+
+.analytics-trend-indicator.down {
+  color: #fc8181;
+}
+
+.analytics-click-hint {
+  text-align: center;
+  color: #a0aec0;
+  font-size: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #4a5568;
+  margin-top: 1rem;
+}
+
+/* Goal Cards */
+.goal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.goal-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.goal-icon-container {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.goal-icon-family {
+  background-color: rgba(66, 153, 225, 0.2);
+}
+
+.goal-icon-personal {
+  background-color: rgba(72, 187, 120, 0.2);
+}
+
+.goal-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.goal-icon-family-color {
+  color: #4299e1;
+}
+
+.goal-icon-personal-color {
+  color: #48bb78;
+}
+
+.goal-details h4 {
+  font-weight: 600;
+  color: white;
+  margin: 0 0 0.25rem 0;
+}
+
+.goal-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #a0aec0;
+}
+
+.goal-badge {
+  background-color: rgba(66, 153, 225, 0.2);
+  color: #90cdf4;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid #4299e1;
+}
+
+.goal-owner {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.goal-owner-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.goal-amount {
+  text-align: right;
+}
+
+.goal-amount-main {
+  font-size: 2rem;
+  font-weight: bold;
+  color: white;
+  margin: 0;
+}
+
+.goal-amount-total {
+  font-size: 0.875rem;
+  color: #a0aec0;
+}
+
+.goal-progress {
+  margin-bottom: 1rem;
+}
+
+.goal-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: #e2e8f0;
+}
+
+.goal-progress-bar {
+  width: 100%;
+  height: 0.75rem;
+  background-color: #4a5568;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.goal-progress-fill {
+  height: 100%;
+  border-radius: 0.375rem;
+  transition: width 0.3s ease;
+}
+
+.goal-progress-fill-family {
+  background: linear-gradient(to right, #4299e1, #3182ce);
+}
+
+.goal-progress-fill-personal {
+  background: linear-gradient(to right, #48bb78, #38a169);
+}
+
+.goal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid #4a5568;
+  font-size: 0.875rem;
+}
+
+.goal-remaining {
+  color: #a0aec0;
+}
+
+.goal-remaining-amount {
+  color: #e2e8f0;
+  font-weight: 600;
+  margin-left: 0.25rem;
+}
+
+.goal-date {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #a0aec0;
+  text-align: right;
+}
+
+.goal-date-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.goal-date-value {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+/* Task Cards */
+.task-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.task-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.task-icon-completed {
+  color: #68d391;
+}
+
+.task-icon-active {
+  color: #ed8936;
+}
+
+.task-title {
+  font-weight: 600;
+  margin: 0;
+}
+
+.task-title-completed {
+  color: #68d391;
+  text-decoration: line-through;
+}
+
+.task-title-active {
+  color: white;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.task-status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.task-status-completed {
+  background-color: rgba(72, 187, 120, 0.2);
+  color: #68d391;
+  border: 1px solid #48bb78;
+}
+
+.task-status-active {
+  background-color: rgba(237, 137, 54, 0.2);
+  color: #ed8936;
+  border: 1px solid #dd6b20;
+}
+
+.task-owner {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: #a0aec0;
+}
+
+.task-owner-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.task-reward {
+  font-size: 0.875rem;
+  color: #e2e8f0;
+}
+
+.task-reward-value {
+  color: #ed8936;
+  font-weight: 600;
+}
+
+/* Loading és Error states */
+.loading-container, .error-container {
+  min-height: 100vh;
+  background-color: #1a202c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.loading-content, .error-content {
+  text-align: center;
+  max-width: 28rem;
+}
+
+.loading-spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 2px solid transparent;
+  border-top: 2px solid #4299e1;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-icon {
+  width: 4rem;
+  height: 4rem;
+  color: #fc8181;
+  margin: 0 auto 1rem;
+}
+
+.error-title, .loading-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.error-message, .loading-message {
+  color: #e2e8f0;
+  margin-bottom: 1rem;
+}
+
+.error-debug {
+  margin-bottom: 1rem;
+}
+
+.error-debug p {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  margin-bottom: 0.5rem;
+}
+
+.error-retry-btn, .error-login-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #4299e1;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.error-retry-btn:hover, .error-login-btn:hover {
+  background-color: #3182ce;
+}
+
+.error-retry-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Empty state */
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem 0;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-message {
+  color: #a0aec0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 1rem;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .financial-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .goal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .goal-amount {
+    text-align: left;
+  }
+  
+  .goal-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .goal-date {
+    text-align: left;
+  }
+  
+  /* Analytics kártyák mobile */
+  .analytics-legend {
+    margin-top: 0.5rem;
+  }
+  
+  .analytics-legend-item {
+    padding: 0.25rem 0;
+  }
+  
+  .analytics-trend-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+  
+  .analytics-trend-indicator {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+}
