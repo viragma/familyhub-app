@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .scheduler import scheduler
@@ -98,12 +98,17 @@ def setup_admin_user(user: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 @app.post("/api/login")
-def login_for_access_token(user_id: int, pin: str, db: Session = Depends(get_db)):
+def login_for_access_token(user_id: int = Form(...), pin: str = Form(...), db: Session = Depends(get_db)):
+
     user = get_user(db, user_id=user_id)
     if not user or not verify_pin(pin, user.pin_hash):
-        raise HTTPException(status_code=401, detail="Hibás felhasználói azonosító vagy PIN kód", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Hibás felhasználói azonosító vagy PIN kód", headers={"WWW-Authenticate": "Bearer"})
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/users/me", response_model=User)
+def read_users_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
 
 @app.get("/api/users/me", response_model=User)
 def read_users_me(current_user: UserModel = Depends(get_current_user)):
@@ -141,26 +146,29 @@ def remove_task_endpoint(task_id: int, db: Session = Depends(get_db)):
     if db_task is None: raise HTTPException(status_code=404, detail="A feladat nem található")
     return db_task
 
+# === JAVÍTÁS: HIÁNYZÓ GET VÉGPONT HOZZÁADVA ===
 @app.get("/api/accounts", response_model=list[Account])
-def read_accounts(current_user: UserModel = Depends(get_current_user), db: Session = Depends(get_db)):
+def read_accounts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """ Listázza a kasszákat, a felhasználó szerepköre alapján szűrve. """
     return get_accounts_by_family(db, user=current_user)
 
-@app.post("/api/accounts/{account_id}/transactions", response_model=Transaction)
-def add_transaction_to_account(
-    account_id: int, 
-    transaction: TransactionCreate, 
-    current_user: UserModel = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+@app.post("/api/accounts", response_model=Account)
+def create_new_account(
+    account: AccountCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
-    """ Hozzáad egy új tranzakciót egy adott kasszához. """
-    # JAVÍTÁS: 'user_id=current_user.id' helyett a teljes 'user=current_user' objektumot adjuk át.
-    return create_account_transaction(
-        db=db, 
-        transaction=transaction, 
-        account_id=account_id, 
-        user=current_user
-    )
+    return create_family_account(db=db, account=account, family_id=current_user.family_id, owner_user=current_user)
+
+@app.put("/api/accounts/{account_id}", response_model=Account)
+def update_account_details(
+    account_id: int,
+    account_data: AccountCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return update_account(db=db, account_id=account_id, account_data=account_data, user=current_user)
+
 @app.get("/api/categories", response_model=list[CategorySchema])
 def read_categories(db: Session = Depends(get_db)):
     return get_categories(db=db)
@@ -489,16 +497,16 @@ def get_detailed_category_endpoint(
     Részletes kategória analitika analytics oldalhoz
     """
     try:
-        print(f"Category detailed: {start_date} - {end_date}")
-        # Dummy data egyelőre
-        return {
-            "categories": [
-                {"name": "Élelmiszer", "amount": 85000, "transactionCount": 12},
-                {"name": "Közlekedés", "amount": 45000, "transactionCount": 8},
-                {"name": "Szórakozás", "amount": 25000, "transactionCount": 5}
-            ],
-            "subcategories": []
-        }
+        # A string-ként érkező kategória ID-kat listává alakítjuk
+        category_ids = [int(cat_id) for cat_id in categories.split(',')] if categories else None
+        
+        return get_detailed_category_analytics(
+            db=db, 
+            user=current_user, 
+            start_date=start_date, 
+            end_date=end_date, 
+            category_ids=category_ids
+        )
     except Exception as e:
         print(f"Detailed category endpoint error: {e}")
         return {"categories": [], "subcategories": []}
@@ -514,18 +522,12 @@ def get_detailed_savings_endpoint(
     Részletes megtakarítás analitika analytics oldalhoz
     """
     try:
-        print(f"Savings detailed: {start_date} - {end_date}")
-        # Dummy data egyelőre
-        return [
-            {"month": "2025.01", "savings": 25000, "income": 120000, "expenses": 95000},
-            {"month": "2025.02", "savings": 30000, "income": 125000, "expenses": 95000},
-            {"month": "2025.03", "savings": 15000, "income": 115000, "expenses": 100000},
-            {"month": "2025.04", "savings": 40000, "income": 130000, "expenses": 90000},
-            {"month": "2025.05", "savings": 35000, "income": 128000, "expenses": 93000},
-            {"month": "2025.06", "savings": 28000, "income": 122000, "expenses": 94000},
-            {"month": "2025.07", "savings": 22000, "income": 118000, "expenses": 96000},
-            {"month": "2025.08", "savings": 33000, "income": 127000, "expenses": 94000}
-        ]
+        return get_detailed_savings_analytics(
+            db=db, 
+            user=current_user, 
+            start_date=start_date, 
+            end_date=end_date
+        )
     except Exception as e:
         print(f"Detailed savings endpoint error: {e}")
         return []

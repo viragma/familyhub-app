@@ -1,154 +1,124 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  PieChart as PieChartIcon, 
-  BarChart3, 
-  Calendar, 
-  Filter, 
-  Download,
-  ArrowLeft,
-  ChevronDown 
+import {
+  PieChart as PieChartIcon,
+  BarChart3,
+  Calendar,
+  Filter,
+  ArrowLeft
 } from 'lucide-react';
-import { 
-  PieChart, 
-  Cell, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  BarChart,
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  BarChart as RechartsBarChart,
   Bar,
   Legend
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
-import '../components/Analytics.css'; // Külön CSS fájl
-
-const CATEGORY_COLORS = [
-  '#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f56565', 
-  '#38b2ac', '#ecc94b', '#ed64a6', '#68d391', '#fc8181'
-];
+import '../components/Analytics.css';
 
 const AnalyticsPage = () => {
   const { token, apiUrl } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'categories');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Szűrők
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Év eleje
-    endDate: new Date().toISOString().split('T')[0] // Ma
+
+  const [dateRange, setDateRange] = useState(() => {
+    const today = new Date();
+    const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+    return { startDate, endDate };
   });
+
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]);
-  
-  // Adatok
+
   const [categoryData, setCategoryData] = useState([]);
   const [savingsData, setSavingsData] = useState([]);
   const [subcategoryData, setSubcategoryData] = useState([]);
 
-  // Tab váltás
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
 
-  // Kategóriák lekérése
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
+    if (!token || !apiUrl) return;
     try {
-      const response = await fetch(`${apiUrl}/api/categories`, {
+      const response = await fetch(`${apiUrl}/api/categories/tree`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        const categories = await response.json();
-        setAvailableCategories(categories);
+        setAvailableCategories(await response.json());
       }
     } catch (err) {
       console.error('Kategóriák lekérési hiba:', err);
     }
-  };
+  }, [apiUrl, token]);
 
-  // Kategória analitika adatok
-  const fetchCategoryAnalytics = async () => {
+  const fetchData = useCallback(async () => {
+    if (!token || !apiUrl) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-        ...(selectedCategories.length && { categories: selectedCategories.join(',') })
-      });
-
-      const response = await fetch(`${apiUrl}/api/analytics/category-detailed?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCategoryData(data.categories || []);
-        setSubcategoryData(data.subcategories || []);
-      }
-    } catch (err) {
-      setError('Kategória adatok lekérési hiba');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Megtakarítás analitika adatok
-  const fetchSavingsAnalytics = async () => {
-    try {
-      setLoading(true);
+      let endpoint = '';
       const params = new URLSearchParams({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate
       });
 
-      const response = await fetch(`${apiUrl}/api/analytics/savings-detailed?${params}`, {
+      if (activeTab === 'categories') {
+        if (selectedCategories.length) {
+          params.append('categories', selectedCategories.join(','));
+        }
+        endpoint = `/api/analytics/category-detailed?${params}`;
+      } else {
+        endpoint = `/api/analytics/savings-detailed?${params}`;
+      }
+
+      const response = await fetch(`${apiUrl}${endpoint}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (!response.ok) {
+        throw new Error('Hiba az adatok lekérésekor');
+      }
+
+      const data = await response.json();
+      if (activeTab === 'categories') {
+        setCategoryData(data.categories || []);
+        setSubcategoryData(data.subcategories || []);
+      } else {
         setSavingsData(data || []);
       }
     } catch (err) {
-      setError('Megtakarítás adatok lekérési hiba');
+      setError(err.message);
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, token, activeTab, dateRange, selectedCategories]);
 
-  // Adatok frissítése
-  const refreshData = () => {
-    if (activeTab === 'categories') {
-      fetchCategoryAnalytics();
-    } else {
-      fetchSavingsAnalytics();
-    }
-  };
-
-  // Inicializálás
   useEffect(() => {
-    if (token && apiUrl) {
-      fetchCategories();
-      refreshData();
-    }
-  }, [token, apiUrl, activeTab, dateRange, selectedCategories]);
+    fetchCategories();
+  }, [fetchCategories]);
 
-  // Kategória komponens
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const CategoryAnalytics = () => {
     const totalSpending = categoryData.reduce((sum, item) => sum + item.amount, 0);
-    const dataWithColors = categoryData.map((item, index) => ({
-      ...item,
-      color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]
-    }));
 
     return (
       <div className="analytics-content">
@@ -172,22 +142,23 @@ const AnalyticsPage = () => {
             <div className="analytics-chart-large">
               <ResponsiveContainer width="100%" height={400}>
                 <PieChart>
-                  <PieChart
-                    data={dataWithColors}
+                  <Pie
+                    data={categoryData}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
                     outerRadius={140}
                     dataKey="amount"
+                    nameKey="name"
                   >
-                    {dataWithColors.map((entry, index) => (
+                    {categoryData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
-                  </PieChart>
-                  <Tooltip 
+                  </Pie>
+                  <Tooltip
                     formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Költés']}
-                    contentStyle={{ 
-                      backgroundColor: '#2d3748', 
+                    contentStyle={{
+                      backgroundColor: '#2d3748',
                       border: '1px solid #4a5568',
                       borderRadius: '8px',
                       color: '#e2e8f0'
@@ -204,26 +175,30 @@ const AnalyticsPage = () => {
             <h4>Kategóriák összehasonlítása</h4>
             <div className="analytics-chart-large">
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={dataWithColors} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <XAxis 
-                    dataKey="name" 
+                <RechartsBarChart data={categoryData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <XAxis
+                    dataKey="name"
                     angle={-45}
                     textAnchor="end"
                     height={100}
                     tick={{ fontSize: 12, fill: '#a0aec0' }}
                   />
                   <YAxis tick={{ fontSize: 12, fill: '#a0aec0' }} />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Költés']}
-                    contentStyle={{ 
-                      backgroundColor: '#2d3748', 
+                    contentStyle={{
+                      backgroundColor: '#2d3748',
                       border: '1px solid #4a5568',
                       borderRadius: '8px',
                       color: '#e2e8f0'
                     }}
                   />
-                  <Bar dataKey="amount" fill="#4299e1" />
-                </BarChart>
+                  <Bar dataKey="amount">
+                    {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </RechartsBarChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -239,11 +214,11 @@ const AnalyticsPage = () => {
               <div>Arány</div>
               <div>Tranzakciók</div>
             </div>
-            {dataWithColors.map((item, index) => (
+            {categoryData.map((item, index) => (
               <div key={index} className="analytics-table-row">
                 <div className="analytics-table-category">
-                  <div 
-                    className="analytics-table-color" 
+                  <div
+                    className="analytics-table-color"
                     style={{ backgroundColor: item.color }}
                   ></div>
                   {item.name}
@@ -252,7 +227,7 @@ const AnalyticsPage = () => {
                   {item.amount.toLocaleString('hu-HU')} Ft
                 </div>
                 <div className="analytics-table-percentage">
-                  {((item.amount / totalSpending) * 100).toFixed(1)}%
+                  {totalSpending > 0 ? ((item.amount / totalSpending) * 100).toFixed(1) : 0}%
                 </div>
                 <div className="analytics-table-count">
                   {item.transactionCount || 0}
@@ -265,11 +240,10 @@ const AnalyticsPage = () => {
     );
   };
 
-  // Megtakarítás komponens
-  const SavingsAnalytics = () => {
+    const SavingsAnalytics = () => {
     const totalSavings = savingsData.reduce((sum, item) => sum + (item.savings || 0), 0);
     const averageSavings = savingsData.length ? totalSavings / savingsData.length : 0;
-    const bestMonth = savingsData.reduce((best, current) => 
+    const bestMonth = savingsData.reduce((best, current) =>
       (current.savings || 0) > (best.savings || 0) ? current : best, savingsData[0] || {});
 
     return (
@@ -297,56 +271,57 @@ const AnalyticsPage = () => {
         </div>
 
         <div className="analytics-charts-grid">
-          {/* Vonaldiagram */}
           <div className="analytics-chart-card full-width">
             <h4>Havi megtakarítás alakulása</h4>
             <div className="analytics-chart-large">
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart data={savingsData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <XAxis 
-                    dataKey="month" 
+                  <XAxis
+                    dataKey="month"
                     tick={{ fontSize: 12, fill: '#a0aec0' }}
                   />
                   <YAxis tick={{ fontSize: 12, fill: '#a0aec0' }} />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Megtakarítás']}
-                    contentStyle={{ 
-                      backgroundColor: '#2d3748', 
+                    contentStyle={{
+                      backgroundColor: '#2d3748',
                       border: '1px solid #4a5568',
                       borderRadius: '8px',
                       color: '#e2e8f0'
                     }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="savings" 
-                    stroke="#4299e1" 
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="savings"
+                    name="Megtakarítás"
+                    stroke="#4299e1"
                     strokeWidth={3}
                     dot={{ fill: '#4299e1', strokeWidth: 2, r: 4 }}
                     activeDot={{ r: 6 }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="income" 
-                    stroke="#48bb78" 
+                  <Line
+                    type="monotone"
+                    dataKey="income"
+                    name="Bevétel"
+                    stroke="#48bb78"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="expenses" 
-                    stroke="#f56565" 
+                  <Line
+                    type="monotone"
+                    dataKey="expenses"
+                    name="Kiadás"
+                    stroke="#f56565"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                   />
-                  <Legend />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        {/* Havi részletezés */}
         <div className="analytics-table-card">
           <h4>Havi részletezés</h4>
           <div className="analytics-table">
@@ -358,9 +333,9 @@ const AnalyticsPage = () => {
               <div>Változás</div>
             </div>
             {savingsData.map((item, index) => {
-              const prevSavings = index > 0 ? savingsData[index - 1].savings : 0;
-              const change = item.savings - prevSavings;
-              
+              const prevSavings = index > 0 ? (savingsData[index - 1].savings || 0) : 0;
+              const change = (item.savings || 0) - prevSavings;
+
               return (
                 <div key={index} className="analytics-table-row">
                   <div>{item.month}</div>
@@ -387,19 +362,15 @@ const AnalyticsPage = () => {
 
   return (
     <div className="analytics-page">
-      {/* Header */}
-      
-
-      {/* Tabs */}
       <div className="analytics-tabs">
-        <button 
+        <button
           className={`analytics-tab ${activeTab === 'categories' ? 'active' : ''}`}
           onClick={() => handleTabChange('categories')}
         >
           <PieChartIcon />
           Kategória Analízis
         </button>
-        <button 
+        <button
           className={`analytics-tab ${activeTab === 'savings' ? 'active' : ''}`}
           onClick={() => handleTabChange('savings')}
         >
@@ -408,7 +379,6 @@ const AnalyticsPage = () => {
         </button>
       </div>
 
-      {/* Szűrők */}
       <div className="analytics-filters">
         <div className="analytics-filter-group">
           <label>
@@ -438,7 +408,7 @@ const AnalyticsPage = () => {
               <Filter />
               Kategóriák
             </label>
-            <select 
+            <select
               multiple
               value={selectedCategories}
               onChange={(e) => setSelectedCategories(Array.from(e.target.selectedOptions, option => option.value))}
@@ -452,17 +422,8 @@ const AnalyticsPage = () => {
             </select>
           </div>
         )}
-
-        <button 
-          onClick={refreshData}
-          className="analytics-refresh-btn"
-          disabled={loading}
-        >
-          Frissítés
-        </button>
       </div>
 
-      {/* Tartalom */}
       {loading && (
         <div className="analytics-loading">
           <div className="loading-spinner"></div>
@@ -473,14 +434,13 @@ const AnalyticsPage = () => {
       {error && (
         <div className="analytics-error">
           <p>{error}</p>
-          <button onClick={refreshData}>Újrapróbálás</button>
+          <button onClick={fetchData}>Újrapróbálás</button>
         </div>
       )}
 
       {!loading && !error && (
         <>
-          {activeTab === 'categories' && <CategoryAnalytics />}
-          {activeTab === 'savings' && <SavingsAnalytics />}
+          {activeTab === 'categories' ? <CategoryAnalytics /> : <SavingsAnalytics />}
         </>
       )}
     </div>

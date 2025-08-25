@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import TransactionModal from '../TransactionModal';
-import TransferModal from '../TransferModal'; 
+import TransferModal from '../TransferModal';
 import AccountModal from '../AccountModal';
 import ModernTransactionsList from './ModernTransactionsList';
 import QuickActionsPanel from './QuickActionsPanel';
@@ -19,7 +19,7 @@ function ModernAccountsOverview() {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [modalConfig, setModalConfig] = useState({ type: '', accountId: null, accountName: '' });
   const [selectedAccountGroup, setSelectedAccountGroup] = useState('all');
-  
+
   const [filters, setFilters] = useState({
     accountId: 'all',
     type: 'all',
@@ -41,28 +41,31 @@ function ModernAccountsOverview() {
     try {
       const [accRes, catRes, transRes] = await Promise.all([
         fetch(`${apiUrl}/api/accounts`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${apiUrl}/api/categories`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${apiUrl}/api/categories/tree`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${apiUrl}/api/transactions?${queryParams.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } }),
       ]);
-      
-      const accData = await accRes.json();
-      const catData = await catRes.json();
-      const transData = await transRes.json();
-      
+
+      const accData = accRes.ok ? await accRes.json() : [];
+      const catData = catRes.ok ? await catRes.json() : [];
+      const transData = transRes.ok ? await transRes.json() : [];
+
       setAccounts(accData);
       setCategories(catData);
       setTransactions(transData);
-    } catch (error) { 
-      console.error("Hiba az adatok lekérésekor:", error); 
+    } catch (error) {
+      console.error("Hiba az adatok lekérésekor:", error);
+      setAccounts([]);
+      setCategories([]);
+      setTransactions([]);
     }
   }, [token, user, apiUrl, filters]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-  
+
   const groupedAccounts = useMemo(() => {
-    if (!user || accounts.length === 0) return [];
+    if (!user || !Array.isArray(accounts) || accounts.length === 0) return [];
 
     const getSortOrder = (account) => {
         if (account.owner_user_id === user.id) return 0;
@@ -109,7 +112,6 @@ function ModernAccountsOverview() {
     return groups;
   }, [accounts, user]);
 
-  // Filter accounts based on selected group
   const displayedGroups = useMemo(() => {
     if (selectedAccountGroup === 'all') return groupedAccounts;
     return groupedAccounts.filter(group => group.id === selectedAccountGroup);
@@ -242,7 +244,6 @@ function ModernAccountsOverview() {
 
   return (
     <div className="modern-accounts-overview">
-      {/* Quick Actions Panel */}
       <QuickActionsPanel 
         onNewAccount={() => setIsAccountModalOpen(true)}
         onQuickTransaction={openModalForNew}
@@ -250,7 +251,6 @@ function ModernAccountsOverview() {
         user={user}
       />
 
-      {/* Account Group Filter */}
       <div className="account-group-filter">
         <div className="filter-chips">
           <button 
@@ -273,7 +273,6 @@ function ModernAccountsOverview() {
         </div>
       </div>
 
-      {/* Accounts Grid */}
       <div className="accounts-section">
         {displayedGroups.map(group => (
           <div key={group.id} className="account-group">
@@ -368,7 +367,6 @@ function ModernAccountsOverview() {
         ))}
       </div>
 
-      {/* Modern Transactions List */}
       <ModernTransactionsList 
         transactions={transactions}
         filters={filters}
@@ -378,7 +376,6 @@ function ModernAccountsOverview() {
         user={user}
       />
 
-      {/* Modals */}
       <AccountModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}

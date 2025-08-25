@@ -6,15 +6,12 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('authToken'));
   const [user, setUser] = useState(null);
   
-  // === ÚJ DINAMIKUS LOGIKA ===
-  // A böngésző címsorából vesszük az IP címet, a port pedig fixen 8000.
   const apiUrl = `http://${window.location.hostname}:8000`;
 
   useEffect(() => {
     const fetchUser = async () => {
       if (token) {
         try {
-          // Itt már az új, dinamikus apiUrl-t használjuk
           const response = await fetch(`${apiUrl}/api/users/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -31,14 +28,21 @@ export const AuthProvider = ({ children }) => {
       }
     };
     fetchUser();
-  }, [token, apiUrl]); // Az apiUrl-t is felvesszük a függőségek közé
+  }, [token, apiUrl]);
 
   const login = async (userId, pin) => {
     try {
-      // Itt is az új, dinamikus apiUrl-t használjuk
-      const response = await fetch(`${apiUrl}/api/login?user_id=${userId}&pin=${pin}`, {
+      // JAVÍTÁS: Az adatokat a kérés törzsébe (body) helyezzük, URLSearchParams formátumban.
+      const body = new URLSearchParams();
+      body.append('user_id', userId);
+      body.append('pin', pin);
+
+      const response = await fetch(`${apiUrl}/api/login`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
       });
+
       if (!response.ok) throw new Error('Hibás PIN kód vagy felhasználó.');
       
       const data = await response.json();
@@ -58,7 +62,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    // Most már az 'apiUrl'-t is elérhetővé tesszük az egész alkalmazás számára
     <AuthContext.Provider value={{ token, user, login, logout, apiUrl }}>
       {children}
     </AuthContext.Provider>

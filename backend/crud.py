@@ -510,94 +510,79 @@ def get_all_personal_accounts(db: Session, family_id: int):
     ).all()
 def get_financial_summary(db: Session, user: models.User):
     """
-    ❌ EREDETI használta a problémás get_accounts_by_family függvényt
+    Kiszámolja a pénzügyi összegzést a Dashboard kártya számára a helyes, új logika alapján.
     """
-    family_id = user.family_id
     current_month = datetime.now().month
     current_year = datetime.now().year
-    
-    # ❌ TÖRLENDŐ - ez problémás:
-    # visible_accounts = get_accounts_by_family(db, user=user)
-    
-    # ✅ JAVÍTOTT - közvetlen DB query:
-    if user.role in ["Családfő", "Szülő"]:
-        # Egyszerű query, joinedload nélkül
-        all_family_accounts = db.query(models.Account).filter(
-            models.Account.family_id == family_id
-        ).all()
-        
-        # Szülők személyes kasszái
-        parent_personal_accounts = []
-        for acc in all_family_accounts:
-            if acc.owner_user and acc.owner_user.role in ['Családfő', 'Szülő'] and acc.type == 'személyes':
-                parent_personal_accounts.append(acc)
-        
-        other_accounts_summary = [
-            {"name": acc.name, "balance": float(acc.balance)} 
-            for acc in all_family_accounts if acc.type != 'személyes'
-        ]
-        
-        total_parents_balance = sum(acc.balance for acc in parent_personal_accounts)
-        visible_account_ids = [acc.id for acc in all_family_accounts]
 
-    else:  # Gyerek/Tizenéves
-        personal_account = db.query(models.Account).filter(
-            models.Account.owner_user_id == user.id,
+    # Szerepkör-alapú szűrők definiálása
+    if user.role in ["Családfő", "Szülő"]:
+        # SZÜLŐI NÉZET
+        parent_roles = ["Családfő", "Szülő"]
+        parent_ids = [u.id for u in db.query(models.User.id).filter(models.User.family_id == user.family_id, models.User.role.in_(parent_roles)).all()]
+        
+        # A szülők egyenlege CSAK a személyes kasszáik összege
+        total_balance = db.query(func.sum(models.Account.balance)).filter(
+            models.Account.owner_user_id.in_(parent_ids),
             models.Account.type == 'személyes'
-        ).first()
-        
-        if not personal_account:
-            return {
-                "view_type": "child",
-                "balance_title": "Zsebpénzem", 
-                "total_balance": 0,
-                "other_accounts": [],
-                "monthly_income": 0, 
-                "monthly_expense": 0, 
-                "monthly_savings": 0
-            }
-            
-        visible_account_ids = [personal_account.id]
-        total_parents_balance = personal_account.balance
-        other_accounts_summary = []
+        ).scalar() or Decimal(0)
 
-    # Statisztikák számítása
-    monthly_income = db.query(func.sum(models.Transaction.amount)).filter(
-        models.Transaction.account_id.in_(visible_account_ids),
-        models.Transaction.type == 'bevétel',
-        models.Transaction.transfer_id == None,
-        extract('year', models.Transaction.date) == current_year,
-        extract('month', models.Transaction.date) == current_month
-    ).scalar() or Decimal(0)
-    
-    monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(
-        models.Transaction.account_id.in_(visible_account_ids),
-        models.Transaction.type == 'kiadás',
-        ((models.Transaction.transfer_id == None) | (models.Transaction.is_family_expense == True)),
-        extract('year', models.Transaction.date) == current_year,
-        extract('month', models.Transaction.date) == current_month
-    ).scalar() or Decimal(0)
+        # Havi bevétel: csak a külső forrásból származó
+        monthly_income = db.query(func.sum(models.Transaction.amount)).filter(
+            models.Transaction.account_id.in_(db.query(models.Account.id).filter(models.Account.owner_user_id.in_(parent_ids))),
+            models.Transaction.type == 'bevétel',
+            models.Transaction.transfer_id == None,
+            extract('year', models.Transaction.date) == current_year,
+            extract('month', models.Transaction.date) == current_month
+        ).scalar() or Decimal(0)
 
-    if user.role in ["Családfő", "Szülő"]:
+        # Havi kiadás: külső kiadás VAGY zsebpénz
+        monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(
+            models.Transaction.account_id.in_(db.query(models.Account.id).filter(models.Account.owner_user_id.in_(parent_ids))),
+            models.Transaction.type == 'kiadás',
+            or_(
+                models.Transaction.transfer_id == None,
+                models.Transaction.is_family_expense == True
+            ),
+            extract('year', models.Transaction.date) == current_year,
+            extract('month', models.Transaction.date) == current_month
+        ).scalar() or Decimal(0)
+
         return {
-            "view_type": "parent",
-            "balance_title": "Szülők Egyenlege",
-            "total_balance": float(total_parents_balance),
-            "other_accounts": other_accounts_summary,
-            "monthly_income": float(monthly_income),
-            "monthly_expense": float(monthly_expense),
-            "monthly_savings": float(monthly_income - monthly_expense)
+            "view_type": "parent", "balance_title": "Szülők közös egyenlege",
+            "total_balance": float(total_balance), "monthly_income": float(monthly_income),
+            "monthly_expense": float(monthly_expense), "monthly_savings": float(monthly_income - monthly_expense)
         }
     else:
+        # GYEREK NÉZET
+        personal_account = db.query(models.Account).filter(models.Account.owner_user_id == user.id).first()
+        if not personal_account:
+            return {"view_type": "child", "balance_title": "Zsebpénzem", "total_balance": 0, "monthly_income": 0, "monthly_expense": 0, "monthly_savings": 0}
+
+        total_balance = personal_account.balance
+
+        # Havi bevétel: minden, ami bejön (zsebpénz is)
+        monthly_income = db.query(func.sum(models.Transaction.amount)).filter(
+            models.Transaction.account_id == personal_account.id,
+            models.Transaction.type == 'bevétel',
+            extract('year', models.Transaction.date) == current_year,
+            extract('month', models.Transaction.date) == current_month
+        ).scalar() or Decimal(0)
+
+        # Havi kiadás: minden, ami kimegy
+        monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(
+            models.Transaction.account_id == personal_account.id,
+            models.Transaction.type == 'kiadás',
+            extract('year', models.Transaction.date) == current_year,
+            extract('month', models.Transaction.date) == current_month
+        ).scalar() or Decimal(0)
+
         return {
-            "view_type": "child",
-            "balance_title": "Zsebpénzem",
-            "total_balance": float(total_parents_balance),
-            "other_accounts": other_accounts_summary,
-            "monthly_income": float(monthly_income),
-            "monthly_expense": float(monthly_expense),
-            "monthly_savings": float(monthly_income - monthly_expense)
+            "view_type": "child", "balance_title": "Zsebpénzem",
+            "total_balance": float(total_balance), "monthly_income": float(monthly_income),
+            "monthly_expense": float(monthly_expense), "monthly_savings": float(monthly_income - monthly_expense)
         }
+
 def update_category(db: Session, category_id: int, category_data: schemas.CategoryCreate):
     db_category = get_category(db, category_id)
     if db_category:
@@ -990,128 +975,94 @@ def get_category_spending_analytics(
         print(f"Category analytics error: {e}")
         return []
 
-def get_savings_trend_analytics(db: Session, user: models.User, year: int = None):
-    """
-    Havi megtakarítás trend lekérdezése - dashboard kártyához
-    """
+def get_category_spending_analytics(
+    db: Session, user: models.User, month: int = None, year: int = None
+):
     try:
-        from datetime import datetime
-        
-        if not year:
-            year = datetime.now().year
+        if not month: month = datetime.now().month
+        if not year: year = datetime.now().year
             
-        # Felhasználó szerepkör alapú kassza szűrés
+        visible_account_ids = _get_analytics_account_ids(db, user)
+        if not visible_account_ids: return []
+            
+        expense_filter = and_(
+            models.Transaction.type == 'kiadás',
+            extract('month', models.Transaction.date) == month,
+            extract('year', models.Transaction.date) == year
+        )
         if user.role in ["Családfő", "Szülő"]:
-            family_accounts = db.query(models.Account).filter(
-                models.Account.family_id == user.family_id
-            ).all()
-            visible_account_ids = [acc.id for acc in family_accounts]
-        else:
-            personal_account = db.query(models.Account).filter(
-                models.Account.owner_user_id == user.id,
-                models.Account.type == 'személyes'
-            ).first()
-            visible_account_ids = [personal_account.id] if personal_account else []
+             expense_filter = and_(expense_filter, or_(
+                models.Transaction.transfer_id == None,
+                models.Transaction.is_family_expense == True
+            ))
+
+        category_stats = db.query(
+            models.Category.name.label('name'),
+            models.Category.color.label('color'),
+            func.sum(models.Transaction.amount).label('amount'),
+            func.count(models.Transaction.id).label('transactionCount')
+        ).join(
+            models.Transaction, models.Transaction.category_id == models.Category.id
+        ).filter(models.Transaction.account_id.in_(visible_account_ids), expense_filter).group_by(
+            models.Category.id, models.Category.name, models.Category.color
+        ).order_by(
+            func.sum(models.Transaction.amount).desc()
+        ).limit(10).all()
         
-        if not visible_account_ids:
-            return []
-            
-        # Havi bontású adatok
-        months = []
-        for month in range(1, 13):
-            # Havi bevétel - egyszerűsítve
-            monthly_income = db.query(
-                func.sum(models.Transaction.amount)
-            ).filter(
-                models.Transaction.account_id.in_(visible_account_ids),
-                models.Transaction.type == 'bevétel',
-                extract('month', models.Transaction.date) == month,
-                extract('year', models.Transaction.date) == year
-            ).scalar() or 0
-            
-            # Havi kiadás - egyszerűsítve
-            monthly_expense = db.query(
-                func.sum(models.Transaction.amount)
-            ).filter(
-                models.Transaction.account_id.in_(visible_account_ids),
-                models.Transaction.type == 'kiadás',
-                extract('month', models.Transaction.date) == month,
-                extract('year', models.Transaction.date) == year
-            ).scalar() or 0
-            
-            savings = float(monthly_income) - float(monthly_expense)
-            
-            months.append({
-                "month": f"{month:02d}",
-                "savings": savings,
-                "income": float(monthly_income),
-                "expenses": float(monthly_expense)
-            })
-            
-        return months
-        
+        return [
+            {"name": stat.name, "color": stat.color or '#cccccc', "amount": float(stat.amount), "transactionCount": stat.transactionCount}
+            for stat in category_stats
+        ]
     except Exception as e:
-        print(f"Savings trend analytics error: {e}")
+        print(f"Category analytics error: {e}")
         return []
 
 def get_savings_trend_analytics(db: Session, user: models.User, year: int = None):
     """
-    Havi megtakarítás trend lekérdezése - dashboard kártyához
+    JAVÍTOTT: Most már csak az aktuális hónapig (bezárólag) kéri le az adatokat,
+    így a Dashboard kártya mindig a valós aktuális hónapot mutatja.
     """
     try:
+        current_dt = datetime.now()
         if not year:
-            year = datetime.now().year
-            
-        visible_accounts = get_accounts_by_family(db, user=user)
-        visible_account_ids = [acc.id for acc in visible_accounts]
+            year = current_dt.year
         
-        if not visible_account_ids:
-            return []
+        # Meghatározzuk, hogy meddig kell a ciklusnak futnia
+        end_month = 12
+        if year == current_dt.year:
+            end_month = current_dt.month
+
+        visible_account_ids = _get_analytics_account_ids(db, user)
+        if not visible_account_ids: return []
             
-        # Havi bontású adatok
         months = []
-        for month in range(1, 13):
-            # Havi bevétel
-            monthly_income = db.query(
-                func.sum(models.Transaction.amount)
-            ).filter(
-                and_(
-                    models.Transaction.account_id.in_(visible_account_ids),
-                    models.Transaction.type == 'bevétel',
-                    models.Transaction.transfer_id == None,
-                    extract('month', models.Transaction.date) == month,
-                    extract('year', models.Transaction.date) == year
-                )
+        # A ciklus már csak a releváns hónapokig fut
+        for month in range(1, end_month + 1):
+            if user.role in ["Családfő", "Szülő"]:
+                income_filter = and_(models.Transaction.type == 'bevétel', models.Transaction.transfer_id == None)
+                expense_filter = and_(models.Transaction.type == 'kiadás', or_(models.Transaction.transfer_id == None, models.Transaction.is_family_expense == True))
+            else:
+                income_filter = and_(models.Transaction.type == 'bevétel')
+                expense_filter = and_(models.Transaction.type == 'kiadás')
+
+            monthly_income = db.query(func.sum(models.Transaction.amount)).filter(
+                models.Transaction.account_id.in_(visible_account_ids),
+                extract('month', models.Transaction.date) == month,
+                extract('year', models.Transaction.date) == year,
+                income_filter
             ).scalar() or 0
             
-            # Havi kiadás
-            monthly_expense = db.query(
-                func.sum(models.Transaction.amount)
-            ).filter(
-                and_(
-                    models.Transaction.account_id.in_(visible_account_ids),
-                    models.Transaction.type == 'kiadás',
-                    or_(
-                        models.Transaction.transfer_id == None,
-                        models.Transaction.is_family_expense == True
-                    ),
-                    extract('month', models.Transaction.date) == month,
-                    extract('year', models.Transaction.date) == year
-                )
+            monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(
+                models.Transaction.account_id.in_(visible_account_ids),
+                extract('month', models.Transaction.date) == month,
+                extract('year', models.Transaction.date) == year,
+                expense_filter
             ).scalar() or 0
             
-            # Megtakarítás = Bevétel - Kiadás
             savings = float(monthly_income) - float(monthly_expense)
-            
-            months.append({
-                "month": f"{year}.{month:02d}",
-                "savings": savings,
-                "income": float(monthly_income),
-                "expenses": float(monthly_expense)
-            })
+            months.append({"month": f"{year}.{month:02d}", "savings": savings, "income": float(monthly_income), "expenses": float(monthly_expense)})
             
         return months
-        
     except Exception as e:
         print(f"Savings trend analytics error: {e}")
         return []
@@ -1123,51 +1074,49 @@ def get_detailed_category_analytics(
     end_date: str,
     category_ids: list = None
 ):
-    """
-    Részletes kategória analitika - analytics oldalhoz
-    """
     try:
-        visible_accounts = get_accounts_by_family(db, user=user)
-        visible_account_ids = [acc.id for acc in visible_accounts]
+        visible_account_ids = _get_analytics_account_ids(db, user)
         
         if not visible_account_ids:
             return {"categories": [], "subcategories": []}
-            
-        # Base query
+
+        base_filter = and_(
+            models.Transaction.account_id.in_(visible_account_ids),
+            models.Transaction.type == 'kiadás',
+            models.Transaction.date >= start_date,
+            models.Transaction.date <= end_date,
+        )
+        if user.role in ["Családfő", "Szülő"]:
+             base_filter = and_(base_filter, or_(
+                models.Transaction.transfer_id == None,
+                models.Transaction.is_family_expense == True
+            ))
+
         query = db.query(
             models.Category.name.label('name'),
+            models.Category.color.label('color'),
             func.sum(models.Transaction.amount).label('amount'),
             func.count(models.Transaction.id).label('transactionCount')
         ).join(
             models.Transaction, models.Transaction.category_id == models.Category.id
-        ).filter(
-            and_(
-                models.Transaction.account_id.in_(visible_account_ids),
-                models.Transaction.type == 'kiadás',
-                models.Transaction.date >= start_date,
-                models.Transaction.date <= end_date,
-                models.Transaction.transfer_id == None
-            )
-        )
+        ).filter(base_filter)
         
-        # Kategória szűrés ha van
         if category_ids:
             query = query.filter(models.Category.id.in_(category_ids))
             
-        # Főkategóriák
         category_stats = query.filter(
             models.Category.parent_id == None
         ).group_by(
-            models.Category.id, models.Category.name
+            models.Category.id, models.Category.name, models.Category.color
         ).order_by(
             func.sum(models.Transaction.amount).desc()
         ).all()
         
-        # Alkategóriák
+        
         subcategory_stats = query.filter(
             models.Category.parent_id != None
         ).group_by(
-            models.Category.id, models.Category.name
+            models.Category.id, models.Category.name, models.Category.color
         ).order_by(
             func.sum(models.Transaction.amount).desc()
         ).all()
@@ -1176,6 +1125,7 @@ def get_detailed_category_analytics(
             "categories": [
                 {
                     "name": stat.name,
+                    "color": stat.color or '#cccccc',
                     "amount": float(stat.amount),
                     "transactionCount": stat.transactionCount
                 }
@@ -1184,6 +1134,7 @@ def get_detailed_category_analytics(
             "subcategories": [
                 {
                     "name": stat.name,
+                    "color": stat.color or '#cccccc',
                     "amount": float(stat.amount),
                     "transactionCount": stat.transactionCount
                 }
@@ -1196,76 +1147,81 @@ def get_detailed_category_analytics(
         return {"categories": [], "subcategories": []}
 
 def get_detailed_savings_analytics(
-    db: Session, 
-    user: models.User, 
-    start_date: str, 
-    end_date: str
+    db: Session, user: models.User, start_date: str, end_date: str
 ):
     """
-    Részletes megtakarítás analitika - analytics oldalhoz
+    JAVÍTOTT: Most már ez a függvény is a helyes, szerepkör-alapú logikát használja.
     """
     try:
-        visible_accounts = get_accounts_by_family(db, user=user)
-        visible_account_ids = [acc.id for acc in visible_accounts]
-        
-        if not visible_account_ids:
-            return []
+        visible_account_ids = _get_analytics_account_ids(db, user)
+        if not visible_account_ids: return []
             
-        # Parse dates
         start = datetime.strptime(start_date, '%Y-%m-%d')
         end = datetime.strptime(end_date, '%Y-%m-%d')
         
-        # Havi bontás
         results = []
-        current = start.replace(day=1)  # Hónap elejére
+        current = start.replace(day=1)
         
         while current <= end:
-            # Havi bevétel
-            monthly_income = db.query(
-                func.sum(models.Transaction.amount)
-            ).filter(
-                and_(
-                    models.Transaction.account_id.in_(visible_account_ids),
-                    models.Transaction.type == 'bevétel',
-                    models.Transaction.transfer_id == None,
-                    extract('month', models.Transaction.date) == current.month,
-                    extract('year', models.Transaction.date) == current.year
-                )
+            # Szerepkör-specifikus szűrők
+            if user.role in ["Családfő", "Szülő"]:
+                income_filter = and_(models.Transaction.type == 'bevétel', models.Transaction.transfer_id == None)
+                expense_filter = and_(models.Transaction.type == 'kiadás', or_(models.Transaction.transfer_id == None, models.Transaction.is_family_expense == True))
+            else:
+                income_filter = and_(models.Transaction.type == 'bevétel')
+                expense_filter = and_(models.Transaction.type == 'kiadás')
+            
+            monthly_income = db.query(func.sum(models.Transaction.amount)).filter(
+                models.Transaction.account_id.in_(visible_account_ids),
+                extract('month', models.Transaction.date) == current.month,
+                extract('year', models.Transaction.date) == current.year,
+                income_filter
             ).scalar() or 0
             
-            # Havi kiadás
-            monthly_expense = db.query(
-                func.sum(models.Transaction.amount)
-            ).filter(
-                and_(
-                    models.Transaction.account_id.in_(visible_account_ids),
-                    models.Transaction.type == 'kiadás',
-                    or_(
-                        models.Transaction.transfer_id == None,
-                        models.Transaction.is_family_expense == True
-                    ),
-                    extract('month', models.Transaction.date) == current.month,
-                    extract('year', models.Transaction.date) == current.year
-                )
+            monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(
+                models.Transaction.account_id.in_(visible_account_ids),
+                extract('month', models.Transaction.date) == current.month,
+                extract('year', models.Transaction.date) == current.year,
+                expense_filter
             ).scalar() or 0
             
             savings = float(monthly_income) - float(monthly_expense)
+            results.append({"month": current.strftime('%Y.%m'), "savings": savings, "income": float(monthly_income), "expenses": float(monthly_expense)})
             
-            results.append({
-                "month": current.strftime('%Y.%m'),
-                "savings": savings,
-                "income": float(monthly_income),
-                "expenses": float(monthly_expense)
-            })
-            
-            # Következő hónap
             if current.month == 12:
                 current = current.replace(year=current.year + 1, month=1)
             else:
                 current = current.replace(month=current.month + 1)
                 
         return results
-        
     except Exception as e:
         print(f"Detailed savings analytics error: {e}")
         return []
+
+
+def _get_analytics_account_ids(db: Session, user: models.User) -> list[int]:
+    """
+    Kifejezetten analitikai célokra adja vissza a releváns kasszák azonosítóit.
+    - Szülők/Családfő: Csak a saját személyes, a közös, a cél- és a vészkasszákat veszi figyelembe.
+                      A gyerekek személyes kasszáit kihagyja az összesítésből.
+    - Gyerekek/Tizenévesek: Csak a számukra látható kasszákat adja vissza (jellemzően a sajátjukat).
+    """
+    if user.role in ["Családfő", "Szülő"]:
+        parent_roles = ["Családfő", "Szülő"]
+        
+        parent_ids_query = db.query(models.User.id).filter(
+            models.User.family_id == user.family_id,
+            models.User.role.in_(parent_roles)
+        )
+        parent_ids = [pid[0] for pid in parent_ids_query.all()]
+
+        accounts_query = db.query(models.Account.id).filter(
+            models.Account.family_id == user.family_id,
+            or_(
+                models.Account.type.in_(['közös', 'cél', 'vész']),
+                models.Account.owner_user_id.in_(parent_ids)
+            )
+        )
+        return [acc_id[0] for acc_id in accounts_query.all()]
+    else:
+        return [acc.id for acc in user.visible_accounts]
