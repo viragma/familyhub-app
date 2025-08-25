@@ -247,30 +247,50 @@ def create_account_transaction(db: Session, transaction: schemas.TransactionCrea
     return db_transaction
 def get_categories(db: Session):
     """
-    Lekérdezi az összes kategóriát, és egy fába rendezi őket
-    a szülő-gyerek kapcsolatok alapján.
+    Egyszerű kategória lista - circular reference nélkül
     """
-    # 1. Lekérdezzük az ÖSSZES kategóriát egyszerre
+    categories = db.query(models.Category).all()
+    return [
+        {
+            "id": cat.id,
+            "name": cat.name,
+            "parent_id": cat.parent_id,
+            "color": cat.color,
+            "icon": cat.icon,
+            "has_children": db.query(models.Category).filter(models.Category.parent_id == cat.id).count() > 0
+        }
+        for cat in categories
+    ]
+
+def get_categories_tree(db: Session):
+    """
+    Fa struktúra - csak amikor tényleg kell
+    """
     all_categories = db.query(models.Category).all()
     
-    # 2. Létrehozunk egy szótárat, hogy könnyen megtaláljuk őket ID alapján
-    category_map = {category.id: category for category in all_categories}
-
-    # 3. Összeállítjuk a fát
-    tree = []
+    categories_dict = []
     for category in all_categories:
-        if category.parent_id:
-            # Ha van szülője, hozzáadjuk a szülő 'children' listájához
-            parent = category_map.get(category.parent_id)
+        category_dict = {
+            "id": category.id,
+            "name": category.name,
+            "parent_id": category.parent_id,
+            "color": category.color,
+            "icon": category.icon,
+            "children": []
+        }
+        categories_dict.append(category_dict)
+    
+    category_map = {cat["id"]: cat for cat in categories_dict}
+    
+    tree = []
+    for cat_dict in categories_dict:
+        if cat_dict["parent_id"]:
+            parent = category_map.get(cat_dict["parent_id"])
             if parent:
-                # Biztosítjuk, hogy a children lista létezzen
-                if not hasattr(parent, 'children'):
-                    parent.children = []
-                parent.children.append(category)
+                parent["children"].append(cat_dict)
         else:
-            # Ha nincs szülője, akkor a fa gyökereleme
-            tree.append(category)
-            
+            tree.append(cat_dict)
+    
     return tree
 
 def create_category(db: Session, category: schemas.CategoryCreate):
@@ -741,3 +761,32 @@ def delete_recurring_rule(db: Session, rule_id: int, user: models.User):
     db.delete(db_rule)
     db.commit()
     return db_rule
+def toggle_rule_status(db: Session, rule_id: int, user: models.User):
+    db_rule = db.query(models.RecurringRule).filter(models.RecurringRule.id == rule_id).first()
+    if not db_rule or (db_rule.owner_id != user.id and user.role not in ["Családfő", "Szülő"]):
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a szabály módosításához.")
+    
+    db_rule.is_active = not db_rule.is_active
+    db.commit()
+    db.refresh(db_rule)
+    return db_rule
+def get_dashboard_goals(db: Session, user: models.User):
+    """ Lekérdezi a felhasználó számára releváns célokat a dashboardra. """
+    # Családi célok, amik a dashboardon jelennek meg
+    family_goals = db.query(models.Account).options(joinedload(models.Account.owner_user)).filter(
+        models.Account.family_id == user.family_id,
+        models.Account.type == 'cél',
+        models.Account.show_on_dashboard == True
+    ).all()
+
+    # A felhasználó saját, személyes céljai
+    personal_goals = db.query(models.Account).options(joinedload(models.Account.owner_user)).filter(
+        models.Account.type == 'cél',
+        models.Account.owner_user_id == user.id,
+        models.Account.show_on_dashboard == False # Csak azokat, amik nem családiak
+    ).all()
+    
+    return {
+        "family_goals": family_goals,
+        "personal_goals": personal_goals
+    }

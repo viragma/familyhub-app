@@ -1374,23 +1374,27 @@ input:checked + .slider:before {
 }
 
 /* --- Töröld ki a régi .modal-tabs és .modal-tab szabályokat, és cseréld le erre a blokkra --- */
+
 .modal-tabs {
   display: flex;
-  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-primary);
+  border-radius: 12px;
+  padding: 0.25rem;
   margin-bottom: 1.5rem;
+  border: 1px solid var(--border);
 }
 
 .modal-tab {
-  padding: 0.75rem 1.5rem;
+  flex: 1;
+  padding: 0.75rem;
   cursor: pointer;
   background: none;
   border: none;
   color: var(--text-secondary);
   font-weight: 600;
-  font-size: 1rem;
-  position: relative;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px; /* Ez a trükk tünteti el a dupla vonalat az aktív fül alatt */
+  font-size: 0.875rem;
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
 .modal-tab:hover {
@@ -1398,8 +1402,9 @@ input:checked + .slider:before {
 }
 
 .modal-tab.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  box-shadow: var(--shadow-sm);
 }
 
 .tab-content {
@@ -1495,4 +1500,74 @@ input:checked + .slider:before {
   width: 100%;
   padding: 0.875rem;
   font-size: 1rem;
+}
+
+/* --- Asztali nézet stílusai (ez az, ami tetszett) --- */
+.rules-container { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+.rule-group-card { background: var(--bg-secondary); border-radius: 16px; border: 1px solid var(--border); border-top-width: 4px; }
+.rule-group-card.bevétel { border-top-color: var(--success); }
+.rule-group-card.kiadás { border-top-color: var(--danger); }
+.rule-group-card.átutalás { border-top-color: var(--accent-secondary); }
+.rule-group-header { padding: 1rem 1.5rem; font-size: 1.25rem; font-weight: 600; border-bottom: 1px solid var(--border); }
+.rule-list-item { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); position: relative; }
+.rule-list-item:last-child { border-bottom: none; }
+.rule-main-info { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+.rule-description { font-weight: 600; font-size: 1.1rem; }
+.rule-amount { font-weight: 700; font-size: 1.1rem; white-space: nowrap; margin-left: 1rem; }
+.rule-footer { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.rule-meta { font-size: 0.875rem; color: var(--text-secondary); }
+.rule-actions { display: flex; align-items: center; gap: 1rem; }
+
+/* --- Mobilnézet felülírása (CSAK EZ VÁLTOZIK) --- */
+@media (max-width: 768px) {
+    .rule-footer {
+        flex-direction: row; /* Vízszintes marad */
+        justify-content: space-between; /* A két szélére tolja a tartalmat */
+    }
+    /* A metaadatokat (dátum) és a kapcsolót egy csoportba tesszük balra */
+    .rule-meta-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+}
+.actions-menu-container {
+  position: relative;
+}
+
+.actions-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 10;
+  width: 150px;
+  overflow: hidden;
+  animation: fadeIn 0.2s ease;
+  padding: 0.5rem;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.menu-item:hover {
+  background-color: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+.menu-item.delete {
+  color: var(--danger);
 }

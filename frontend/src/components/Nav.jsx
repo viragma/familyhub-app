@@ -22,7 +22,6 @@ function Nav({ theme, toggleTheme }) {
   {user && user.role === 'Családfő' && (
             <>
               <NavLink to="/manage-family" className="nav-item">Család Kezelése</NavLink>
-              <NavLink to="/manage-categories" className="nav-item">Kategóriák</NavLink>
             </>
           )}
           <NavLink to="/tasks" className="nav-item">Feladatok</NavLink>

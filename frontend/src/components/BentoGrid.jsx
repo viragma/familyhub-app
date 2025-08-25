@@ -1,5 +1,6 @@
 import React from 'react';
 import BentoCard from './BentoCard';
+import GoalProgressCard from './GoalProgressCard';
 
 function BentoGrid({ dashboardData }) {
   // Ez a sor megvéd az összeomlástól, amíg az adatok töltődnek
@@ -8,30 +9,18 @@ function BentoGrid({ dashboardData }) {
   }
 
   // Kinyerjük a releváns adatokat az új, helyes struktúrából
-  const { financial_summary } = dashboardData;
+  const { financial_summary, tasks, goals } = dashboardData;
   const goal = dashboardData.goal || { name: "Célkassza", current: 0, target: 0 };
   const goalPercentage = (goal.target > 0) ? (goal.current / goal.target) * 100 : 0;
-
+ 
   return (
     <div className="bento-grid">
-      <BentoCard title={financial_summary.balance_title || "Egyenleg"} icon="💰" className="card-wide">
-        <div>
-          {/* JAVÍTÁS: financial_summary.total_balance-t használunk */}
-          <div className="balance-amount">{parseFloat(financial_summary.total_balance).toLocaleString('hu-HU')} Ft</div>
-          
-          {financial_summary.view_type === 'parent' && financial_summary.other_accounts.length > 0 && (
-            <div className="balance-sub-list">
-              {financial_summary.other_accounts.map(acc => (
-                <div className="sub-list-item" key={acc.name}>
-                  <span>{acc.name}</span>
-                  <span>{parseFloat(acc.balance).toLocaleString('hu-HU')} Ft</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </BentoCard>
-
+        <BentoCard title={financial_summary.balance_title || "Egyenleg"} icon="💰" className="card-wide">
+          <div>
+            {/* A kártya leegyszerűsítve, ahogy kérted */}
+            <div className="balance-amount">{parseFloat(financial_summary.total_balance).toLocaleString('hu-HU')} Ft</div>
+          </div>
+        </BentoCard>
       <BentoCard title="Havi Statisztika" icon="📈">
         <div className="stats-grid">
             <div className="stat-item">
@@ -54,19 +43,24 @@ function BentoGrid({ dashboardData }) {
         </div>
       </BentoCard>
 
-      <BentoCard title={goal.name} icon="🏖️">
-         <div>
-          <div className="progress-container">
-            <div className="progress-header">
-              <span>{goal.current.toLocaleString('hu-HU')} Ft / {goal.target.toLocaleString('hu-HU')} Ft</span>
-              <span style={{ color: 'var(--accent-primary)' }}>{goalPercentage.toFixed(0)}%</span>
+   {/* === ÚJ, DINAMIKUS CÉLOK SZEKCIÓ === */}
+      {goals && goals.family_goals.length > 0 && (
+        <>
+            <h2 className="account-group-header">Családi Célok</h2>
+            <div className="bento-grid">
+                {goals.family_goals.map(goal => <GoalProgressCard key={goal.id} goal={goal} />)}
             </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${goalPercentage}%` }}></div>
+        </>
+      )}
+
+      {goals && goals.personal_goals.length > 0 && (
+        <>
+            <h2 className="account-group-header">Személyes Céljaim</h2>
+            <div className="bento-grid">
+                {goals.personal_goals.map(goal => <GoalProgressCard key={goal.id} goal={goal} />)}
             </div>
-          </div>
-        </div>
-      </BentoCard>
+        </>
+      )}
 
       {/* A többi kártya egyelőre statikus maradhat */}
       <BentoCard title="Mai Feladatok" icon="✅" className="card-tall">

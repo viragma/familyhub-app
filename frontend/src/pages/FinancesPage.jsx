@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSwipeable } from 'react-swipeable';
+// A 'useSwipeable' importot eltávolítottuk
 import AccountsOverview from '../components/finance_tabs/AccountsOverview';
 import RecurringRulesManager from '../components/finance_tabs/RecurringRulesManager';
 import CategoryManager from '../components/finance_tabs/CategoryManager';
@@ -8,24 +8,6 @@ import CategoryManager from '../components/finance_tabs/CategoryManager';
 function FinancesPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const { user } = useAuth();
-
-  const tabs = ['overview', 'recurring'];
-  if (user && ['Szülő', 'Családfő'].includes(user.role)) {
-    tabs.push('categories');
-  }
-
-  const handlers = useSwipeable({
-    onSwipedLeft: () => {
-      const currentIndex = tabs.indexOf(activeTab);
-      if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
-    },
-    onSwipedRight: () => {
-      const currentIndex = tabs.indexOf(activeTab);
-      if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
-    },
-    preventScrollOnSwipe: true,
-    trackMouse: true
-  });
 
   return (
     <div>
@@ -41,7 +23,8 @@ function FinancesPage() {
         )}
       </div>
 
-      <div {...handlers}>
+      {/* A swipe 'handlers'-t eltávolítottuk a konténer div-ről */}
+      <div>
         <div className={`tab-content ${activeTab === 'overview' ? 'active' : ''}`}>
           <AccountsOverview />
         </div>

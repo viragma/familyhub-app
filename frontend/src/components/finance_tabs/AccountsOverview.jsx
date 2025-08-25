@@ -245,7 +245,6 @@ function AccountsOverview() {
      
         <h1>Pénzügyek</h1>
         <div>
-          <button className="btn btn-secondary" onClick={() => setIsTransferModalOpen(true)} style={{marginRight: '1rem'}}>Átutalás</button>
           <button className="btn btn-primary" onClick={() => setIsAccountModalOpen(true)}>+ Új Kassza</button>
         </div>
  

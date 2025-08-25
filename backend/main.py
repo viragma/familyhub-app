@@ -11,7 +11,8 @@ from .crud import (
     create_family_account, get_accounts_by_family, create_account_transaction,
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
     create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category,update_account, delete_account,get_account,
-    update_account_viewer,create_recurring_rule,get_all_transfer_targets,get_valid_transfer_targets,get_recurring_rules, update_recurring_rule, delete_recurring_rule
+    update_account_viewer,create_recurring_rule,get_all_transfer_targets,get_valid_transfer_targets,get_recurring_rules, update_recurring_rule, delete_recurring_rule,
+    toggle_rule_status,get_dashboard_goals
 
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
@@ -159,6 +160,10 @@ def add_transaction_to_account(
 def read_categories(db: Session = Depends(get_db)):
     return get_categories(db=db)
 
+@app.get("/api/categories/tree")  
+def read_categories_tree(db: Session = Depends(get_db)):
+    return get_categories_tree(db=db)
+
 @app.post("/api/categories", response_model=CategorySchema)
 def add_category(category: CategoryCreate, db: Session = Depends(get_db), admin: UserModel = Depends(get_current_admin_user)):
     return create_category(db=db, category=category)
@@ -243,16 +248,14 @@ def read_transfer_recipients(current_user: UserModel = Depends(get_current_user)
 
 @app.get("/api/dashboard")
 def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
-    # JAVÍTÁS: Add the 'user' argument to the get_tasks call
     tasks_from_db = get_tasks(db, user=current_user)
     financials = get_financial_summary(db, user=current_user)
+    goals = get_dashboard_goals(db, user=current_user) # Új hívás
     
     return {
          "financial_summary": financials,
          "tasks": tasks_from_db,
-         "goal": {"name": "Nyaralás Alap", "current": 320000, "target": 500000},
-         "family": [ { "id": 1, "name": 'Apa', "initial": 'A', "online": True, "color": '...' } ],
-         "shopping_list": { "items": ['Tej (2 liter)','Kenyér'], "estimated_cost": 8500 }
+         "goals": goals # A régi, statikus 'goal' helyett
     }
 @app.post("/api/accounts", response_model=Account)
 def create_new_account(
@@ -335,3 +338,7 @@ def update_rule(rule_id: int, rule: RecurringRuleCreate, db: Session = Depends(g
 @app.delete("/api/recurring-rules/{rule_id}", response_model=RecurringRule)
 def delete_rule(rule_id: int, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
     return delete_recurring_rule(db=db, rule_id=rule_id, user=current_user)
+@app.patch("/api/recurring-rules/{rule_id}/toggle-active", response_model=RecurringRule)
+def toggle_rule(rule_id: int, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    """ Aktiválja vagy szünetelteti az ismétlődő szabályt. """
+    return toggle_rule_status(db=db, rule_id=rule_id, user=current_user)

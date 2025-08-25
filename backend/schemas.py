@@ -2,11 +2,10 @@ from pydantic import BaseModel
 from datetime import date
 from datetime import datetime
 from decimal import Decimal 
-from typing import List, Optional
-from typing import Optional
+from typing import List, Optional, ForwardRef
 import uuid
 
-
+# --- Base modellek ---
 class CategoryBase(BaseModel):
     name: str
     parent_id: Optional[int] = None
@@ -16,14 +15,32 @@ class CategoryBase(BaseModel):
 class CategoryCreate(CategoryBase):
     pass
 
+# Simple Category without children for avoiding recursion
+class CategorySimple(CategoryBase):
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+# Full Category with children - használd csak akkor, amikor tényleg kell
 class Category(CategoryBase):
     id: int
     children: List['Category'] = []
 
     class Config:
         from_attributes = True
+        # Recursion limit beállítás
+        validate_assignment = True
 
-# --- Task Sémák (Frissítve) ---
+# Response model kategóriákhoz - ez használható a legtöbb API válaszban
+class CategoryResponse(CategoryBase):
+    id: int
+    has_children: bool = False  # Jelzi, hogy vannak-e gyerekei
+    
+    class Config:
+        from_attributes = True
+
+# --- Task Sémák ---
 class TaskBase(BaseModel):
     title: str
     status: str = 'nyitott'
@@ -36,10 +53,11 @@ class TaskCreate(TaskBase):
 
 class Task(TaskBase):
     id: int
+    
     class Config:
         from_attributes = True
 
-# --- User és Family Sémák (Változatlanok) ---
+# --- User sémák ---
 class UserBase(BaseModel):
     name: str
     display_name: str
@@ -51,13 +69,7 @@ class UserCreate(UserBase):
     pin: str
     family_id: int
 
-class User(UserBase):
-    id: int
-    family_id: int
-    class Config:
-        from_attributes = True
-
-# A User osztály alá, de még a Family elé
+# Simple user profile - cirkuláris referenciák elkerüléséhez
 class UserProfile(BaseModel):
     id: int
     display_name: str
@@ -66,81 +78,135 @@ class UserProfile(BaseModel):
     class Config:
         from_attributes = True
 
+# User without family reference
+class User(UserBase):
+    id: int
+    family_id: int
+    
+    class Config:
+        from_attributes = True
+
+# --- Family sémák ---
 class FamilyBase(BaseModel):
     name: str
 
 class FamilyCreate(FamilyBase):
     pass
 
-class Family(FamilyBase):
+# Family without members to avoid recursion
+class FamilySimple(FamilyBase):
     id: int
-    members: list[User] = []
+    
     class Config:
         from_attributes = True
 
+# Full family with members - csak ha tényleg kell
+class Family(FamilyBase):
+    id: int
+    members: list[UserProfile] = []  # UserProfile használata User helyett
+    
+    class Config:
+        from_attributes = True
+
+# --- Transaction sémák ---
 class TransactionBase(BaseModel):
     description: str
     amount: Decimal
     type: str # 'bevétel' vagy 'kiadás'
-    category_id: Optional[int] = None # Frissítve: a category_id-t fogadjuk
-    creator: Optional[UserProfile] = None # Frissítve: a creator-t fogadjuk
-
-
+    category_id: Optional[int] = None
+    creator_id: Optional[int] = None  # Csak ID-t tárolunk
 
 class TransactionCreate(TransactionBase):
     pass
 
+# Simple transaction response
+class TransactionSimple(TransactionBase):
+    id: int
+    date: datetime
+    account_id: int
+    transfer_id: Optional[uuid.UUID] = None
+    
+    class Config:
+        from_attributes = True
+
+# Full transaction with related objects
 class Transaction(TransactionBase):
     id: int
     date: datetime
     account_id: int
-    category: Optional[Category] = None # A teljes kategória objektumot is vissza tudjuk adni
+    category: Optional[CategoryResponse] = None  # CategoryResponse használata
     creator: Optional[UserProfile] = None
     transfer_id: Optional[uuid.UUID] = None
+    
     class Config:
         from_attributes = True
 
+# --- Transfer séma ---
 class TransferCreate(BaseModel):
     from_account_id: int
     to_account_id: int
     amount: Decimal
     description: str
 
+# --- Account sémák ---
 class AccountBase(BaseModel):
     name: str
     type: str
     goal_amount: Optional[Decimal] = None
     goal_date: Optional[date] = None
-    # Az 'is_family_wide' mezőt ELTÁVOLÍTJUK
 
 class AccountCreate(AccountBase):
     viewer_ids: list[int] = []
-    show_on_dashboard: bool = False # Hozzáadjuk az új mezőt
+    show_on_dashboard: bool = False
 
+# Simple account response
+class AccountSimple(AccountBase):
+    id: int
+    balance: Decimal
+    family_id: int
+    owner_user_id: int | None = None
+    
+    class Config:
+        from_attributes = True
+
+# Full account with related objects - használd csak akkor, amikor kell
 class Account(AccountBase):
     id: int
     balance: Decimal
     family_id: int
     owner_user_id: int | None = None
-    transactions: list[Transaction] = []
-    # A válaszban is visszaküldhetjük, kik láthatják
+    # transactions: list[TransactionSimple] = []  # TransactionSimple használata
     viewers: list[UserProfile] = []
     owner_user: Optional[UserProfile] = None
+    
     class Config:
         from_attributes = True
 
+# Account response transactions nélkül - a legtöbb esetben ezt használd
+class AccountResponse(AccountBase):
+    id: int
+    balance: Decimal
+    family_id: int
+    owner_user_id: int | None = None
+    viewers: list[UserProfile] = []
+    owner_user: Optional[UserProfile] = None
+    show_on_dashboard: bool = False
+    
+    class Config:
+        from_attributes = True
 
+# --- Recurring Rule sémák ---
 class RecurringRuleBase(BaseModel):
     description: str
     amount: Decimal
     type: str # 'bevétel', 'kiadás', vagy 'átutalás'
-    from_account_id: Optional[int] = None # Átutalásnál a forrás
-    to_account_id: Optional[int] = None # Átutalásnál a cél, B/K-nál a kassza
+    from_account_id: Optional[int] = None
+    to_account_id: Optional[int] = None
     category_id: Optional[int] = None
     frequency: str
     day_of_month: Optional[int] = None
-    day_of_week: Optional[int] = None # <-- Új
-    month_of_year: Optional[int] = None # 
+    day_of_week: Optional[int] = None
+    month_of_year: Optional[int] = None
     start_date: date
     end_date: Optional[date] = None
 
@@ -155,3 +221,6 @@ class RecurringRule(RecurringRuleBase):
 
     class Config:
         from_attributes = True
+
+# Forward reference frissítések
+Category.model_rebuild()
