@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date 
 from decimal import Decimal
 from sqlalchemy import func, extract
 from sqlalchemy.orm import Session
@@ -8,8 +8,9 @@ from fastapi import HTTPException,status
 from .schemas import (
     Task as TaskSchema, TaskCreate,
     Family, FamilyCreate,
-    User, UserCreate, UserProfile,Account, Transaction, TransactionCreate,TransferCreate
-)
+    User, UserCreate, UserProfile,Account, Transaction, TransactionCreate,TransferCreate,ExpectedExpense,ExpectedExpenseCreate
+    
+    )
 from .security import get_pin_hash
 from . import models
 import uuid
@@ -21,7 +22,8 @@ from datetime import datetime
 import uuid
 from . import models, schemas
 from .security import get_pin_hash
-from sqlalchemy import func, extract, and_, or_  # ← and_, or_ hozzáadása
+from sqlalchemy import func, extract, and_, or_ 
+from dateutil.relativedelta import relativedelta
 
 # --- User CRUD Műveletek ---
 def get_user(db: Session, user_id: int):
@@ -515,11 +517,17 @@ def get_financial_summary(db: Session, user: models.User):
     current_month = datetime.now().month
     current_year = datetime.now().year
 
+    # A várható költségek lekérdezésének alapja
+    expected_expenses_query = db.query(func.sum(models.ExpectedExpense.estimated_amount)).filter(
+        models.ExpectedExpense.status == 'tervezett'
+    )
+
     # Szerepkör-alapú szűrők definiálása
     if user.role in ["Családfő", "Szülő"]:
         # SZÜLŐI NÉZET
         parent_roles = ["Családfő", "Szülő"]
-        parent_ids = [u.id for u in db.query(models.User.id).filter(models.User.family_id == user.family_id, models.User.role.in_(parent_roles)).all()]
+        parent_ids_query = db.query(models.User.id).filter(models.User.family_id == user.family_id, models.User.role.in_(parent_roles))
+        parent_ids = [pid[0] for pid in parent_ids_query.all()]
         
         # A szülők egyenlege CSAK a személyes kasszáik összege
         total_balance = db.query(func.sum(models.Account.balance)).filter(
@@ -531,7 +539,7 @@ def get_financial_summary(db: Session, user: models.User):
         monthly_income = db.query(func.sum(models.Transaction.amount)).filter(
             models.Transaction.account_id.in_(db.query(models.Account.id).filter(models.Account.owner_user_id.in_(parent_ids))),
             models.Transaction.type == 'bevétel',
-            models.Transaction.transfer_id == None,
+            models.Transaction.transfer_id.is_(None), # Helyesebb IS NULL ellenőrzés
             extract('year', models.Transaction.date) == current_year,
             extract('month', models.Transaction.date) == current_month
         ).scalar() or Decimal(0)
@@ -541,23 +549,39 @@ def get_financial_summary(db: Session, user: models.User):
             models.Transaction.account_id.in_(db.query(models.Account.id).filter(models.Account.owner_user_id.in_(parent_ids))),
             models.Transaction.type == 'kiadás',
             or_(
-                models.Transaction.transfer_id == None,
+                models.Transaction.transfer_id.is_(None),
                 models.Transaction.is_family_expense == True
             ),
             extract('year', models.Transaction.date) == current_year,
             extract('month', models.Transaction.date) == current_month
         ).scalar() or Decimal(0)
+        
+        # A szülők az egész család várható költségeit látják
+        expected_amount = expected_expenses_query.filter(models.ExpectedExpense.family_id == user.family_id).scalar() or Decimal(0)
 
         return {
-            "view_type": "parent", "balance_title": "Szülők közös egyenlege",
-            "total_balance": float(total_balance), "monthly_income": float(monthly_income),
-            "monthly_expense": float(monthly_expense), "monthly_savings": float(monthly_income - monthly_expense)
+            "view_type": "parent", 
+            "balance_title": "Szülők közös egyenlege",
+            "total_balance": float(total_balance), 
+            "monthly_income": float(monthly_income),
+            "monthly_expense": float(monthly_expense), 
+            "monthly_savings": float(monthly_income - monthly_expense),
+            "expected_expenses": float(expected_amount),
+            "available_balance": float(total_balance - expected_amount)
         }
     else:
         # GYEREK NÉZET
         personal_account = db.query(models.Account).filter(models.Account.owner_user_id == user.id).first()
+        
+        # A gyerek csak a saját várható költségeit látja
+        expected_amount = expected_expenses_query.filter(models.ExpectedExpense.owner_id == user.id).scalar() or Decimal(0)
+
         if not personal_account:
-            return {"view_type": "child", "balance_title": "Zsebpénzem", "total_balance": 0, "monthly_income": 0, "monthly_expense": 0, "monthly_savings": 0}
+            return {
+                "view_type": "child", "balance_title": "Zsebpénzem", "total_balance": 0, 
+                "monthly_income": 0, "monthly_expense": 0, "monthly_savings": 0,
+                "expected_expenses": float(expected_amount), "available_balance": float(0 - expected_amount)
+            }
 
         total_balance = personal_account.balance
 
@@ -578,11 +602,15 @@ def get_financial_summary(db: Session, user: models.User):
         ).scalar() or Decimal(0)
 
         return {
-            "view_type": "child", "balance_title": "Zsebpénzem",
-            "total_balance": float(total_balance), "monthly_income": float(monthly_income),
-            "monthly_expense": float(monthly_expense), "monthly_savings": float(monthly_income - monthly_expense)
+            "view_type": "child", 
+            "balance_title": "Zsebpénzem",
+            "total_balance": float(total_balance), 
+            "monthly_income": float(monthly_income),
+            "monthly_expense": float(monthly_expense), 
+            "monthly_savings": float(monthly_income - monthly_expense),
+            "expected_expenses": float(expected_amount),
+            "available_balance": float(total_balance - expected_amount)
         }
-
 def update_category(db: Session, category_id: int, category_data: schemas.CategoryCreate):
     db_category = get_category(db, category_id)
     if db_category:
@@ -1225,3 +1253,124 @@ def _get_analytics_account_ids(db: Session, user: models.User) -> list[int]:
         return [acc_id[0] for acc_id in accounts_query.all()]
     else:
         return [acc.id for acc in user.visible_accounts]
+    
+# === ÚJ CRUD MŰVELETEK A VÁRHATÓ KÖLTSÉGEKHEZ ===
+
+def get_expected_expenses(db: Session, user: models.User):
+    """
+    Lekérdezi a várható költségeket jogosultságnak megfelelően.
+    Szülők mindent látnak a családban, gyerekek csak a sajátjukat.
+    """
+    query = db.query(models.ExpectedExpense).options(
+        joinedload(models.ExpectedExpense.owner),
+        joinedload(models.ExpectedExpense.category)
+    ).filter(models.ExpectedExpense.status == 'tervezett')
+
+    if user.role in ["Családfő", "Szülő"]:
+        return query.filter(models.ExpectedExpense.family_id == user.family_id).order_by(models.ExpectedExpense.due_date.asc()).all()
+    else:
+        return query.filter(models.ExpectedExpense.owner_id == user.id).order_by(models.ExpectedExpense.due_date.asc()).all()
+
+def create_expected_expense(db: Session, expense_data: schemas.ExpectedExpenseCreate, user: models.User):
+    """
+    Új várható költség létrehozása.
+    """
+    due_date = expense_data.due_date
+    today = date.today()
+
+    if expense_data.due_date_option == 'this_month':
+        due_date = date(today.year, today.month, 1) + relativedelta(months=1, days=-1)
+    elif expense_data.due_date_option == 'next_month':
+        due_date = date(today.year, today.month, 1) + relativedelta(months=2, days=-1)
+    
+    if not due_date:
+        raise HTTPException(status_code=400, detail="Az esedékesség dátumának megadása kötelező.")
+
+    # Biztonságosabb adatkinyerés a model_dump segítségével
+    db_expense_data = expense_data.model_dump(exclude={"due_date", "due_date_option"})
+    db_expense = models.ExpectedExpense(
+        **db_expense_data,
+        due_date=due_date,
+        owner_id=user.id,
+        family_id=user.family_id
+    )
+    db.add(db_expense)
+    db.commit()
+    db.refresh(db_expense)
+    return db_expense
+
+def update_expected_expense(db: Session, expense_id: int, expense_data: schemas.ExpectedExpenseCreate, user: models.User):
+    """
+    Meglévő várható költség frissítése.
+    """
+    db_expense = db.query(models.ExpectedExpense).filter(models.ExpectedExpense.id == expense_id).first()
+    if not db_expense:
+        raise HTTPException(status_code=404, detail="Várható költség nem található.")
+    
+    if db_expense.owner_id != user.id and user.role not in ["Családfő", "Szülő"]:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a módosításhoz.")
+        
+    update_data = expense_data.model_dump(exclude_unset=True)
+    
+    if "due_date_option" in update_data:
+        today = date.today()
+        if update_data["due_date_option"] == 'this_month':
+            update_data["due_date"] = date(today.year, today.month, 1) + relativedelta(months=1, days=-1)
+        elif update_data["due_date_option"] == 'next_month':
+            update_data["due_date"] = date(today.year, today.month, 1) + relativedelta(months=2, days=-1)
+        del update_data["due_date_option"]
+    
+    for key, value in update_data.items():
+        setattr(db_expense, key, value)
+        
+    db.commit()
+    db.refresh(db_expense)
+    return db_expense
+
+def delete_expected_expense(db: Session, expense_id: int, user: models.User):
+    """
+    Várható költség törlése (státusz 'törölve'-re állítása).
+    """
+    db_expense = db.query(models.ExpectedExpense).filter(models.ExpectedExpense.id == expense_id).first()
+    if not db_expense:
+        raise HTTPException(status_code=404, detail="Várható költség nem található.")
+
+    if db_expense.owner_id != user.id and user.role not in ["Családfő", "Szülő"]:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a törléshez.")
+    
+    db_expense.status = 'törölve'
+    db.commit()
+    db.refresh(db_expense)
+    return db_expense
+
+def complete_expected_expense(db: Session, expense_id: int, completion_data: schemas.ExpectedExpenseComplete, user: models.User):
+    """
+    Egy várható költség "teljesítése": létrehoz egy valódi tranzakciót.
+    """
+    db_expense = db.query(models.ExpectedExpense).filter(models.ExpectedExpense.id == expense_id).first()
+    if not db_expense or db_expense.status != 'tervezett':
+        raise HTTPException(status_code=404, detail="Tervezett állapotú várható költség nem található.")
+
+    target_account = get_account(db, account_id=completion_data.account_id, user=user)
+    if not target_account:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a választott kasszához.")
+
+    transaction_schema = schemas.TransactionCreate(
+        description=db_expense.description,
+        amount=completion_data.actual_amount,
+        type='kiadás',
+        category_id=db_expense.category_id,
+        creator_id=user.id
+    )
+    
+    new_transaction = create_account_transaction(db, transaction=transaction_schema, account_id=target_account.id, user=user)
+
+    db_expense.status = 'teljesült'
+    db_expense.actual_amount = completion_data.actual_amount
+    db_expense.transaction_id = new_transaction.id
+    
+    db.commit()
+    db.refresh(db_expense)
+    
+    return db_expense
+    

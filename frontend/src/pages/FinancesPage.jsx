@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import ModernAccountsOverview from '../components/finance_tabs/ModernAccountsOverview';
 import RecurringRulesManager from '../components/finance_tabs/RecurringRulesManager';
 import CategoryManager from '../components/finance_tabs/CategoryManager';
+import ExpectedExpensesManager from '../components/finance_tabs/ExpectedExpensesManager'; // ÚJ IMPORT
 import FinancialSummaryCard from '../components/finance_tabs/FinancialSummaryCard';
 
 function FinancesPage() {
@@ -22,6 +23,13 @@ function FinancesPage() {
           >
             <span className="tab-icon">📊</span>
             <span className="tab-label">Áttekintés</span>
+          </button>
+          <button 
+            className={`finances-tab ${activeTab === 'expected' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('expected')}
+          >
+            <span className="tab-icon">📅</span>
+            <span className="tab-label">Tervezett</span>
           </button>
           <button 
             className={`finances-tab ${activeTab === 'recurring' ? 'active' : ''}`} 
@@ -46,6 +54,9 @@ function FinancesPage() {
       <div className="finances-content">
         <div className={`finances-tab-content ${activeTab === 'overview' ? 'active' : ''}`}>
           <ModernAccountsOverview />
+        </div>
+           <div className={`finances-tab-content ${activeTab === 'expected' ? 'active' : ''}`}>
+          <ExpectedExpensesManager />
         </div>
         <div className={`finances-tab-content ${activeTab === 'recurring' ? 'active' : ''}`}>
           <RecurringRulesManager />

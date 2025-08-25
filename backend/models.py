@@ -2,6 +2,10 @@ from sqlalchemy import Boolean, Column, Integer, String, Date, ForeignKey, Numer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
+from sqlalchemy import (
+    Boolean, Column, Integer, String, Date, ForeignKey,
+    Numeric, DateTime, Table, Enum
+)
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -21,6 +25,8 @@ class Category(Base):
     color = Column(String, nullable=True)
     icon = Column(String, nullable=True)
     transactions = relationship("Transaction", back_populates="category")
+    # VISSZAHIVATKOZÁS HOZZÁADVA
+    expected_expenses = relationship("ExpectedExpense", back_populates="category")
 
 class Family(Base):
     __tablename__ = "families"
@@ -28,6 +34,9 @@ class Family(Base):
     name = Column(String, unique=True, index=True)
     members = relationship("User", back_populates="family")
     accounts = relationship("Account", back_populates="family")
+    # VISSZAHIVATKOZÁS HOZZÁADVA
+    expected_expenses = relationship("ExpectedExpense", back_populates="family")
+
 
 class User(Base):
     __tablename__ = "users"
@@ -44,9 +53,9 @@ class User(Base):
     personal_account = relationship("Account", uselist=False, back_populates="owner_user")
     wishlist_items = relationship("WishlistItem", back_populates="owner")
     transactions = relationship("Transaction", back_populates="creator")
-    
-    # ÚJ KAPCSOLAT: Mely kasszákat láthatja a felhasználó
     visible_accounts = relationship("Account", secondary=account_visibility_association, back_populates="viewers")
+    # VISSZAHIVATKOZÁS HOZZÁADVA
+    expected_expenses = relationship("ExpectedExpense", back_populates="owner")
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -79,6 +88,7 @@ class Account(Base):
     # ÚJ KAPCSOLAT: Mely felhasználók láthatják ezt a kasszát
     viewers = relationship("User", secondary=account_visibility_association, back_populates="visible_accounts")
 
+
 class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)
@@ -94,6 +104,9 @@ class Transaction(Base):
     category = relationship("Category", back_populates="transactions")
     transfer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     is_family_expense = Column(Boolean, default=False)
+    # VISSZAHIVATKOZÁS HOZZÁADVA
+    expected_expense = relationship("ExpectedExpense", back_populates="transaction", uselist=False)
+
 
 class Debt(Base):
     __tablename__ = "debts"
@@ -140,3 +153,24 @@ class RecurringRule(Base):
     end_date = Column(Date, nullable=True)
     next_run_date = Column(Date)
     is_active = Column(Boolean, default=True) # A szüneteltetéshez
+
+class ExpectedExpense(Base):
+    __tablename__ = 'expected_expenses'
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(String, nullable=False)
+    estimated_amount = Column(Numeric(10, 2), nullable=False)
+    actual_amount = Column(Numeric(10, 2), nullable=True)
+    due_date = Column(Date, nullable=False)
+    status = Column(Enum('tervezett', 'teljesült', 'törölve', name='expense_status_enum'), default='tervezett', nullable=False)
+    priority = Column(Enum('magas', 'közepes', 'alacsony', name='priority_enum'), default='közepes', nullable=False)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    family_id = Column(Integer, ForeignKey('families.id'), nullable=False)
+    category_id = Column(Integer, ForeignKey('categories.id'), nullable=True)
+    transaction_id = Column(Integer, ForeignKey('transactions.id'), nullable=True)
+    is_recurring = Column(Boolean, default=False, nullable=False)
+    recurring_frequency = Column(String, nullable=True)
+    
+    owner = relationship("User", back_populates="expected_expenses")
+    family = relationship("Family", back_populates="expected_expenses")
+    category = relationship("Category", back_populates="expected_expenses")
+    transaction = relationship("Transaction", back_populates="expected_expense", uselist=False)

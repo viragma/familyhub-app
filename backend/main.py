@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Form
+from fastapi import FastAPI, Depends, HTTPException, status, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .scheduler import scheduler
 from sqlalchemy import func, extract, and_, or_
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, date
+from typing import Optional, List
 from fastapi import Query
 from contextlib import asynccontextmanager
 
@@ -16,9 +16,11 @@ from .crud import (
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
     create_transfer,get_all_personal_accounts,get_financial_summary,update_category, delete_category,update_account, delete_account,get_account,
     update_account_viewer,create_recurring_rule,get_all_transfer_targets,get_valid_transfer_targets,get_recurring_rules, update_recurring_rule, delete_recurring_rule,
-    toggle_rule_status,get_dashboard_goals,delete_account_with_dependencies,get_categories_tree,get_category_spending_analytics,get_savings_trend_analytics,get_detailed_category_analytics,get_detailed_savings_analytics
-
-
+    toggle_rule_status,get_dashboard_goals,delete_account_with_dependencies,get_categories_tree,get_category_spending_analytics,get_savings_trend_analytics,get_detailed_category_analytics,get_detailed_savings_analytics,
+    # Új importok
+    get_expected_expenses, create_expected_expense, update_expected_expense,
+    delete_expected_expense, complete_expected_expense,
+    create_account_transaction
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -28,7 +30,11 @@ from .schemas import (
     User, UserCreate, UserProfile,
     Account, Transaction, TransactionCreate, AccountCreate,
     Category as CategorySchema, CategoryCreate,TransferCreate,
-    RecurringRule, RecurringRuleCreate 
+    RecurringRule, RecurringRuleCreate,
+    # Új importok
+    ExpectedExpense as ExpectedExpenseSchema, ExpectedExpenseCreate,
+    ExpectedExpenseComplete,
+    Transaction as TransactionSchema, TransactionCreate,
 )
 from .database import SessionLocal, engine
 from .security import create_access_token, verify_pin, oauth2_scheme, SECRET_KEY, ALGORITHM
@@ -395,7 +401,21 @@ def check_account_dependencies(
     Ellenőrzi, hogy egy kassza törölhető-e (milyen függőségei vannak)
     """
     return delete_account_with_dependencies(db=db, account_id=account_id, user=current_user, force=False)
+@app.post("/api/accounts/{account_id}/transactions", response_model=TransactionSchema)
+def add_transaction_to_account(
+    account_id: int,
+    transaction: TransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Hozzáad egy új bevételi vagy kiadási tranzakciót egy adott kasszához.
+    """
+    return create_account_transaction(db=db, transaction=transaction, account_id=account_id, user=current_user)
 
+
+
+    
 @app.post("/api/accounts/{account_id}/share", response_model=Account)
 def toggle_account_sharing(
     account_id: int, 
@@ -531,3 +551,50 @@ def get_detailed_savings_endpoint(
     except Exception as e:
         print(f"Detailed savings endpoint error: {e}")
         return []
+
+
+@app.get("/api/expected-expenses", response_model=List[ExpectedExpenseSchema])
+def read_expected_expenses(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Lekérdezi a felhasználó számára látható, tervezett állapotú várható költségeket."""
+    return get_expected_expenses(db=db, user=current_user)
+
+@app.post("/api/expected-expenses", response_model=ExpectedExpenseSchema, status_code=status.HTTP_201_CREATED)
+def add_expected_expense(
+    expense_data: ExpectedExpenseCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Új várható költség létrehozása."""
+    return create_expected_expense(db=db, expense_data=expense_data, user=current_user)
+
+@app.put("/api/expected-expenses/{expense_id}", response_model=ExpectedExpenseSchema)
+def modify_expected_expense(
+    expense_id: int,
+    expense_data: ExpectedExpenseCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Meglévő várható költség módosítása."""
+    return update_expected_expense(db=db, expense_id=expense_id, expense_data=expense_data, user=current_user)
+
+@app.delete("/api/expected-expenses/{expense_id}", response_model=ExpectedExpenseSchema)
+def remove_expected_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Várható költség törlése (státusz módosítása)."""
+    return delete_expected_expense(db=db, expense_id=expense_id, user=current_user)
+
+@app.post("/api/expected-expenses/{expense_id}/complete", response_model=ExpectedExpenseSchema)
+def complete_expense(
+    expense_id: int,
+    completion_data: ExpectedExpenseComplete,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Egy várható költséget valódi tranzakcióvá alakít."""
+    return complete_expected_expense(db=db, expense_id=expense_id, completion_data=completion_data, user=current_user)

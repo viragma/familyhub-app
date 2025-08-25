@@ -2,8 +2,43 @@ from pydantic import BaseModel
 from datetime import date
 from datetime import datetime
 from decimal import Decimal 
-from typing import List, Optional, ForwardRef
+from typing import List, Optional, ForwardRef,Literal
 import uuid
+
+# --- Várható Költség Sémák ---
+class ExpectedExpenseBase(BaseModel):
+    description: str
+    estimated_amount: Decimal
+    priority: Literal['magas', 'közepes', 'alacsony'] = 'közepes'
+    category_id: Optional[int] = None
+    is_recurring: bool = False
+    recurring_frequency: Optional[str] = None
+
+class ExpectedExpenseCreate(ExpectedExpenseBase):
+    # A frontendtől vagy egy konkrét dátum, vagy egy opció érkezik
+    due_date: Optional[date] = None
+    # JAVÍTÁS: A hiányzó mező hozzáadva
+    due_date_option: Optional[Literal['specific_date', 'this_month', 'next_month']] = 'specific_date'
+
+class ExpectedExpense(ExpectedExpenseBase):
+    id: int
+    due_date: date # A DB-ből már mindig konkrét dátum jön vissza
+    actual_amount: Optional[Decimal] = None
+    status: Literal['tervezett', 'teljesült', 'törölve']
+    owner_id: int
+    family_id: int
+    transaction_id: Optional[int] = None
+    
+    owner: 'UserProfile'
+    category: Optional['CategorySimple'] = None
+
+    class Config:
+        from_attributes = True
+
+class ExpectedExpenseComplete(BaseModel):
+    actual_amount: Decimal
+    account_id: int
+
 
 # --- Base modellek ---
 class CategoryBase(BaseModel):
@@ -82,6 +117,7 @@ class UserProfile(BaseModel):
 class User(UserBase):
     id: int
     family_id: int
+    expected_expenses: List[ExpectedExpense] = []
     
     class Config:
         from_attributes = True
@@ -103,7 +139,9 @@ class FamilySimple(FamilyBase):
 # Full family with members - csak ha tényleg kell
 class Family(FamilyBase):
     id: int
-    members: list[UserProfile] = []  # UserProfile használata User helyett
+    members: list[UserProfile] = []
+    # FRISSÍTÉS: Hozzáadjuk a várható költségeket
+    expected_expenses: List[ExpectedExpense] = []
     
     class Config:
         from_attributes = True
@@ -224,3 +262,4 @@ class RecurringRule(RecurringRuleBase):
 
 # Forward reference frissítések
 Category.model_rebuild()
+ExpectedExpense.model_rebuild()

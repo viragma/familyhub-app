@@ -1,0 +1,129 @@
+.expense-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.expense-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.expense-card.p-high { border-left-color: var(--danger); }
+.expense-card.p-medium { border-left-color: var(--warning); }
+.expense-card.p-low { border-left-color: var(--success); }
+
+.expense-card-main {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.expense-content {
+  flex-grow: 1;
+}
+
+.expense-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.expense-category-icon {
+  font-size: 1.5rem;
+}
+
+.expense-description {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.expense-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.urgent-date {
+  color: var(--warning);
+  font-weight: bold;
+}
+
+.expense-amount {
+  text-align: right;
+}
+
+.amount-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.amount-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.expense-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.action-btn-complete {
+  flex-grow: 1;
+  background-color: var(--success);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+.action-btn-complete:hover {
+  background-color: #059669;
+}
+.expense-actions .action-btn-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  background-color: var(--bg-primary);
+}
+.expense-actions .action-btn-icon.danger {
+  color: var(--danger);
+}
+.expense-actions .action-btn-icon:hover {
+  background-color: var(--accent-primary);
+  color: white;
+}
+.expense-actions .action-btn-icon.danger:hover {
+  background-color: var(--danger);
+  color: white;
+}
