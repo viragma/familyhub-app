@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import '../components/Dashboard.css';
 import ForecastCard from '../components/ForecastCard';
+import UpcomingEventsCard from '../components/UpcomingEventsCard'; // ÚJ IMPORT
+
 // Kategória költés kártya
 const CategorySpendingCard = ({ data, onClick }) => {
   if (!data || !data.length) {
@@ -173,6 +175,7 @@ const DashboardPage = () => {
     categorySpending: null,
     savingsTrend: null
   });
+  const [upcomingEvents, setUpcomingEvents] = useState([]); // ÚJ STATE
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -185,8 +188,8 @@ const DashboardPage = () => {
         throw new Error('Nincs bejelentkezett felhasználó');
       }
 
-      // Dashboard és analitikai adatok párhuzamos lekérése
-      const [dashboardResponse, categoryResponse, savingsResponse] = await Promise.all([
+      // Adatok párhuzamos lekérése
+      const [dashboardResponse, categoryResponse, savingsResponse, upcomingEventsResponse] = await Promise.all([
         fetch(`${apiUrl}/api/dashboard`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
@@ -195,6 +198,9 @@ const DashboardPage = () => {
         }),
         fetch(`${apiUrl}/api/analytics/savings-trend`, {
           headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${apiUrl}/api/upcoming-events`, { // ÚJ LEKÉRÉS
+            headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 
@@ -209,12 +215,14 @@ const DashboardPage = () => {
       const dashboardData = await dashboardResponse.json();
       const categoryData = categoryResponse.ok ? await categoryResponse.json() : [];
       const savingsData = savingsResponse.ok ? await savingsResponse.json() : [];
+      const upcomingEventsData = upcomingEventsResponse.ok ? await upcomingEventsResponse.json() : []; // ÚJ ADAT FELDOLGOZÁSA
 
       setDashboardData(dashboardData);
       setAnalyticsData({
         categorySpending: categoryData,
         savingsTrend: savingsData
       });
+      setUpcomingEvents(upcomingEventsData); // ÚJ STATE BEÁLLÍTÁSA
 
     } catch (err) {
       console.error('Hiba a dashboard adatok lekérésekor:', err);
@@ -291,11 +299,15 @@ const DashboardPage = () => {
       </div>
     );
   }
+  
+  const forecast = dashboardData?.next_month_forecast;
 
   return (
     <div className="">
       <div className="dashboard-grid">
         
+        <UpcomingEventsCard events={upcomingEvents} /> {/* ÚJ KÁRTYA MEGJELENÍTÉSE */}
+
         {dashboardData?.financial_summary && (
           <div className="dashboard-card financial-card-wide">
             <div className="dashboard-card-header">
@@ -311,7 +323,6 @@ const DashboardPage = () => {
                 {dashboardData.financial_summary.total_balance?.toLocaleString('hu-HU') || '0'} Ft
               </span>
             </div>
-               {/* --- ÚJ RÉSZ KEZDETE --- */}
             {dashboardData.financial_summary.view_type === 'parent' && (
               <div className="balance-sub-list">
                 <div className="sub-list-item available">
@@ -322,7 +333,6 @@ const DashboardPage = () => {
                 </div>
               </div>
             )}
-            {/* --- ÚJ RÉSZ VÉGE --- */}
             <div className="financial-stats-grid">
               <div className="financial-stat-item">
                 <span className="financial-stat-label">Havi bevétel</span>
@@ -352,11 +362,21 @@ const DashboardPage = () => {
             </div>
           </div>
         )}
-                        {/* --- ÚJ RÉSZ KEZDETE --- */}
-        {dashboardData?.next_month_forecast && (
-          <ForecastCard forecastData={dashboardData.next_month_forecast} />
+        
+        {forecast?.personal && (
+          <ForecastCard 
+            forecastData={forecast.personal} 
+            title="Személyes Előrejelzés" 
+          />
         )}
-        {/* --- ÚJ RÉSZ VÉGE --- */}
+        
+        {forecast?.view_type === 'parent' && forecast.family && (
+          <ForecastCard 
+            forecastData={forecast.family} 
+            title="Családi Előrejelzés" 
+          />
+        )}
+        
         <CategorySpendingCard 
           data={analyticsData.categorySpending}
           onClick={handleCategoryAnalyticsClick}

@@ -55,7 +55,7 @@ const AnalyticsPage = () => {
   const fetchCategories = useCallback(async () => {
     if (!token || !apiUrl) return;
     try {
-      const response = await fetch(`${apiUrl}/api/categories/tree`, {
+      const response = await fetch(`${apiUrl}/api/categories`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {

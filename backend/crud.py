@@ -1,15 +1,16 @@
-from datetime import datetime, date 
+from datetime import datetime, date, timedelta
 from decimal import Decimal
-from sqlalchemy import func, extract
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import joinedload
+from sqlalchemy import func, extract, and_, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
 from . import models, schemas
+from .security import get_pin_hash
+import uuid
 from fastapi import HTTPException,status
 from .schemas import (
     Task as TaskSchema, TaskCreate,
     Family, FamilyCreate,
-    User, UserCreate, UserProfile,Account, Transaction, TransactionCreate,TransferCreate,ExpectedExpense,ExpectedExpenseCreate
-    
+    User, UserCreate, UserProfile,Account, Transaction, TransactionCreate,TransferCreate,ExpectedExpense,ExpectedExpenseCreate,
+    UpcomingEvent
     )
 from .security import get_pin_hash
 from . import models
@@ -264,43 +265,7 @@ def get_categories(db: Session):
         for cat in categories
     ]
 
-def get_categories_tree(db: Session):
-    """
-    Fa struktúra - csak amikor tényleg kell
-    """
-    all_categories = db.query(models.Category).all()
-    
-    categories_dict = []
-    for category in all_categories:
-        category_dict = {
-            "id": category.id,
-            "name": category.name,
-            "parent_id": category.parent_id,
-            "color": category.color,
-            "icon": category.icon,
-            "children": []
-        }
-        categories_dict.append(category_dict)
-    
-    category_map = {cat["id"]: cat for cat in categories_dict}
-    
-    tree = []
-    for cat_dict in categories_dict:
-        if cat_dict["parent_id"]:
-            parent = category_map.get(cat_dict["parent_id"])
-            if parent:
-                parent["children"].append(cat_dict)
-        else:
-            tree.append(cat_dict)
-    
-    return tree
 
-def create_category(db: Session, category: schemas.CategoryCreate):
-    db_category = models.Category(**category.model_dump())
-    db.add(db_category)
-    db.commit()
-    db.refresh(db_category)
-    return db_category
 def get_transactions(
     db: Session, 
     user: models.User, 
@@ -521,27 +486,57 @@ def get_next_month_forecast(db: Session, user: models.User):
     next_month = next_month_date.month
     next_month_year = next_month_date.year
 
-    # --- Segédfüggvény a számításokhoz, hogy ne ismételjük a kódot ---
-    def calculate_forecast_for_owners(owner_ids: list[int]):
+    # --- Segédfüggvény a számításokhoz ---
+    def calculate_forecast_for_owners(owner_ids: list[int], is_family_forecast: bool = False):
         if not isinstance(owner_ids, list):
-            owner_ids = [owner_ids] # Ha csak egy ID-t kap, listává alakítjuk
+            owner_ids = [owner_ids]
 
-        recurring_income = db.query(func.sum(models.RecurringRule.amount)).filter(
-            models.RecurringRule.owner_id.in_(owner_ids),
+        # --- JAVÍTOTT RENDSZERES BEVÉTELEK ---
+        income_query = db.query(func.sum(models.RecurringRule.amount)).join(
+            models.Account, models.RecurringRule.to_account_id == models.Account.id
+        ).filter(
             models.RecurringRule.is_active == True,
             models.RecurringRule.type == 'bevétel',
             extract('year', models.RecurringRule.next_run_date) == next_month_year,
             extract('month', models.RecurringRule.next_run_date) == next_month
-        ).scalar() or Decimal(0)
+        )
 
-        recurring_expenses = db.query(func.sum(models.RecurringRule.amount)).filter(
-            models.RecurringRule.owner_id.in_(owner_ids),
+        # Családi nézetben a szülők és a közös kasszák is számítanak
+        if is_family_forecast:
+            income_query = income_query.filter(
+                or_(
+                    models.Account.owner_user_id.in_(owner_ids),
+                    models.Account.type == 'közös'
+                )
+            )
+        else: # Személyes nézetben csak a saját kasszák
+            income_query = income_query.filter(models.Account.owner_user_id.in_(owner_ids))
+        
+        recurring_income = income_query.scalar() or Decimal(0)
+
+        # --- JAVÍTOTT RENDSZERES KIADÁSOK ---
+        expense_query = db.query(func.sum(models.RecurringRule.amount)).join(
+            models.Account, models.RecurringRule.to_account_id == models.Account.id
+        ).filter(
             models.RecurringRule.is_active == True,
             models.RecurringRule.type == 'kiadás',
             extract('year', models.RecurringRule.next_run_date) == next_month_year,
             extract('month', models.RecurringRule.next_run_date) == next_month
-        ).scalar() or Decimal(0)
+        )
 
+        if is_family_forecast:
+            expense_query = expense_query.filter(
+                or_(
+                    models.Account.owner_user_id.in_(owner_ids),
+                    models.Account.type == 'közös'
+                )
+            )
+        else:
+            expense_query = expense_query.filter(models.Account.owner_user_id.in_(owner_ids))
+
+        recurring_expenses = expense_query.scalar() or Decimal(0)
+
+        # --- TERVEZETT KIADÁSOK (a logika itt is a tulajdonoson alapul) ---
         expected_expenses = db.query(func.sum(models.ExpectedExpense.estimated_amount)).filter(
             models.ExpectedExpense.owner_id.in_(owner_ids),
             models.ExpectedExpense.status == 'tervezett',
@@ -561,10 +556,10 @@ def get_next_month_forecast(db: Session, user: models.User):
 
     # --- Fő logika ---
     if user.role in ["Családfő", "Szülő"]:
-        # Szülői nézet: Két kalkulációt végzünk
+        # Szülői nézet: Két kalkuláció
         
         # 1. Személyes előrejelzés (csak a bejelentkezett felhasználó)
-        personal_forecast = calculate_forecast_for_owners([user.id])
+        personal_forecast = calculate_forecast_for_owners([user.id], is_family_forecast=False)
 
         # 2. Családi előrejelzés (az összes szülő, a gyerekek NÉLKÜL)
         parent_roles = ["Családfő", "Szülő"]
@@ -573,7 +568,7 @@ def get_next_month_forecast(db: Session, user: models.User):
             .filter(models.User.family_id == user.family_id, models.User.role.in_(parent_roles))
             .all()
         ]
-        family_forecast = calculate_forecast_for_owners(parent_ids)
+        family_forecast = calculate_forecast_for_owners(parent_ids, is_family_forecast=True)
 
         return {
             "view_type": "parent",
@@ -583,7 +578,7 @@ def get_next_month_forecast(db: Session, user: models.User):
         }
     else:
         # Gyerek nézet: Csak a sajátját számoljuk
-        personal_forecast = calculate_forecast_for_owners([user.id])
+        personal_forecast = calculate_forecast_for_owners([user.id], is_family_forecast=False)
         return {
             "view_type": "child",
             "personal": personal_forecast,
@@ -701,24 +696,7 @@ def get_financial_summary(db: Session, user: models.User):
             "expected_expenses": float(expected_amount),
             "available_balance": float(total_balance - expected_amount)
         }
-def update_category(db: Session, category_id: int, category_data: schemas.CategoryCreate):
-    db_category = get_category(db, category_id)
-    if db_category:
-        db_category.name = category_data.name
-        db_category.color = category_data.color
-        db_category.icon = category_data.icon
-        db.commit()
-        db.refresh(db_category)
-    return db_category
 
-def delete_category(db: Session, category_id: int):
-    db_category = get_category(db, category_id)
-    if db_category:
-        db.delete(db_category)
-        db.commit()
-    return db_category
-
-# ... (a meglévő importok és függvények)
 
 def update_account(db: Session, account_id: int, account_data: schemas.AccountCreate, user: models.User):
     db_account = get_account_by_id_simple(db, account_id)
@@ -827,25 +805,6 @@ def update_account_viewer(db: Session, account_id: int, viewer_id: int, owner: m
     
     db.commit()
     return db_account
-
-# --- Category CRUD ---
-def get_category(db: Session, category_id: int):
-    return db.query(models.Category).filter(models.Category.id == category_id).first()
-
-def get_categories(db: Session):
-    all_categories = db.query(models.Category).all()
-    category_map = {category.id: category for category in all_categories}
-    tree = []
-    for category in all_categories:
-        if category.parent_id:
-            parent = category_map.get(category.parent_id)
-            if parent:
-                if not hasattr(parent, 'children'):
-                    parent.children = []
-                parent.children.append(category)
-        else:
-            tree.append(category)
-    return tree
 
 def create_recurring_rule(db: Session, rule: schemas.RecurringRuleCreate, user: models.User):
     # A 'next_run_date'-et a start_date alapján számoljuk ki
@@ -1464,3 +1423,91 @@ def complete_expected_expense(db: Session, expense_id: int, completion_data: sch
     
     return db_expense
     
+def get_upcoming_events(db: Session, user: models.User):
+    today = date.today()
+    thirty_days_later = today + timedelta(days=30)
+    events = []
+
+    user_ids = [user.id]
+    if user.role in ["Családfő", "Szülő"]:
+        user_ids = [m.id for m in user.family.members]
+
+    recurring_rules = db.query(models.RecurringRule).options(joinedload(models.RecurringRule.owner_user)).filter(
+        models.RecurringRule.owner_id.in_(user_ids),
+        models.RecurringRule.is_active == True,
+        models.RecurringRule.next_run_date.between(today, thirty_days_later)
+    ).all()
+    for rule in recurring_rules:
+        events.append({
+            "date": rule.next_run_date, "description": rule.description, "amount": rule.amount,
+            "type": rule.type, "owner_name": rule.owner_user.display_name, "is_recurring": True
+        })
+
+    expected_expenses = db.query(models.ExpectedExpense).options(joinedload(models.ExpectedExpense.owner)).filter(
+        models.ExpectedExpense.owner_id.in_(user_ids),
+        models.ExpectedExpense.status == 'tervezett',
+        models.ExpectedExpense.due_date.between(today, thirty_days_later)
+    ).all()
+    for expense in expected_expenses:
+        events.append({
+            "date": expense.due_date, "description": expense.description, "amount": expense.estimated_amount,
+            "type": 'tervezett kiadás', "owner_name": expense.owner.display_name, "is_recurring": expense.is_recurring
+        })
+
+    return sorted(events, key=lambda e: e['date'])    
+
+# --- Category CRUD ---
+def get_category(db: Session, category_id: int):
+    return db.query(models.Category).filter(models.Category.id == category_id).first()
+
+def get_categories_tree(db: Session):
+    """
+    Ez a függvény adja vissza a kategóriákat fa-struktúrában.
+    Csak a főkategóriákat kérdezi le, és az SQLAlchemy automatikusan betölti az alkategóriákat.
+    """
+    return db.query(models.Category).options(
+        selectinload(models.Category.children)
+    ).filter(models.Category.parent_id.is_(None)).all()
+
+def create_category(db: Session, category: schemas.CategoryCreate):
+    # Ellenőrzés duplikáció ellen
+    exists_query = db.query(models.Category).filter(
+        models.Category.name == category.name, 
+        models.Category.parent_id == category.parent_id
+    )
+    if db.query(exists_query.exists()).scalar():
+        raise HTTPException(status_code=400, detail="Ilyen nevű kategória már létezik ezen a szinten.")
+
+    db_category = models.Category(**category.model_dump())
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
+def update_category(db: Session, category_id: int, category_data: schemas.CategoryCreate):
+    db_category = get_category(db, category_id)
+    if db_category:
+        db_category.name = category_data.name
+        db_category.color = category_data.color
+        db_category.icon = category_data.icon
+        db.commit()
+        db.refresh(db_category)
+    return db_category
+
+def delete_category(db: Session, category_id: int):
+    db_category = get_category(db, category_id)
+    if not db_category:
+        return None
+
+    # Hivatkozások eltávolítása a törlés előtt
+    db.query(models.Transaction).filter(models.Transaction.category_id == category_id).update({"category_id": None})
+    db.query(models.ExpectedExpense).filter(models.ExpectedExpense.category_id == category_id).update({"category_id": None})
+    db.query(models.RecurringRule).filter(models.RecurringRule.category_id == category_id).update({"category_id": None})
+    
+    # Alkategóriák felsőbb szintre emelése
+    db.query(models.Category).filter(models.Category.parent_id == category_id).update({"parent_id": None})
+
+    db.delete(db_category)
+    db.commit()
+    
+    return db_category

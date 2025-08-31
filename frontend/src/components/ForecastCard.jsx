@@ -1,7 +1,6 @@
 import React from 'react';
 import { Telescope, TrendingUp, TrendingDown, PiggyBank, User, Users } from 'lucide-react';
 
-
 // Segédfüggvény a számok formázásához és színezéséhez
 const StatItem = ({ label, value, currency = 'Ft', colorClass = '' }) => (
   <div className="forecast-stat">
@@ -24,7 +23,7 @@ function ForecastCard({ forecastData, title }) {
     projected_savings, 
   } = forecastData;
 
-const savingsClass = projected_savings >= 0 ? 'income' : 'expense';
+  const savingsClass = projected_savings >= 0 ? 'income' : 'expense';
   const savingsIcon = projected_savings >= 0 
     ? <PiggyBank size={32} className="income"/> 
     : <TrendingDown size={32} className="expense"/>;

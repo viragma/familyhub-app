@@ -39,7 +39,16 @@ class ExpectedExpenseComplete(BaseModel):
     actual_amount: Decimal
     account_id: int
 
+class UpcomingEvent(BaseModel):
+    date: date
+    description: str
+    amount: Decimal
+    type: str  # 'bevétel', 'kiadás', 'átutalás', 'tervezett kiadás'
+    owner_name: str
+    is_recurring: bool
 
+    class Config:
+        from_attributes = True
 # --- Base modellek ---
 class CategoryBase(BaseModel):
     name: str

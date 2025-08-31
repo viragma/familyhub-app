@@ -20,7 +20,7 @@ from .crud import (
     # Új importok
     get_expected_expenses, create_expected_expense, update_expected_expense,
     delete_expected_expense, complete_expected_expense,
-    create_account_transaction,get_next_month_forecast
+    create_account_transaction,get_next_month_forecast,get_upcoming_events
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -34,7 +34,7 @@ from .schemas import (
     # Új importok
     ExpectedExpense as ExpectedExpenseSchema, ExpectedExpenseCreate,
     ExpectedExpenseComplete,
-    Transaction as TransactionSchema, TransactionCreate,
+    Transaction as TransactionSchema, TransactionCreate,UpcomingEvent
 )
 from .database import SessionLocal, engine
 from .security import create_access_token, verify_pin, oauth2_scheme, SECRET_KEY, ALGORITHM
@@ -177,25 +177,23 @@ def update_account_details(
 
 @app.get("/api/categories", response_model=list[CategorySchema])
 def read_categories(db: Session = Depends(get_db)):
-    return get_categories(db=db)
+    return get_categories_tree(db)
 
-@app.get("/api/categories/tree")  
-def read_categories_tree(db: Session = Depends(get_db)):
-    return get_categories_tree(db=db)
+@app.get("/api/categories/tree", response_model=list[CategorySchema])
+def read_categories_as_tree(db: Session = Depends(get_db)):
+    return get_categories_tree(db)
 
 @app.post("/api/categories", response_model=CategorySchema)
-def add_category(category: CategoryCreate, db: Session = Depends(get_db), admin: UserModel = Depends(get_current_admin_user)):
-    return create_category(db=db, category=category)
+def add_category(category: CategorySchema, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
+    return create_category(db, category)
 
 @app.put("/api/categories/{category_id}", response_model=CategorySchema)
-def update_category_details(
-    category_id: int,
-    category_data: CategoryCreate,
-    db: Session = Depends(get_db),
-    admin: UserModel = Depends(get_current_admin_user)
-):
-    """ Módosít egy kategóriát (csak Családfő). """
-    return update_category(db=db, category_id=category_id, category_data=category_data)
+def update_category_details(category_id: int, category_data: CategorySchema, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
+    return update_category(db, category_id, category_data)
+
+@app.delete("/api/categories/{category_id}", response_model=CategorySchema)
+def remove_category(category_id: int, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
+    return delete_category(db, category_id)
 
 @app.delete("/api/categories/{category_id}", response_model=CategorySchema)
 def remove_category(
@@ -602,3 +600,8 @@ def complete_expense(
 ):
     """Egy várható költséget valódi tranzakcióvá alakít."""
     return complete_expected_expense(db=db, expense_id=expense_id, completion_data=completion_data, user=current_user)
+
+@app.get("/api/upcoming-events", response_model=List[UpcomingEvent])
+def read_upcoming_events(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """Lekérdezi a következő 30 nap eseményeit."""
+    return get_upcoming_events(db=db, user=current_user)
