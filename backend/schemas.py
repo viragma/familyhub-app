@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal 
 from typing import List, Optional, ForwardRef,Literal
 import uuid
+from typing import Literal
 
 # --- Várható Költség Sémák ---
 class ExpectedExpenseBase(BaseModel):
@@ -269,6 +270,117 @@ class RecurringRule(RecurringRuleBase):
     class Config:
         from_attributes = True
 
+
+class WishImageBase(BaseModel):
+    image_url: str
+    image_order: int = 0
+
+class WishImage(WishImageBase):
+    id: int
+    wish_id: int
+
+    class Config:
+        from_attributes = True
+
+class WishLinkBase(BaseModel):
+    url: str
+    title: Optional[str] = None
+
+class WishLinkCreate(WishLinkBase): # Létrehozunk egy külön Create sémát
+    pass
+
+class WishLink(WishLinkBase):
+    id: int
+    wish_id: int
+
+    class Config:
+        from_attributes = True
+        
+class WishApprovalBase(BaseModel):
+    status: Literal['approved', 'rejected', 'modifications_requested', 'conditional']
+    feedback: Optional[str] = None
+    conditional_note: Optional[str] = None
+
+class WishApprovalCreate(WishApprovalBase):
+    pass # A többi adatot a végpontból és a felhasználóból vesszük
+
+# A meglévő WishApproval séma maradjon, csak a Base-ből örököljön
+class WishApproval(WishApprovalBase):
+    id: int
+    wish_id: int
+    approver_user_id: int
+    approver: UserProfile
+
+    class Config:
+        from_attributes = True
+
+class WishApproval(BaseModel):
+    id: int
+    wish_id: int
+    approver_user_id: int
+    status: Literal['approved', 'rejected', 'modifications_requested', 'conditional']
+    feedback: Optional[str] = None
+    conditional_note: Optional[str] = None
+    approver: UserProfile
+
+    class Config:
+        from_attributes = True
+
+class WishBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    estimated_price: Decimal
+    priority: Literal['low', 'medium', 'high'] = 'medium'
+    category_id: Optional[int] = None
+    deadline: Optional[date] = None
+
+class WishCreate(WishBase):
+    images: Optional[List[str]] = [] # Base64 kódolt képek listája
+    links: Optional[List[WishLinkCreate]] = []
+
+
+class Wish(WishBase):
+    id: int
+    status: Literal['draft', 'pending', 'approved', 'conditional', 'modifications_requested', 'rejected', 'completed']
+    owner_user_id: int
+    family_id: int
+    goal_account_id: Optional[int] = None
+    
+    owner: UserProfile
+    category: Optional[CategorySimple] = None
+    images: List[WishImage] = []
+    links: List[WishLink] = []
+    approvals: List[WishApproval] = []
+    goal_account: Optional[AccountSimple] = None # <--- EZ AZ ÚJ SOR
+
+    class Config:
+        from_attributes = True
+
+class Notification(BaseModel):
+    type: str
+    message: str
+    link: str
+
+class WishHistory(BaseModel):
+    id: int
+    user: UserProfile
+    action: str
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Frissítsd a Wish sémát is, hogy tartalmazza az előzményeket
+class Wish(WishBase):
+    # ... (meglévő mezők)
+    history: List[WishHistory] = []
+    
+    class Config:
+        from_attributes = True
 # Forward reference frissítések
+Wish.model_rebuild()
+User.model_rebuild() # Ha a User sémába is bekerül a Wish
+Family.model_rebuild() # Ha a Family sémába is bekerül a Wish
 Category.model_rebuild()
 ExpectedExpense.model_rebuild()

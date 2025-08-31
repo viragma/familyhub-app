@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import '../components/Dashboard.css';
 import ForecastCard from '../components/ForecastCard';
-import UpcomingEventsCard from '../components/UpcomingEventsCard'; // ÚJ IMPORT
+import UpcomingEventsCard from '../components/UpcomingEventsCard';
+import NotificationBar from '../components/NotificationBar';
 
 // Kategória költés kártya
 const CategorySpendingCard = ({ data, onClick }) => {
@@ -177,6 +178,7 @@ const DashboardPage = () => {
   });
   const [upcomingEvents, setUpcomingEvents] = useState([]); // ÚJ STATE
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState(null);
 
   const fetchData = async () => {
@@ -189,19 +191,12 @@ const DashboardPage = () => {
       }
 
       // Adatok párhuzamos lekérése
-      const [dashboardResponse, categoryResponse, savingsResponse, upcomingEventsResponse] = await Promise.all([
-        fetch(`${apiUrl}/api/dashboard`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${apiUrl}/api/analytics/category-spending`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${apiUrl}/api/analytics/savings-trend`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${apiUrl}/api/upcoming-events`, { // ÚJ LEKÉRÉS
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
+        const [dashboardResponse, categoryResponse, savingsResponse, upcomingEventsResponse, notificationsResponse] = await Promise.all([ // <--- ÚJ LEKÉRÉS
+        fetch(`${apiUrl}/api/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${apiUrl}/api/analytics/category-spending`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${apiUrl}/api/analytics/savings-trend`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${apiUrl}/api/upcoming-events`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${apiUrl}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } }) // <--- ÚJ LEKÉRÉS
       ]);
 
       if (!dashboardResponse.ok) {
@@ -223,6 +218,8 @@ const DashboardPage = () => {
         savingsTrend: savingsData
       });
       setUpcomingEvents(upcomingEventsData); // ÚJ STATE BEÁLLÍTÁSA
+      setNotifications(notificationsResponse.ok ? await notificationsResponse.json() : []); // <--- ÚJ STATE BEÁLLÍTÁSA
+
 
     } catch (err) {
       console.error('Hiba a dashboard adatok lekérésekor:', err);
@@ -304,6 +301,8 @@ const DashboardPage = () => {
 
   return (
     <div className="">
+          {/* --- ÚJ ÉRTESÍTÉSI SÁV --- */}
+      <NotificationBar notifications={notifications} />
       <div className="dashboard-grid">
         
         <UpcomingEventsCard events={upcomingEvents} /> {/* ÚJ KÁRTYA MEGJELENÍTÉSE */}

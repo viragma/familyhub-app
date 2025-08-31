@@ -19,6 +19,7 @@ function Nav({ theme, toggleTheme }) {
           {user && ['Szülő', 'Családfő','Gyerek','Tizenéves'].includes(user.role) && (
     <NavLink to="/finances" className="nav-item">Pénzügyek</NavLink>
 )}
+    <NavLink to="/wishes" className="nav-item">Kívánságok</NavLink>
   {user && user.role === 'Családfő' && (
             <>
               <NavLink to="/manage-family" className="nav-item">Család Kezelése</NavLink>

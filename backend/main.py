@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Form, Body
+from fastapi import FastAPI, Depends, HTTPException, status, Form, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .scheduler import scheduler
@@ -20,7 +20,11 @@ from .crud import (
     # Új importok
     get_expected_expenses, create_expected_expense, update_expected_expense,
     delete_expected_expense, complete_expected_expense,
-    create_account_transaction,get_next_month_forecast,get_upcoming_events
+    create_account_transaction,get_next_month_forecast,get_upcoming_events,
+    create_wish, get_wishes_by_family, get_wish, update_wish, delete_wish,
+    submit_wish_for_approval,process_wish_approval,
+    get_dashboard_notifications,
+    get_wish_history
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -34,7 +38,12 @@ from .schemas import (
     # Új importok
     ExpectedExpense as ExpectedExpenseSchema, ExpectedExpenseCreate,
     ExpectedExpenseComplete,
-    Transaction as TransactionSchema, TransactionCreate,UpcomingEvent
+    Transaction as TransactionSchema, TransactionCreate,UpcomingEvent,
+    Wish as WishSchema, WishCreate,
+    WishApproval as WishApprovalSchema, Wish as WishSchema,
+    Notification,
+    WishHistory as WishHistorySchema
+
 )
 from .database import SessionLocal, engine
 from .security import create_access_token, verify_pin, oauth2_scheme, SECRET_KEY, ALGORITHM
@@ -605,3 +614,104 @@ def complete_expense(
 def read_upcoming_events(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Lekérdezi a következő 30 nap eseményeit."""
     return get_upcoming_events(db=db, user=current_user)
+
+
+@app.post("/api/wishes", response_model=WishSchema, status_code=status.HTTP_201_CREATED)
+def add_new_wish(
+    wish: WishCreate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """Új kívánság létrehozása a bejelentkezett felhasználó számára."""
+    return create_wish(db=db, wish=wish, user=current_user)
+
+@app.get("/api/wishes", response_model=List[WishSchema])
+def read_wishes(
+    statuses: Optional[List[str]] = Query(None),
+    owner_ids: Optional[List[int]] = Query(None),
+    category_ids: Optional[List[int]] = Query(None),
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """Listázza a család kívánságait szűrési lehetőségekkel."""
+    wishes = get_wishes_by_family(
+        db=db, user=current_user, 
+        statuses=statuses, owner_ids=owner_ids, category_ids=category_ids,
+        skip=skip, limit=limit
+    )
+    return wishes
+
+@app.get("/api/wishes/{wish_id}", response_model=WishSchema)
+def read_wish(
+    wish_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """Egy konkrét kívánság lekérdezése ID alapján."""
+    db_wish = get_wish(db, wish_id=wish_id, user=current_user)
+    if db_wish is None:
+        raise HTTPException(status_code=404, detail="Kívánság nem található")
+    return db_wish
+
+@app.put("/api/wishes/{wish_id}", response_model=WishSchema)
+def modify_wish(
+    wish_id: int, 
+    wish: WishCreate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """Meglévő kívánság módosítása."""
+    db_wish = update_wish(db, wish_id=wish_id, wish_data=wish, user=current_user)
+    if db_wish is None:
+        raise HTTPException(status_code=404, detail="Kívánság nem található")
+    return db_wish
+
+@app.delete("/api/wishes/{wish_id}")
+def remove_wish(
+    wish_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """Kívánság törlése (soft delete)."""
+    result = delete_wish(db, wish_id=wish_id, user=current_user)
+    if not result:
+        raise HTTPException(status_code=404, detail="Kívánság nem található")
+    return result
+
+@app.post("/api/wishes/{wish_id}/submit", response_model=WishSchema)
+def submit_wish(
+    wish_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Egy kívánság beküldése jóváhagyásra (állapot: draft -> pending)."""
+    return submit_wish_for_approval(db=db, wish_id=wish_id, user=current_user)
+
+@app.post("/api/wishes/{wish_id}/approval")
+def decide_on_wish(
+    wish_id: int,
+    approval_data: WishApprovalSchema, # Létre kell hoznunk ezt a sémát
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Egy szülő/családfő döntést hoz egy kívánságról (approve, reject, etc.)."""
+    return process_wish_approval(db=db, wish_id=wish_id, approval_data=approval_data, approver=current_user)
+
+@app.get("/api/notifications", response_model=List[Notification])
+def read_notifications(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Lekérdezi a felhasználó számára releváns dashboard értesítéseket."""
+    return get_dashboard_notifications(db=db, user=current_user)
+
+@app.get("/api/wishes/{wish_id}/history", response_model=List[WishHistorySchema])
+def read_wish_history(
+    wish_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Egy kívánság teljes előzményének lekérdezése."""
+    return get_wish_history(db=db, wish_id=wish_id, user=current_user)

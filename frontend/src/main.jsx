@@ -17,6 +17,7 @@ import ParentRoute from './components/ParentRoute.jsx'
 import CategoryManagementPage from './pages/CategoryManagementPage.jsx';
 import AccountDetailPage from './pages/AccountDetailPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage';
+import WishesPage from './pages/WishesPage.jsx';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
           { path: "/", element: <DashboardPage /> },
           { path: "tasks", element: <TasksPage /> },
           { path: "analytics", element: <AnalyticsPage /> },
+          { path: "wishes", element: <WishesPage /> },
           // Az admin útvonalat egy külön 'wrapper' védi
           {
             element: <AdminRoute />, // Ez a komponens csak az alatta lévőket védi

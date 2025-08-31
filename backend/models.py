@@ -1,11 +1,12 @@
 from sqlalchemy import (
     Boolean, Column, Integer, String, Date, ForeignKey,
-    Numeric, DateTime, Table, Enum
+    Numeric, DateTime, Table, Enum,Text
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+
 
 # Összekötő tábla a kasszák láthatóságához
 account_visibility_association = Table('account_visibility', Base.metadata,
@@ -26,6 +27,7 @@ class Category(Base):
     
     transactions = relationship("Transaction", back_populates="category")
     expected_expenses = relationship("ExpectedExpense", back_populates="category")
+    wishes = relationship("Wish", back_populates="category")
 
 class Family(Base):
     __tablename__ = "families"
@@ -34,6 +36,7 @@ class Family(Base):
     members = relationship("User", back_populates="family")
     accounts = relationship("Account", back_populates="family")
     expected_expenses = relationship("ExpectedExpense", back_populates="family")
+    wishes = relationship("Wish", back_populates="family")
 
 class User(Base):
     __tablename__ = "users"
@@ -56,6 +59,9 @@ class User(Base):
     # JAVÍTOTT KAPCSOLAT: User -> Account (many-to-many)
     visible_accounts = relationship("Account", secondary=account_visibility_association, back_populates="viewers")
     owned_accounts = relationship("Account", back_populates="owner_user", foreign_keys="[Account.owner_user_id]")
+    wishes = relationship("Wish", back_populates="owner", foreign_keys="[Wish.owner_user_id]")
+
+
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -155,3 +161,85 @@ class ExpectedExpense(Base):
     family = relationship("Family", back_populates="expected_expenses")
     category = relationship("Category", back_populates="expected_expenses")
     transaction = relationship("Transaction", back_populates="expected_expense", uselist=False)
+
+
+class Wish(Base):
+    __tablename__ = "wishes"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    estimated_price = Column(Numeric(10, 2), nullable=False)
+    actual_price = Column(Numeric(10, 2), nullable=True)
+    priority = Column(Enum('low', 'medium', 'high', name='wish_priority_enum'), default='medium')
+    status = Column(Enum('draft', 'pending', 'approved', 'conditional', 'modifications_requested', 'rejected', 'completed', name='wish_status_enum'), default='draft')
+    deadline = Column(Date, nullable=True)
+    
+    owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    family_id = Column(Integer, ForeignKey("families.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    goal_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    owner = relationship("User", back_populates="wishes", foreign_keys=[owner_user_id])
+    family = relationship("Family", back_populates="wishes")
+    category = relationship("Category", back_populates="wishes")
+    goal_account = relationship("Account", foreign_keys=[goal_account_id])
+    
+    images = relationship("WishImage", back_populates="wish", cascade="all, delete-orphan")
+    links = relationship("WishLink", back_populates="wish", cascade="all, delete-orphan")
+    approvals = relationship("WishApproval", back_populates="wish", cascade="all, delete-orphan")
+    history = relationship("WishHistory", back_populates="wish", cascade="all, delete-orphan")
+
+class WishImage(Base):
+    __tablename__ = "wish_images"
+    id = Column(Integer, primary_key=True, index=True)
+    wish_id = Column(Integer, ForeignKey("wishes.id"), nullable=False)
+    image_url = Column(String(500), nullable=False)
+    image_order = Column(Integer, default=0)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    wish = relationship("Wish", back_populates="images")
+
+class WishLink(Base):
+    __tablename__ = "wish_links"
+    id = Column(Integer, primary_key=True, index=True)
+    wish_id = Column(Integer, ForeignKey("wishes.id"), nullable=False)
+    url = Column(String(500), nullable=False)
+    title = Column(String(255), nullable=True)
+    link_order = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    wish = relationship("Wish", back_populates="links")
+
+class WishApproval(Base):
+    __tablename__ = "wish_approvals"
+    id = Column(Integer, primary_key=True, index=True)
+    wish_id = Column(Integer, ForeignKey("wishes.id"), nullable=False)
+    approver_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(Enum('approved', 'rejected', 'modifications_requested', 'conditional', name='approval_status_enum'), nullable=False)
+    feedback = Column(Text, nullable=True)
+    conditional_note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    wish = relationship("Wish", back_populates="approvals")
+    approver = relationship("User")
+
+class WishHistory(Base):
+    __tablename__ = "wish_history"
+    id = Column(Integer, primary_key=True, index=True)
+    wish_id = Column(Integer, ForeignKey("wishes.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(Enum('created', 'submitted', 'approved', 'rejected', 'modified', 'completed', 'deleted', name='history_action_enum'), nullable=False)
+    old_values = Column(JSONB, nullable=True)
+    new_values = Column(JSONB, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    wish = relationship("Wish", back_populates="history")
+    user = relationship("User")

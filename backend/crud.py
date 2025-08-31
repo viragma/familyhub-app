@@ -10,11 +10,12 @@ from .schemas import (
     Task as TaskSchema, TaskCreate,
     Family, FamilyCreate,
     User, UserCreate, UserProfile,Account, Transaction, TransactionCreate,TransferCreate,ExpectedExpense,ExpectedExpenseCreate,
-    UpcomingEvent
+    UpcomingEvent, AccountCreate
     )
 from .security import get_pin_hash
 from . import models
-import uuid
+import base64
+import os
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload,selectinload
 # JAVÍTÁS: Hozzáadjuk a hiányzó 'func' és 'extract' importokat
@@ -25,6 +26,11 @@ from . import models, schemas
 from .security import get_pin_hash
 from sqlalchemy import func, extract, and_, or_ 
 from dateutil.relativedelta import relativedelta
+from . import models, schemas
+from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
+from typing import Optional, List
+from sqlalchemy.dialects.postgresql import insert
 
 # --- User CRUD Műveletek ---
 def get_user(db: Session, user_id: int):
@@ -1511,3 +1517,309 @@ def delete_category(db: Session, category_id: int):
     db.commit()
     
     return db_category
+
+# --- Wish CRUD Műveletek ---
+
+def get_wish(db: Session, wish_id: int, user: models.User):
+    """Lekérdez egy konkrét kívánságot, ellenőrizve a jogosultságot."""
+    wish = db.query(models.Wish).filter(models.Wish.id == wish_id).first()
+    if wish and wish.family_id != user.family_id:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod megtekinteni ezt a kívánságot.")
+    return wish
+
+def get_wishes_by_family(db: Session, user: models.User, 
+                         statuses: Optional[List[str]] = None,
+                         owner_ids: Optional[List[int]] = None,
+                         category_ids: Optional[List[int]] = None,
+                         skip: int = 0, limit: int = 100):
+    """Listázza egy család összes kívánságát, szűrési és jogosultsági feltételekkel."""
+    
+    # Alap lekérdezés a szükséges adatok betöltésével
+    base_query = db.query(models.Wish).options(
+        selectinload(models.Wish.owner),
+        selectinload(models.Wish.approvals).selectinload(models.WishApproval.approver),
+        selectinload(models.Wish.goal_account),
+        selectinload(models.Wish.category)
+    ).filter(models.Wish.family_id == user.family_id)
+
+    # Jogosultsági szűrés: a gyerekek nem látják mások vázlatait
+    if user.role not in ["Családfő", "Szülő"]:
+        base_query = base_query.filter(
+            sa.or_(
+                models.Wish.status != 'draft',
+                models.Wish.owner_user_id == user.id
+            )
+        )
+    
+    # Dinamikus szűrők alkalmazása
+    if statuses:
+        base_query = base_query.filter(models.Wish.status.in_(statuses))
+    if owner_ids:
+        base_query = base_query.filter(models.Wish.owner_user_id.in_(owner_ids))
+    if category_ids:
+        base_query = base_query.filter(models.Wish.category_id.in_(category_ids))
+
+    return base_query.order_by(models.Wish.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def create_wish(db: Session, wish: schemas.WishCreate, user: models.User):
+    """Létrehoz egy új kívánságot, képekkel és linkekkel együtt."""
+    
+    # Különválasztjuk a kívánság alapadatait a képektől és linkektől
+    wish_data = wish.model_dump(exclude={"images", "links"})
+    db_wish = models.Wish(
+        **wish_data,
+        owner_user_id=user.id,
+        family_id=user.family_id
+    )
+    
+    # Linkek hozzáadása
+    if wish.links:
+        for i, link_data in enumerate(wish.links):
+            db_link = models.WishLink(**link_data.model_dump(), wish=db_wish, link_order=i)
+            db.add(db_link)
+            
+    # Képfeltöltés kezelése (egyelőre csak szimuláljuk a mentést)
+    # A valós alkalmazásban itt egy felhő tárhelyre (pl. S3, Firebase Storage) töltenénk fel.
+    if wish.images:
+        # Hozzuk létre a mappát, ha nem létezik
+        upload_dir = "uploads/wish_images"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        for i, img_base64 in enumerate(wish.images):
+            try:
+                # A base64 stringet dekódoljuk
+                header, encoded = img_base64.split(",", 1)
+                image_data = base64.b64decode(encoded)
+                
+                # Generálunk egy egyedi fájlnevet
+                file_extension = header.split("/")[1].split(";")[0]
+                filename = f"{db_wish.id or 'new'}_{user.id}_{datetime.utcnow().timestamp()}_{i}.{file_extension}"
+                filepath = os.path.join(upload_dir, filename)
+                
+                # A fájl mentése (szimuláció)
+                # A valóságban ide jönne a feltöltési logika. Most csak az elérési utat tároljuk.
+                # with open(filepath, "wb") as f:
+                #     f.write(image_data)
+                
+                image_url = f"/{filepath}" # Relatív URL
+                
+                db_image = models.WishImage(
+                    wish=db_wish, 
+                    image_url=image_url, 
+                    image_order=i
+                )
+                db.add(db_image)
+
+            except Exception as e:
+                print(f"Hiba a képfeldolgozás során: {e}")
+                # A hibás képet kihagyjuk, de a folyamat megy tovább
+                continue
+
+
+
+    db.add(db_wish)
+    db.flush()
+    create_history_entry(db, wish_id=db_wish.id, user_id=user.id, action='created', new_values={'name': db_wish.name})
+    db.commit()
+    db.refresh(db_wish)
+    return db_wish
+
+def update_wish(db: Session, wish_id: int, wish_data: schemas.WishCreate, user: models.User):
+    """Frissít egy meglévő kívánságot."""
+    db_wish = get_wish(db, wish_id, user)
+    if not db_wish:
+        return None
+
+    # Jogosultság ellenőrzés: csak a tulajdonos vagy szülő módosíthat
+    can_edit = (
+        user.id == db_wish.owner_user_id or
+        user.role in ["Családfő", "Szülő"]
+    )
+    if not can_edit:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kívánság módosításához.")
+
+    update_data = wish_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_wish, key, value)
+    
+    db.add(db_wish)
+    db.commit()
+    db.refresh(db_wish)
+    return db_wish
+
+def delete_wish(db: Session, wish_id: int, user: models.User):
+    """Töröl egy kívánságot (soft delete)."""
+    db_wish = get_wish(db, wish_id, user)
+    if not db_wish:
+        return None
+
+    # Jogosultság ellenőrzés: csak a tulajdonos vagy családfő törölhet
+    can_delete = (
+        user.id == db_wish.owner_user_id or
+        user.role == "Családfő"
+    )
+    if not can_delete:
+         raise HTTPException(status_code=403, detail="Nincs jogosultságod a kívánság törléséhez.")
+
+    db_wish.deleted_at = datetime.utcnow()
+    db.commit()
+    return {"detail": "Kívánság sikeresen törölve"}
+
+def submit_wish_for_approval(db: Session, wish_id: int, user: models.User):
+    """Beküld egy kívánságot jóváhagyásra."""
+    db_wish = get_wish(db, wish_id, user)
+    if not db_wish:
+        raise HTTPException(status_code=404, detail="Kívánság nem található.")
+    if db_wish.owner_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Csak a saját kívánságodat küldheted be.")
+    if db_wish.status != 'draft':
+        raise HTTPException(status_code=400, detail="Ez a kívánság már be lett küldve.")
+
+    db_wish.status = 'pending'
+    db_wish.submitted_at = datetime.utcnow()
+    create_history_entry(db, wish_id=wish_id, user_id=user.id, action='submitted')
+    db.commit()
+    db.refresh(db_wish)
+    return db_wish
+
+def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.WishApprovalCreate, approver: models.User):
+    """Feldolgozza a szülői döntést egy kívánságról, és kezeli a kassza létrehozását."""
+    if approver.role not in ["Családfő", "Szülő"]:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod döntést hozni.")
+    
+    db_wish = get_wish(db, wish_id, approver)
+    if not db_wish:
+        raise HTTPException(status_code=404, detail="Kívánság nem található.")
+    if db_wish.status != 'pending':
+        raise HTTPException(status_code=400, detail="Ez a kívánság jelenleg nem hagyható jóvá.")
+
+    existing_approval = db.query(models.WishApproval).filter(
+        models.WishApproval.wish_id == wish_id,
+        models.WishApproval.approver_user_id == approver.id
+    ).first()
+
+    if existing_approval:
+        raise HTTPException(status_code=400, detail="Erről a kívánságról már döntöttél.")
+
+    # Új approval rekord létrehozása
+    new_approval = models.WishApproval(
+        wish_id=wish_id,
+        approver_user_id=approver.id,
+        status=approval_data.status,
+        feedback=approval_data.feedback,
+        conditional_note=approval_data.conditional_note
+    )
+    db.add(new_approval)
+    db.flush() # Lefuttatjuk, hogy a new_approval kapjon ID-t
+
+    # --- JÓVÁHAGYÁSI LOGIKA ÉS KASSZA LÉTREHOZÁS ---
+    if approval_data.status == 'rejected':
+        db_wish.status = 'rejected'
+    elif approval_data.status == 'modifications_requested':
+        db_wish.status = 'modifications_requested'
+    elif approval_data.status in ['approved', 'conditional']:
+        
+        # Összegyűjtjük az összes szülőt a családban
+        parents = db.query(models.User).filter(
+            models.User.family_id == db_wish.family_id,
+            models.User.role.in_(['Családfő', 'Szülő'])
+        ).all()
+        
+        # Összegyűjtjük az eddigi jóváhagyásokat ehhez a kívánsághoz
+        all_approvals = db.query(models.WishApproval).filter(
+            models.WishApproval.wish_id == wish_id,
+            models.WishApproval.status.in_(['approved', 'conditional'])
+        ).all()
+
+        # Ha a jóváhagyások száma eléri a szülők számát, akkor a kívánság teljesen jóváhagyott
+        if len(all_approvals) >= len(parents):
+            db_wish.status = 'approved'
+            db_wish.approved_at = datetime.utcnow()
+
+            # Automatikus kassza létrehozása
+            goal_account_schema = AccountCreate(
+                name=f"Cél: {db_wish.name}",
+                type='cél',
+                goal_amount=db_wish.estimated_price,
+                goal_date=db_wish.deadline,
+                show_on_dashboard=True,
+                viewer_ids=[member.id for member in db_wish.family.members] # Mindenki láthatja
+            )
+            
+            # A create_family_account függvényt használjuk, a tulajdonos a kívánság tulajdonosa lesz
+            new_account = create_family_account(db, account=goal_account_schema, family_id=db_wish.family_id, owner_user=db_wish.owner)
+            
+            # Összekötjük a kívánságot az új kasszával
+            db_wish.goal_account_id = new_account.id
+
+    notes = f"Döntés: {approval_data.status}."
+    if approval_data.feedback:
+        notes += f" Visszajelzés: {approval_data.feedback}"
+    create_history_entry(db, wish_id=wish_id, user_id=approver.id, action=approval_data.status, notes=notes)
+    db.commit()
+    db.refresh(db_wish)
+    return db_wish
+
+# A backend/crud.py fájlban, a többi CRUD függvény mellé
+
+def get_dashboard_notifications(db: Session, user: models.User):
+    """Összegyűjti a dashboardon megjelenítendő értesítéseket a felhasználó számára."""
+    notifications = []
+
+    # 1. Jóváhagyásra váró kívánságok (csak szülőknek)
+    if user.role in ["Családfő", "Szülő"]:
+        pending_wishes_count = db.query(models.Wish).filter(
+            models.Wish.family_id == user.family_id,
+            models.Wish.status == 'pending',
+            # Olyan kívánság, amihez ennek a szülőnek még nincs jóváhagyása
+            ~models.Wish.approvals.any(models.WishApproval.approver_user_id == user.id)
+        ).count()
+
+        if pending_wishes_count > 0:
+            notifications.append({
+                "type": "pending_approvals",
+                "message": f"{pending_wishes_count} kívánság vár a jóváhagyásodra.",
+                "link": "/wishes?tab=pending"
+            })
+
+    # 2. Módosításra visszaküldött kívánságok (csak a tulajdonosnak)
+    mod_requested_count = db.query(models.Wish).filter(
+        models.Wish.owner_user_id == user.id,
+        models.Wish.status == 'modifications_requested'
+    ).count()
+
+    if mod_requested_count > 0:
+        notifications.append({
+            "type": "modifications_requested",
+            "message": f"{mod_requested_count} kívánságod módosításra vár.",
+            "link": "/wishes?tab=my-wishes"
+        })
+
+    # TODO: Később itt lehetne még több értesítés, pl. "Elérte a célját a kassza"
+
+    return notifications
+
+def create_history_entry(db: Session, wish_id: int, user_id: int, action: str, notes: str = None, old_values: dict = None, new_values: dict = None):
+    """Létrehoz egy új bejegyzést a WishHistory táblában."""
+    history_entry = models.WishHistory(
+        wish_id=wish_id,
+        user_id=user_id,
+        action=action,
+        notes=notes,
+        old_values=old_values,
+        new_values=new_values
+    )
+    db.add(history_entry)
+
+def get_wish_history(db: Session, wish_id: int, user: models.User):
+    """Lekérdezi egy kívánság teljes előzményét."""
+    # Ellenőrizzük, hogy a felhasználónak van-e joga látni a kívánságot
+    db_wish = get_wish(db, wish_id, user)
+    if not db_wish:
+        raise HTTPException(status_code=404, detail="Kívánság nem található.")
+    
+    return db.query(models.WishHistory).options(
+        selectinload(models.WishHistory.user) # Betöltjük a felhasználó adatait is
+    ).filter(models.WishHistory.wish_id == wish_id).order_by(models.WishHistory.created_at.desc()).all()
+    
