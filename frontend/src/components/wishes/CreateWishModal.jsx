@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Camera, Link as LinkIcon, XCircle } from 'lucide-react';
+import { Camera, Link as LinkIcon, XCircle, Save, Send } from 'lucide-react';
 
-function CreateWishModal({ isOpen, onClose, onSave }) {
+function CreateWishModal({ isOpen, onClose, onSave, wishToEdit = null }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -12,11 +12,25 @@ function CreateWishModal({ isOpen, onClose, onSave }) {
     deadline: ''
   });
   const [categories, setCategories] = useState([]);
-  const [images, setImages] = useState([]); // Képek (base64) tárolása
-  const [links, setLinks] = useState([]); // Linkek tárolása
+  const [images, setImages] = useState([]);
+  const [links, setLinks] = useState([]);
   const [currentLink, setCurrentLink] = useState({ url: '', title: '' });
 
   const { token, apiUrl } = useAuth();
+
+  const resetState = () => {
+    setFormData({
+        name: '',
+        description: '',
+        estimated_price: '',
+        priority: 'medium',
+        category_id: '',
+        deadline: ''
+    });
+    setImages([]);
+    setLinks([]);
+    setCurrentLink({ url: '', title: '' });
+  };
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -25,25 +39,36 @@ function CreateWishModal({ isOpen, onClose, onSave }) {
           const response = await fetch(`${apiUrl}/api/categories/tree`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          setCategories(await response.json());
-        } catch (error) { console.error("Hiba a kategóriák lekérésekor:", error); }
+          if (response.ok) {
+            setCategories(await response.json());
+          }
+        } catch (error) { 
+          console.error("Hiba a kategóriák lekérésekor:", error); 
+        }
       }
     };
+    
     fetchCategories();
-    // Reset state on open
-    if (isOpen) {
-        setFormData({ name: '', description: '', estimated_price: '', priority: 'medium', category_id: '', deadline: '' });
-        setImages([]);
-        setLinks([]);
-        setCurrentLink({ url: '', title: '' });
+
+    if (isOpen && wishToEdit) {
+      setFormData({
+        name: wishToEdit.name || '',
+        description: wishToEdit.description || '',
+        estimated_price: wishToEdit.estimated_price || '',
+        priority: wishToEdit.priority || 'medium',
+        category_id: wishToEdit.category_id || '',
+        deadline: wishToEdit.deadline ? wishToEdit.deadline.split('T')[0] : ''
+      });
+      // TODO: Képek és linkek betöltése szerkesztéskor
+    } else if (isOpen) {
+      resetState();
     }
-  }, [isOpen, token, apiUrl]);
+  }, [isOpen, wishToEdit, token, apiUrl]);
   
   const handleImageChange = (e) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
       files.forEach(file => {
-        // Validáció (max 5MB, kép formátum)
         if (file.size > 5 * 1024 * 1024) {
           alert("A kép mérete nem haladhatja meg az 5MB-ot!");
           return;
@@ -82,27 +107,20 @@ function CreateWishModal({ isOpen, onClose, onSave }) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleSave = () => {
+  const handleAction = (action) => {
       if (!formData.name || !formData.estimated_price) {
           alert("A név és a becsült ár megadása kötelező!");
           return;
       }
-      
       const dataToSend = {
           ...formData,
-          // Javítás: Ha a category_id üres string, null-t küldünk
           category_id: formData.category_id ? parseInt(formData.category_id, 10) : null,
-          
-          // Javítás: Ha a deadline üres string, null-t küldünk
           deadline: formData.deadline || null,
-          
-          // Az ár string-ként marad, ez helyes
           estimated_price: formData.estimated_price,
-          
           images: images,
           links: links
       };
-      onSave(dataToSend);
+      onSave(dataToSend, action, wishToEdit ? wishToEdit.id : null);
   }
 
   if (!isOpen) return null;
@@ -111,11 +129,10 @@ function CreateWishModal({ isOpen, onClose, onSave }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Új Kívánság</h2>
+          <h2 className="modal-title">{wishToEdit ? 'Kívánság szerkesztése' : 'Új Kívánság'}</h2>
           <button onClick={onClose} className="modal-close-btn">&times;</button>
         </div>
         
-        {/* ... (A felső form mezők változatlanok) ... */}
         <div className="form-group">
           <label className="form-label">Mit szeretnél? *</label>
           <input type="text" name="name" className="form-input" onChange={handleChange} value={formData.name} />
@@ -142,8 +159,16 @@ function CreateWishModal({ isOpen, onClose, onSave }) {
                 ))}
             </select>
         </div>
+
+        <div className="form-group">
+            <label className="form-label">Prioritás</label>
+            <select className="form-input" name="priority" value={formData.priority} onChange={handleChange}>
+                <option value="low">Alacsony</option>
+                <option value="medium">Közepes</option>
+                <option value="high">Magas</option>
+            </select>
+        </div>
         
-        {/* --- ÚJ SZEKCIÓ: Képek --- */}
         <div className="form-group">
             <label className="form-label">Képek</label>
             <div className="image-preview-area">
@@ -160,7 +185,6 @@ function CreateWishModal({ isOpen, onClose, onSave }) {
             <input id="image-upload" type="file" multiple accept="image/png, image/jpeg, image/webp" onChange={handleImageChange} style={{ display: 'none' }} />
         </div>
 
-        {/* --- ÚJ SZEKCIÓ: Linkek --- */}
         <div className="form-group">
             <label className="form-label">Linkek</label>
             <div className="links-list">
@@ -181,7 +205,12 @@ function CreateWishModal({ isOpen, onClose, onSave }) {
         
         <div className="modal-actions">
             <button onClick={onClose} className="btn btn-secondary">Mégse</button>
-            <button onClick={handleSave} className="btn btn-primary">Mentés</button>
+            <button onClick={() => handleAction('draft')} className="btn btn-tertiary">
+                <Save size={16} /> Mentés vázlatként
+            </button>
+            <button onClick={() => handleAction('submit')} className="btn btn-primary">
+                <Send size={16} /> Jóváhagyásra küldés
+            </button>
         </div>
       </div>
     </div>

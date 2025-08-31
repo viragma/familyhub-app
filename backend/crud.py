@@ -1563,90 +1563,118 @@ def get_wishes_by_family(db: Session, user: models.User,
 
 
 def create_wish(db: Session, wish: schemas.WishCreate, user: models.User):
-    """Létrehoz egy új kívánságot, képekkel és linkekkel együtt."""
+    """
+    Létrehoz egy új kívánságot a hozzá tartozó képekkel és linkekkel.
+    Kezeli, hogy a kívánság vázlatként vagy azonnal beküldve jöjjön-e létre.
+    """
     
-    # Különválasztjuk a kívánság alapadatait a képektől és linkektől
-    wish_data = wish.model_dump(exclude={"images", "links"})
+    # 1. Különválasztjuk az alap adatokat a kapcsolódó entitásoktól és a vezérlő flag-től.
+    wish_data = wish.model_dump(exclude={"images", "links", "submit_now"})
     db_wish = models.Wish(
         **wish_data,
         owner_user_id=user.id,
         family_id=user.family_id
     )
     
-    # Linkek hozzáadása
+    # 2. Ha a frontend a "Jóváhagyásra küldés" gombbal küldte az adatot,
+    # a státuszt rögtön 'pending'-re állítjuk. Különben 'draft' marad.
+    if wish.submit_now:
+        db_wish.status = 'pending'
+        db_wish.submitted_at = datetime.utcnow()
+
+    db.add(db_wish)
+    
+    # 3. A db.flush() parancs kiad egy előzetes mentést az adatbázis felé,
+    # anélkül, hogy véglegesítené a tranzakciót. Erre azért van szükség,
+    # hogy a 'db_wish' objektum megkapja az adatbázis által generált ID-ját,
+    # amit a képek, linkek és előzmények mentéséhez használni tudunk.
+    db.flush()
+
+    # 4. Linkek feldolgozása és hozzáadása a kívánsághoz.
     if wish.links:
         for i, link_data in enumerate(wish.links):
-            db_link = models.WishLink(**link_data.model_dump(), wish=db_wish, link_order=i)
+            db_link = models.WishLink(**link_data.model_dump(), wish_id=db_wish.id, link_order=i)
             db.add(db_link)
             
-    # Képfeltöltés kezelése (egyelőre csak szimuláljuk a mentést)
-    # A valós alkalmazásban itt egy felhő tárhelyre (pl. S3, Firebase Storage) töltenénk fel.
+    # 5. Képfeltöltés kezelése.
+    # Éles környezetben itt egy felhő tárhelyre (pl. AWS S3, Firebase Storage) történne a feltöltés.
+    # Most a fájl elérési útját mentjük el.
     if wish.images:
-        # Hozzuk létre a mappát, ha nem létezik
         upload_dir = "uploads/wish_images"
         os.makedirs(upload_dir, exist_ok=True)
         
         for i, img_base64 in enumerate(wish.images):
             try:
-                # A base64 stringet dekódoljuk
                 header, encoded = img_base64.split(",", 1)
                 image_data = base64.b64decode(encoded)
                 
-                # Generálunk egy egyedi fájlnevet
                 file_extension = header.split("/")[1].split(";")[0]
-                filename = f"{db_wish.id or 'new'}_{user.id}_{datetime.utcnow().timestamp()}_{i}.{file_extension}"
+                # Egyedi fájlnév generálása a félreértések elkerülése végett
+                filename = f"{db_wish.id}_{user.id}_{datetime.utcnow().timestamp()}_{i}.{file_extension}"
                 filepath = os.path.join(upload_dir, filename)
                 
-                # A fájl mentése (szimuláció)
-                # A valóságban ide jönne a feltöltési logika. Most csak az elérési utat tároljuk.
+                # A fájl mentése a szerverre (a kikommentezett rész)
                 # with open(filepath, "wb") as f:
                 #     f.write(image_data)
                 
-                image_url = f"/{filepath}" # Relatív URL
+                image_url = f"/{filepath}" # Relatív URL-ként mentjük
                 
                 db_image = models.WishImage(
-                    wish=db_wish, 
+                    wish_id=db_wish.id, 
                     image_url=image_url, 
                     image_order=i
                 )
                 db.add(db_image)
-
             except Exception as e:
                 print(f"Hiba a képfeldolgozás során: {e}")
-                # A hibás képet kihagyjuk, de a folyamat megy tovább
                 continue
 
-
-
-    db.add(db_wish)
-    db.flush()
+    # 6. Előzmény bejegyzések létrehozása a megfelelő eseményekről.
     create_history_entry(db, wish_id=db_wish.id, user_id=user.id, action='created', new_values={'name': db_wish.name})
+    if wish.submit_now:
+        create_history_entry(db, wish_id=db_wish.id, user_id=user.id, action='submitted')
+
+    # 7. A tranzakció véglegesítése. Mostantól minden adat él az adatbázisban.
     db.commit()
+    
+    # 8. Az objektum frissítése az adatbázisból, hogy minden frissen generált adatot tartalmazzon.
     db.refresh(db_wish)
+    
     return db_wish
 
 def update_wish(db: Session, wish_id: int, wish_data: schemas.WishCreate, user: models.User):
-    """Frissít egy meglévő kívánságot."""
+    """Frissít egy meglévő kívánságot, és naplózza a változást."""
     db_wish = get_wish(db, wish_id, user)
     if not db_wish:
-        return None
+        raise HTTPException(status_code=404, detail="Kívánság nem található.")
 
-    # Jogosultság ellenőrzés: csak a tulajdonos vagy szülő módosíthat
+    # Jogosultság: csak a tulajdonos módosíthatja, ha vázlat vagy visszaküldött
     can_edit = (
-        user.id == db_wish.owner_user_id or
-        user.role in ["Családfő", "Szülő"]
+        user.id == db_wish.owner_user_id and
+        db_wish.status in ['draft', 'modifications_requested']
     )
     if not can_edit:
-        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kívánság módosításához.")
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kívánság módosításához ebben az állapotban.")
 
+    # Előzmény rögzítése a változásokról
+    old_values = {"name": db_wish.name, "estimated_price": float(db_wish.estimated_price)}
+    
     update_data = wish_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_wish, key, value)
     
+    new_values = {"name": db_wish.name, "estimated_price": float(db_wish.estimated_price)}
+    create_history_entry(db, wish_id=wish_id, user_id=user.id, action='modified', old_values=old_values, new_values=new_values)
+
+    # Ha módosítás után visszakerül vázlatba, újra be kell küldeni
+    if db_wish.status == 'modifications_requested':
+        db_wish.status = 'draft'
+
     db.add(db_wish)
     db.commit()
     db.refresh(db_wish)
     return db_wish
+
 
 def delete_wish(db: Session, wish_id: int, user: models.User):
     """Töröl egy kívánságot (soft delete)."""
@@ -1822,4 +1850,12 @@ def get_wish_history(db: Session, wish_id: int, user: models.User):
     return db.query(models.WishHistory).options(
         selectinload(models.WishHistory.user) # Betöltjük a felhasználó adatait is
     ).filter(models.WishHistory.wish_id == wish_id).order_by(models.WishHistory.created_at.desc()).all()
+
+def create_and_submit_wish(db: Session, wish: schemas.WishCreate, user: models.User):
+    """Létrehoz egy kívánságot és azonnal be is küldi jóváhagyásra."""
+    # Létrehozzuk vázlatként
+    db_wish = create_wish(db=db, wish=wish, user=user)
+    
+    # Azonnal be is küldjük
+    return submit_wish_for_approval(db=db, wish_id=db_wish.id, user=user)    
     

@@ -337,6 +337,7 @@ class WishBase(BaseModel):
 class WishCreate(WishBase):
     images: Optional[List[str]] = [] # Base64 kódolt képek listája
     links: Optional[List[WishLinkCreate]] = []
+    submit_now: bool = False
 
 
 class Wish(WishBase):

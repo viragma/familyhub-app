@@ -14,6 +14,7 @@ function WishesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   const [selectedWish, setSelectedWish] = useState(null);
+  const [wishToEdit, setWishToEdit] = useState(null);
   const [historyData, setHistoryData] = useState(null);
   const [filters, setFilters] = useState({});
   const [panelFilters, setPanelFilters] = useState({});
@@ -54,6 +55,7 @@ function WishesPage() {
         tabFilters = { statuses: ['completed', 'rejected'] };
         break;
       case 'family-wishes':
+        // Itt szándékosan üres, a panelen lehet szűrni a többiekre
         break;
       default:
         break;
@@ -79,9 +81,13 @@ function WishesPage() {
       });
       if(response.ok) {
         setAllWishes(await response.json());
+      } else {
+        console.error("Hiba a kívánságok lekérésekor, státusz:", response.status);
+        setAllWishes([]); // Hiba esetén ürítsük a listát
       }
     } catch (error) { 
       console.error("Hiba a kívánságok lekérésekor:", error); 
+      setAllWishes([]);
     } finally { 
       setLoading(false); 
     }
@@ -95,47 +101,72 @@ function WishesPage() {
     setPanelFilters(prev => ({ ...prev, [group]: newValues }));
   };
 
-  const handleSaveWish = async (wishData) => {
-     if (!token) return;
-    try {
-      const response = await fetch(`${apiUrl}/api/wishes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(wishData),
-      });
-
-      if (response.ok) {
-        setIsCreateModalOpen(false);
-        fetchWishes();
-      } else {
-        const errorData = await response.json();
-        alert(`Hiba a mentés során: ${errorData.detail}`);
-      }
-    } catch (error) {
-      console.error("Hiba a kívánság mentésekor:", error);
-      alert("Hálózati hiba történt a mentés során.");
-    }
-  };
-
   const handleSubmitWish = async (wishId) => {
+    if (!wishId) return;
     try {
       const response = await fetch(`${apiUrl}/api/wishes/${wishId}/submit`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        fetchWishes();
-      } else {
-        alert("Hiba a beküldés során.");
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Hiba a beküldés során.");
       }
     } catch (error) { 
       console.error("Hiba a beküldéskor:", error); 
+      alert(error.message);
+      throw error; // Dobjuk tovább a hibát, hogy a hívó függvény tudjon róla
     }
   };
 
+  const handleSaveWish = async (wishData, action, wishId) => {
+    if (!token) return;
+  
+    try {
+      let wishToSubmitId = wishId;
+  
+      if (wishId) { // SZERKESZTÉS
+        const updateResponse = await fetch(`${apiUrl}/api/wishes/${wishId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(wishData),
+        });
+        if (!updateResponse.ok) {
+          const errorData = await updateResponse.json();
+          throw new Error(`Hiba a szerkesztés során: ${errorData.detail}`);
+        }
+      } else { // ÚJ LÉTREHOZÁS
+        const createResponse = await fetch(`${apiUrl}/api/wishes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(wishData), // A backend már draftként hozza létre
+        });
+  
+        if (!createResponse.ok) {
+          const errorData = await createResponse.json();
+          throw new Error(`Hiba a vázlat mentése során: ${errorData.detail}`);
+        }
+        const newWish = await createResponse.json();
+        wishToSubmitId = newWish.id;
+      }
+  
+      // HA A "JÓVÁHAGYÁSRA KÜLDÉS" GOMBOT VÁLASZTOTTÁK
+      if (action === 'submit' && wishToSubmitId) {
+        await handleSubmitWish(wishToSubmitId);
+      }
+  
+      // MINDEN ESETBEN FRISSÍTJÜK A VÉGÉN A LISTÁT
+      fetchWishes();
+  
+    } catch (error) {
+      console.error("Hiba a mentési folyamat során:", error);
+      alert(error.message);
+    }
+  
+    setIsCreateModalOpen(false);
+    setWishToEdit(null);
+  };
+  
   const handleApprovalDecision = async (wishId, decisionData) => {
      try {
       const response = await fetch(`${apiUrl}/api/wishes/${wishId}/approval`, {
@@ -161,8 +192,13 @@ function WishesPage() {
     setIsApprovalModalOpen(true);
   };
 
+  const openEditModal = (wish) => {
+    setWishToEdit(wish);
+    setIsCreateModalOpen(true);
+  };
+
   const handleHistoryClick = async (wish) => {
-    if (activeTab !== 'history') return;
+    if (activeTab !== 'history' || !wish) return;
     if (!token) return;
     try {
         const response = await fetch(`${apiUrl}/api/wishes/${wish.id}/history`, {
@@ -200,7 +236,7 @@ function WishesPage() {
             <h1 className="greeting">Kívánságok 🎁</h1>
             <p className="date">Tervezzük meg közösen az álmokat!</p>
           </div>
-          <button onClick={() => setIsCreateModalOpen(true)} className="fab">
+          <button onClick={() => { setWishToEdit(null); setIsCreateModalOpen(true); }} className="fab">
               <Plus size={24} />
           </button>
         </div>
@@ -229,6 +265,7 @@ function WishesPage() {
                         currentUser={user}
                         onSubmit={handleSubmitWish}
                         onApproveClick={openApprovalModal}
+                        onEditClick={openEditModal}
                         onHistoryClick={handleHistoryClick}
                       />)
                   ) : (
@@ -242,7 +279,12 @@ function WishesPage() {
         </div>
       </div>
 
-      <CreateWishModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleSaveWish} />
+      <CreateWishModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => { setIsCreateModalOpen(false); setWishToEdit(null); }} 
+        onSave={handleSaveWish}
+        wishToEdit={wishToEdit}
+      />
       {selectedWish && <ApprovalModal isOpen={isApprovalModalOpen} onClose={() => setSelectedWish(null)} onDecision={handleApprovalDecision} wish={selectedWish} />}
     </div>
   );

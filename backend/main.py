@@ -24,7 +24,7 @@ from .crud import (
     create_wish, get_wishes_by_family, get_wish, update_wish, delete_wish,
     submit_wish_for_approval,process_wish_approval,
     get_dashboard_notifications,
-    get_wish_history
+    get_wish_history, create_and_submit_wish
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -715,3 +715,12 @@ def read_wish_history(
 ):
     """Egy kívánság teljes előzményének lekérdezése."""
     return get_wish_history(db=db, wish_id=wish_id, user=current_user)
+
+@app.post("/api/wishes/create_and_submit", response_model=WishSchema, status_code=status.HTTP_201_CREATED)
+def add_and_submit_new_wish(
+    wish: WishCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Új kívánság létrehozása és azonnali beküldése jóváhagyásra."""
+    return create_and_submit_wish(db=db, wish=wish, user=current_user)
