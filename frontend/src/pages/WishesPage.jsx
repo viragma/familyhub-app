@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Heart, Users, Clock, Target, Plus } from 'lucide-react';
+import { Heart, Users, Clock, Target, Plus, SlidersHorizontal, X, Filter } from 'lucide-react';
 import WishCard from '../components/wishes/WishCard';
 import CreateWishModal from '../components/wishes/CreateWishModal';
 import ApprovalModal from '../components/wishes/ApprovalModal';
 import WishHistoryLog from '../components/wishes/WishHistoryLog';
-import WishFilterPanel from '../components/wishes/WishFilterPanel';
-import './../components/wishes/WishFilterPanel.css';
 
 function WishesPage() {
   const [activeTab, setActiveTab] = useState('my-wishes');
@@ -21,6 +19,7 @@ function WishesPage() {
   const [panelFilters, setPanelFilters] = useState({});
   const [familyMembers, setFamilyMembers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   const { user, token, apiUrl } = useAuth();
 
@@ -99,6 +98,18 @@ function WishesPage() {
   
   const handlePanelFilterChange = (group, newValues) => {
     setPanelFilters(prev => ({ ...prev, [group]: newValues }));
+  };
+
+  const handleFilterOptionClick = (group, value) => {
+    const currentValues = panelFilters[group] || [];
+    const newValues = currentValues.includes(value)
+      ? currentValues.filter(v => v !== value)
+      : [...currentValues, value];
+    handlePanelFilterChange(group, newValues);
+  };
+
+  const clearFilterGroup = (group) => {
+    handlePanelFilterChange(group, []);
   };
 
   const handleSubmitWish = async (wishId) => {
@@ -184,6 +195,23 @@ function WishesPage() {
       console.error("Hiba a döntéskor:", error); 
     }
   };
+
+  const handleActivateWish = async (wishId) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/wishes/${wishId}/activate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if(response.ok) {
+          fetchWishes();
+      } else {
+          const err = await response.json();
+          alert(`Hiba az aktiválás során: ${err.detail}`);
+      }
+    } catch (error) { 
+      console.error("Hiba az aktiváláskor:", error); 
+    }
+  };
   
   const openApprovalModal = (wish) => {
     setSelectedWish(wish);
@@ -213,6 +241,32 @@ function WishesPage() {
     }
   };
 
+  const renderFilterOptions = (group, options, valueKey, labelKey) => (
+    <div className="filter-options-grid">
+      {options.map(option => {
+        const value = option[valueKey];
+        const isActive = (panelFilters[group] || []).includes(value);
+        return (
+          <div
+            key={value}
+            className={`filter-option ${isActive ? 'active' : ''}`}
+            onClick={() => handleFilterOptionClick(group, value)}
+          >
+            {option[labelKey]}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const statusOptions = [
+    { value: 'draft', label: 'Vázlat' },
+    { value: 'pending', label: 'Jóváhagyásra vár' },
+    { value: 'approved', label: 'Jóváhagyva' },
+    { value: 'rejected', label: 'Elutasítva' },
+    { value: 'completed', label: 'Teljesítve' },
+  ];
+
   const tabs = [
     { id: 'my-wishes', label: 'Saját kívánságaim', icon: Heart },
     { id: 'family-wishes', label: 'Családi kívánságok', icon: Users },
@@ -221,72 +275,172 @@ function WishesPage() {
   ];
 
   return (
-    <div className="wishes-page-layout">
-      <WishFilterPanel 
-        filters={panelFilters}
-        onFilterChange={handlePanelFilterChange}
-        familyMembers={familyMembers}
-        categories={categories}
-      />
-      <div className="wishes-page">
-        <div className="header">
-          <div className="greeting-section">
-            <h1 className="greeting">Kívánságok 🎁</h1>
-            <p className="date">Tervezzük meg közösen az álmokat!</p>
-          </div>
-          <button onClick={() => { setWishToEdit(null); setIsCreateModalOpen(true); }} className="fab">
-              <Plus size={24} />
-          </button>
+    <div className="wishes-page">
+      {/* Header */}
+      <div className="header">
+        <div className="greeting-section">
+          <h1 className="greeting">Kívánságok 🎁</h1>
+          <p className="date">Tervezzük meg közösen az álmokat!</p>
         </div>
-        
-        <div className="wishes-tabs">
-           {tabs.map((tab) => (
-              <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`wishes-tab ${activeTab === tab.id ? 'active' : ''}`}
-              >
-                  <tab.icon size={18} />
-                  <span>{tab.label}</span>
-              </button>
-           ))}
-        </div>
-        
-        <div className="wishes-content">
-          {loading ? <p>Kívánságok betöltése...</p> : (
-              <div className="wishes-grid">
-                  {allWishes.length > 0 ? (
-                    allWishes.map(wish => (
-                      // JAVÍTÁS: Itt van a hiányzó 'key' prop.
-                      // Enélkül a React nem tudja hatékonyan kezelni a listát.
-                      <WishCard 
-                        key={wish.id} 
-                        wish={wish} 
-                        currentUser={user}
-                        onSubmit={handleSubmitWish}
-                        onApproveClick={openApprovalModal}
-                        onEditClick={openEditModal}
-                        onHistoryClick={handleHistoryClick}
-                      />
-                    ))
-                  ) : (
-                    <p>Nincsenek a feltételeknek megfelelő kívánságok.</p>
-                  )}
-              </div>
-          )}
-          {historyData && (
-              <WishHistoryLog history={historyData} onClose={() => setHistoryData(null)} />
-          )}
-        </div>
+        <button 
+          onClick={() => { setWishToEdit(null); setIsCreateModalOpen(true); }} 
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <Plus size={20} />
+          Új Kívánság
+        </button>
+      </div>
+      
+      {/* Tabs */}
+      <div className="wishes-tabs">
+         {tabs.map((tab) => (
+            <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`wishes-tab ${activeTab === tab.id ? 'active' : ''}`}
+            >
+                <tab.icon size={18} />
+                <span>{tab.label}</span>
+            </button>
+         ))}
       </div>
 
+      {/* Integrated Filters */}
+      <div className="wishes-filters">
+        <div className="filters-header">
+          <button 
+            className="filters-toggle" 
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <SlidersHorizontal size={18} />
+            <span>Szűrők</span>
+            <span className={`toggle-arrow ${showFilters ? 'open' : ''}`}>▼</span>
+          </button>
+          
+          {/* Active filters indicator */}
+          {Object.values(panelFilters).some(arr => arr?.length > 0) && (
+            <div className="active-filters-count">
+              {Object.values(panelFilters).reduce((sum, arr) => sum + (arr?.length || 0), 0)} aktív
+            </div>
+          )}
+        </div>
+
+        {showFilters && (
+          <div className="filters-content">
+            {/* Status Filter */}
+            <div className="filter-group">
+              <div className="filter-group-header">
+                <h4>Státusz</h4>
+                {(panelFilters.statuses || []).length > 0 && (
+                  <button 
+                    className="filter-clear-btn" 
+                    onClick={() => clearFilterGroup('statuses')}
+                  >
+                    Törlés
+                  </button>
+                )}
+              </div>
+              {renderFilterOptions('statuses', statusOptions, 'value', 'label')}
+            </div>
+
+            {/* Owner Filter */}
+            <div className="filter-group">
+              <div className="filter-group-header">
+                <h4>Tulajdonos</h4>
+                {(panelFilters.owner_ids || []).length > 0 && (
+                  <button 
+                    className="filter-clear-btn" 
+                    onClick={() => clearFilterGroup('owner_ids')}
+                  >
+                    Törlés
+                  </button>
+                )}
+              </div>
+              {renderFilterOptions('owner_ids', familyMembers, 'id', 'display_name')}
+            </div>
+
+            {/* Category Filter */}
+            <div className="filter-group">
+              <div className="filter-group-header">
+                <h4>Kategória</h4>
+                {(panelFilters.category_ids || []).length > 0 && (
+                  <button 
+                    className="filter-clear-btn" 
+                    onClick={() => clearFilterGroup('category_ids')}
+                  >
+                    Törlés
+                  </button>
+                )}
+              </div>
+              {renderFilterOptions('category_ids', categories, 'id', 'name')}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Content */}
+      <div className="wishes-content">
+        {loading ? (
+          <p>Kívánságok betöltése...</p>
+        ) : (
+          <div className="wishes-grid">
+            {allWishes.length > 0 ? (
+              allWishes.map(wish => (
+                <WishCard 
+                  key={wish.id} 
+                  wish={wish} 
+                  currentUser={user}
+                  onSubmit={handleSubmitWish}
+                  onApproveClick={openApprovalModal}
+                  onEditClick={openEditModal}
+                  onHistoryClick={handleHistoryClick}
+                  onActivate={handleActivateWish}
+                />
+              ))
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-icon">🎁</div>
+                <h3 className="empty-state-title">Nincsenek kívánságok</h3>
+                <p className="empty-state-message">
+                  Nincsenek a feltételeknek megfelelő kívánságok.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* History Log */}
+        {historyData && (
+          <WishHistoryLog 
+            history={historyData} 
+            onClose={() => setHistoryData(null)} 
+          />
+        )}
+      </div>
+
+      {/* Modals */}
       <CreateWishModal 
         isOpen={isCreateModalOpen} 
-        onClose={() => { setIsCreateModalOpen(false); setWishToEdit(null); }} 
+        onClose={() => { 
+          setIsCreateModalOpen(false); 
+          setWishToEdit(null); 
+        }} 
         onSave={handleSaveWish}
         wishToEdit={wishToEdit}
       />
-      {selectedWish && <ApprovalModal isOpen={isApprovalModalOpen} onClose={() => setSelectedWish(null)} onDecision={handleApprovalDecision} wish={selectedWish} />}
+      
+      {selectedWish && (
+        <ApprovalModal 
+          isOpen={isApprovalModalOpen} 
+          onClose={() => {
+            setIsApprovalModalOpen(false);
+            setSelectedWish(null);
+          }} 
+          onDecision={handleApprovalDecision} 
+          wish={selectedWish} 
+        />
+      )}
     </div>
   );
 }

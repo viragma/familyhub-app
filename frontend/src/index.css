@@ -2933,7 +2933,7 @@ input:checked + .slider:before {
 
 .wishes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1.5rem;
 }
 
@@ -3170,63 +3170,6 @@ input:checked + .slider:before {
 }
 .history-timestamp { font-size: 0.75rem; color: var(--text-secondary); }
 
-/* A Kívánságok oldal fő elrendezése */
-.wishes-page-layout {
-  display: grid;
-  /* Alapértelmezés (desktop): 2 oszlop - egy 280px-es szűrő és a maradék hely */
-  grid-template-columns: 280px 1fr;
-  gap: 2rem;
-  align-items: flex-start;
-}
-
-/* Media Query tabletre és mobilra (1024px szélesség alatt) */
-@media (max-width: 1024px) {
-  .wishes-page-layout {
-    /* Felülírjuk a szabályt: 1 oszlop, a szűrő és a tartalom egymás alá kerül */
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-}
-.filter-panel {
-  background: var(--bg-secondary);
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid var(--border);
-  position: sticky;
-  top: 2rem;
-}
-
-.filter-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.25rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.filter-group {
-  margin-bottom: 1.5rem;
-}
-.filter-group h4 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: var(--text-secondary);
-}
-.filter-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-  cursor: pointer;
-}
-.filter-checkbox:hover {
-  color: var(--accent-primary);
-}
-
-
 /* --- Wish Card Media & Feedback --- */
 .wish-media {
   margin-top: 1rem;
@@ -3350,118 +3293,34 @@ input:checked + .slider:before {
   font-weight: 600;
   border: 2px solid var(--bg-secondary);
 }
-@media (max-width: 768px) {
-  .wishes-grid {
-    grid-template-columns: 1fr; /* Egyetlen oszlopba rendezi a kártyákat */
-  }
-
-  /* A kártyák belsejében lévő elemeket is jobban optimalizáljuk mobilon */
-  .wish-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .wish-amount-section {
-    width: 100%;
-    flex-direction: row-reverse;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  /* Az oldal általános paddingjét csökkentjük a legkisebb képernyőkön */
-  .page {
-      padding: 1rem;
-  }
-}
-body {
-    overflow-x: hidden;
-}
-
-/* Reszponzív javítások táblagépre és mobilra (1024px alatt) */
-@media (max-width: 1024px) {
-    
-    /* A fő tartalom konténerének igazítása: 
-       Megszüntetjük az asztali nézet oldalsó menüje által hagyott margót. */
-    .main-content {
-        margin-left: 0;
-        width: 100%;
-        padding: 1rem; /* Kisebb margók mobilon a jobb helykihasználásért */
-    }
-
-    /* A Kívánságok oldal elrendezésének javítása: szűrő és tartalom egymás alá kerül */
-    .wishes-page-layout {
-        grid-template-columns: 1fr; /* Váltás egyhasábos elrendezésre */
-        gap: 1.5rem;
-    }
-}
-
-/* Kifejezetten mobilra optimalizált szabályok (768px alatt) */
-@media (max-width: 768px) {
-
-    /* A kívánság kártyák rácsának egyetlen oszlopba rendezése */
-    .wishes-grid {
-        grid-template-columns: 1fr;
-    }
-
-    /* Általános oldal padding további csökkentése a legkisebb képernyőkön */
-    .page {
-        padding: 1rem 0; /* A vízszintes paddinget a .main-content már kezeli */
-    }
-
-    /* A kártyán belüli elemek (cím, ár, státusz) optimalizálása a jobb olvashatóságért */
-    .wish-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
-
-    .wish-amount-section {
-        width: 100%;
-        flex-direction: row-reverse;
-        justify-content: space-between;
-        align-items: center;
-    }
-}
-
 /* =============================================== */
 /* === VÉGLEGES RESZPONZIVITÁSI JAVÍTÁSOK      === */
 /* =============================================== */
 
-/* Alapvető PWA viselkedés: a vízszintes görgetés letiltása az egész oldalon.
-   Ez a legfontosabb szabály, ami megakadályozza az oldal "kilógását". */
 body {
     overflow-x: hidden;
 }
 
-/* A Kívánságok oldal fő elrendezése */
 .wishes-page-layout {
   display: grid;
-  /* Alapértelmezés (desktop): 2 oszlop - egy 280px-es szűrő és a maradék hely */
   grid-template-columns: 280px 1fr;
   gap: 2rem;
   align-items: flex-start;
+  padding: 0 1rem; /* ← EZ HIÁNYZOTT */
 }
 
-/* Media Query tabletre és mobilra (1024px szélesség alatt) */
 @media (max-width: 1024px) {
   .wishes-page-layout {
-    /* Felülírjuk a szabályt: 1 oszlop, a szűrő és a tartalom egymás alá kerül */
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+    padding: 0 1rem;
   }
 }
-
-/* Kifejezetten mobilra optimalizált szabályok (768px alatt) */
 @media (max-width: 768px) {
-
-    /* A kívánság kártyák rácsának egyetlen oszlopba rendezése,
-       ez a legfontosabb javítás, ami megszünteti a túlfolyást. */
     .wishes-grid {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
 
-    /* A kártyán belüli elemek (cím, ár, státusz) optimalizálása a jobb olvashatóságért */
     .wish-header {
         flex-direction: column;
         align-items: flex-start;
@@ -3474,4 +3333,186 @@ body {
         justify-content: space-between;
         align-items: center;
     }
+}
+
+
+@media (max-width: 480px) {
+  .wishes-page-layout {
+    padding: 0 0.5rem;
+  }
+  
+  .wishes-grid {
+    gap: 0.75rem;
+  }
+}
+
+/* =============================================== */
+/* === KÍVÁNSÁGOK OLDAL - EGYSÉGES DESIGN      === */
+/* =============================================== */
+
+/* Fő konténer - mint a többi oldalon */
+.wishes-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* ÚJ - Integrált szűrők */
+.wishes-filters {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.filters-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle-arrow {
+  transition: transform 0.3s ease;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.toggle-arrow.open {
+  transform: rotate(180deg);
+}
+
+.active-filters-count {
+  background: var(--accent-gradient);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.filters-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.filter-group {
+  margin-bottom: 0;
+}
+
+.filter-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filter-group h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.filter-clear-btn:hover {
+  color: var(--accent-primary);
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.filter-options-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filter-option {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.filter-option:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.filter-option.active {
+  background: var(--accent-gradient);
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Grid - javított reszponzivitás */
+.wishes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+/* === RESZPONZÍV JAVÍTÁSOK === */
+@media (max-width: 768px) {
+  .wishes-page {
+    padding: 0 0.5rem;
+  }
+  
+  /* KULCS: Egyoszlopos grid */
+  .wishes-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .filters-header {
+    padding: 1rem;
+  }
+  
+  .filters-content {
+    padding: 1rem;
+  }
+  
+  .filter-options-grid {
+    flex-direction: column;
+  }
+  
+  .filter-option {
+    justify-content: center;
+  }
 }
