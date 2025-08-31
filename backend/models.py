@@ -235,7 +235,7 @@ class WishHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     wish_id = Column(Integer, ForeignKey("wishes.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    action = Column(Enum('created', 'submitted', 'approved', 'rejected', 'modified', 'completed', 'deleted', name='history_action_enum'), nullable=False)
+    action = Column(Enum('created', 'submitted', 'approved', 'rejected', 'modified', 'completed', 'deleted', 'conditional', 'modifications_requested', name='history_action_enum'), nullable=False)
     old_values = Column(JSONB, nullable=True)
     new_values = Column(JSONB, nullable=True)
     notes = Column(Text, nullable=True)

@@ -1527,30 +1527,34 @@ def get_wish(db: Session, wish_id: int, user: models.User):
         raise HTTPException(status_code=403, detail="Nincs jogosultságod megtekinteni ezt a kívánságot.")
     return wish
 
-def get_wishes_by_family(db: Session, user: models.User, 
+def get_wishes_by_family(db: Session, user: models.User,
                          statuses: Optional[List[str]] = None,
                          owner_ids: Optional[List[int]] = None,
                          category_ids: Optional[List[int]] = None,
                          skip: int = 0, limit: int = 100):
     """Listázza egy család összes kívánságát, szűrési és jogosultsági feltételekkel."""
-    
+
     # Alap lekérdezés a szükséges adatok betöltésével
     base_query = db.query(models.Wish).options(
         selectinload(models.Wish.owner),
         selectinload(models.Wish.approvals).selectinload(models.WishApproval.approver),
         selectinload(models.Wish.goal_account),
-        selectinload(models.Wish.category)
+        selectinload(models.Wish.category),
+        # --- JAVÍTÁS: Ezek a sorok biztosítják a képek és linkek betöltését ---
+        selectinload(models.Wish.images),
+        selectinload(models.Wish.links)
+        # --- JAVÍTÁS VÉGE ---
     ).filter(models.Wish.family_id == user.family_id)
 
     # Jogosultsági szűrés: a gyerekek nem látják mások vázlatait
     if user.role not in ["Családfő", "Szülő"]:
         base_query = base_query.filter(
-            sa.or_(
+            or_(
                 models.Wish.status != 'draft',
                 models.Wish.owner_user_id == user.id
             )
         )
-    
+
     # Dinamikus szűrők alkalmazása
     if statuses:
         base_query = base_query.filter(models.Wish.status.in_(statuses))
@@ -1560,7 +1564,6 @@ def get_wishes_by_family(db: Session, user: models.User,
         base_query = base_query.filter(models.Wish.category_id.in_(category_ids))
 
     return base_query.order_by(models.Wish.created_at.desc()).offset(skip).limit(limit).all()
-
 
 def create_wish(db: Session, wish: schemas.WishCreate, user: models.User):
     """
@@ -1695,21 +1698,31 @@ def delete_wish(db: Session, wish_id: int, user: models.User):
     return {"detail": "Kívánság sikeresen törölve"}
 
 def submit_wish_for_approval(db: Session, wish_id: int, user: models.User):
-    """Beküld egy kívánságot jóváhagyásra."""
+    """Beküldi a vázlat vagy módosításra visszaküldött kívánságot jóváhagyásra."""
     db_wish = get_wish(db, wish_id, user)
     if not db_wish:
         raise HTTPException(status_code=404, detail="Kívánság nem található.")
     if db_wish.owner_user_id != user.id:
-        raise HTTPException(status_code=403, detail="Csak a saját kívánságodat küldheted be.")
-    if db_wish.status != 'draft':
-        raise HTTPException(status_code=400, detail="Ez a kívánság már be lett küldve.")
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod ezt a kívánságot beküldeni.")
+    
+    if db_wish.status not in ['draft', 'modifications_requested']:
+        raise HTTPException(status_code=400, detail="Csak vázlat vagy módosításra visszaküldött kívánság küldhető be.")
+    
+    # --- JAVÍTÁS KEZDETE ---
+    # Ha a kívánságot módosítás után küldik újra, töröljük a korábbi döntéseket,
+    # hogy a szülők tiszta lappal szavazhassanak az új verzióról.
+    if db_wish.status == 'modifications_requested':
+        db.query(models.WishApproval).filter(models.WishApproval.wish_id == wish_id).delete()
+    # --- JAVÍTÁS VÉGE ---
 
     db_wish.status = 'pending'
-    db_wish.submitted_at = datetime.utcnow()
-    create_history_entry(db, wish_id=wish_id, user_id=user.id, action='submitted')
+    
+    create_history_entry(db, wish_id=wish_id, user_id=user.id, action="submitted")
     db.commit()
     db.refresh(db_wish)
     return db_wish
+
+# backend/crud.py
 
 def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.WishApprovalCreate, approver: models.User):
     """Feldolgozza a szülői döntést egy kívánságról, és kezeli a kassza létrehozását."""
@@ -1721,6 +1734,8 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
         raise HTTPException(status_code=404, detail="Kívánság nem található.")
     if db_wish.status != 'pending':
         raise HTTPException(status_code=400, detail="Ez a kívánság jelenleg nem hagyható jóvá.")
+    if db_wish.owner_user_id == approver.id:
+        raise HTTPException(status_code=400, detail="Saját kívánságot nem hagyhatsz jóvá.")
 
     existing_approval = db.query(models.WishApproval).filter(
         models.WishApproval.wish_id == wish_id,
@@ -1728,7 +1743,11 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
     ).first()
 
     if existing_approval:
-        raise HTTPException(status_code=400, detail="Erről a kívánságról már döntöttél.")
+        if existing_approval.status == 'modifications_requested':
+            db.delete(existing_approval)
+            db.flush()
+        else:
+            raise HTTPException(status_code=400, detail="Erről a kívánságról már döntöttél.")
 
     # Új approval rekord létrehozása
     new_approval = models.WishApproval(
@@ -1739,52 +1758,63 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
         conditional_note=approval_data.conditional_note
     )
     db.add(new_approval)
-    db.flush() # Lefuttatjuk, hogy a new_approval kapjon ID-t
-
-    # --- JÓVÁHAGYÁSI LOGIKA ÉS KASSZA LÉTREHOZÁS ---
+    
+    # Ha a döntés elutasító, a folyamat azonnal véget ér.
     if approval_data.status == 'rejected':
         db_wish.status = 'rejected'
     elif approval_data.status == 'modifications_requested':
         db_wish.status = 'modifications_requested'
+    
+    # Ha a döntés támogató ('approved' vagy 'conditional')...
     elif approval_data.status in ['approved', 'conditional']:
-        
-        # Összegyűjtjük az összes szülőt a családban
+        wish_owner = db_wish.owner
         parents = db.query(models.User).filter(
             models.User.family_id == db_wish.family_id,
             models.User.role.in_(['Családfő', 'Szülő'])
         ).all()
         
-        # Összegyűjtjük az eddigi jóváhagyásokat ehhez a kívánsághoz
-        all_approvals = db.query(models.WishApproval).filter(
+        required_approvals = 0
+        if wish_owner.role in ['Gyerek', 'Tizenéves']:
+            required_approvals = len(parents)
+        elif wish_owner.role in ['Szülő', 'Családfő']:
+            required_approvals = 1
+            
+        committed_approvals = db.query(models.WishApproval).filter(
             models.WishApproval.wish_id == wish_id,
             models.WishApproval.status.in_(['approved', 'conditional'])
-        ).all()
+        ).count()
+        current_approvals_count = committed_approvals + 1
+        
+        is_fully_supported = False
+        if approver.role == 'Családfő':
+             is_fully_supported = True
+        elif current_approvals_count >= required_approvals and required_approvals > 0:
+             is_fully_supported = True
 
-        # Ha a jóváhagyások száma eléri a szülők számát, akkor a kívánság teljesen jóváhagyott
-        if len(all_approvals) >= len(parents):
-            db_wish.status = 'approved'
-            db_wish.approved_at = datetime.utcnow()
+        if is_fully_supported:
+            # Ha a döntés 'conditional', a státusz is az lesz, és NEM hozunk létre kasszát.
+            if approval_data.status == 'conditional':
+                db_wish.status = 'conditional'
+            else: # Ha sima 'approved'
+                db_wish.status = 'approved'
+                db_wish.approved_at = datetime.utcnow()
+                # Csak 'approved' státusz esetén hozzuk létre a kasszát
+                if not db_wish.goal_account_id:
+                    goal_account_schema = schemas.AccountCreate(
+                        name=f"Cél: {db_wish.name}", type='cél',
+                        goal_amount=db_wish.estimated_price, goal_date=db_wish.deadline,
+                        show_on_dashboard=True,
+                        viewer_ids=[member.id for member in db_wish.family.members]
+                    )
+                    new_account = create_family_account(db, account=goal_account_schema, family_id=db_wish.family_id, owner_user=db_wish.owner)
+                    db_wish.goal_account_id = new_account.id
 
-            # Automatikus kassza létrehozása
-            goal_account_schema = AccountCreate(
-                name=f"Cél: {db_wish.name}",
-                type='cél',
-                goal_amount=db_wish.estimated_price,
-                goal_date=db_wish.deadline,
-                show_on_dashboard=True,
-                viewer_ids=[member.id for member in db_wish.family.members] # Mindenki láthatja
-            )
-            
-            # A create_family_account függvényt használjuk, a tulajdonos a kívánság tulajdonosa lesz
-            new_account = create_family_account(db, account=goal_account_schema, family_id=db_wish.family_id, owner_user=db_wish.owner)
-            
-            # Összekötjük a kívánságot az új kasszával
-            db_wish.goal_account_id = new_account.id
-
+    # Előzmény bejegyzés létrehozása
     notes = f"Döntés: {approval_data.status}."
     if approval_data.feedback:
         notes += f" Visszajelzés: {approval_data.feedback}"
     create_history_entry(db, wish_id=wish_id, user_id=approver.id, action=approval_data.status, notes=notes)
+    
     db.commit()
     db.refresh(db_wish)
     return db_wish

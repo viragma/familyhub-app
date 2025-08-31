@@ -1,0 +1,149 @@
+/* frontend/src/components/wishes/WishFilterPanel.css */
+
+.filter-panel {
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  transition: all 0.3s ease-in-out;
+  position: sticky;
+  top: 6rem;
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.filter-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.toggle-icon {
+  transition: transform 0.3s ease;
+  color: var(--text-secondary);
+  display: none;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.filter-content {
+  padding-top: 1.5rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out, visibility 0.4s;
+  overflow: hidden;
+}
+
+.filter-group {
+  margin-bottom: 2rem;
+}
+.filter-group:last-child {
+  margin-bottom: 0;
+}
+
+.filter-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.filter-group h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-clear-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+}
+.filter-clear-btn:hover {
+    color: var(--accent-primary);
+    background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+
+/* --- ÚJ, MODERN SZŰRŐ GOMBOK --- */
+.filter-options-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filter-option {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.filter-option:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.filter-option.active {
+  background: var(--accent-gradient);
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- MOBIL NÉZET --- */
+@media (max-width: 1024px) {
+  .filter-panel {
+    position: static;
+    top: auto;
+  }
+
+  .toggle-icon {
+    display: block;
+  }
+
+  .filter-content {
+    max-height: 0;
+    padding-top: 0;
+    margin-top: 0;
+    border-top: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+  
+  .filter-panel.expanded .filter-content {
+    max-height: 1000px;
+    padding-top: 1.5rem;
+    margin-top: 1rem;
+    border-top: 1px solid var(--border);
+    opacity: 1;
+    visibility: visible;
+  }
+}

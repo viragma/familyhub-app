@@ -10,7 +10,6 @@ import {
     User,
     Target,
     Send,
-    ShieldCheck,
     Edit,
     MessageSquare,
     Link as LinkIcon
@@ -18,6 +17,7 @@ import {
 
 // Segédfüggvény a státusz jelvényekhez
 const getStatusBadge = (status) => {
+    const cleanStatus = typeof status === 'string' ? status.trim().toLowerCase() : '';
     const badges = {
       draft: { color: 'var(--text-secondary)', text: 'Vázlat', icon: Edit3 },
       pending: { color: 'var(--warning)', text: 'Jóváhagyásra vár', icon: Clock },
@@ -27,10 +27,8 @@ const getStatusBadge = (status) => {
       rejected: { color: 'var(--danger)', text: 'Elutasítva', icon: XCircle },
       completed: { color: 'var(--text-secondary)', text: 'Teljesítve', icon: Target }
     };
-    
-    const badge = badges[status] || badges.draft;
+    const badge = badges[cleanStatus] || badges.draft;
     const IconComponent = badge.icon;
-    
     return (
       <div className="status-badge" style={{ color: badge.color, backgroundColor: `color-mix(in srgb, ${badge.color} 15%, transparent)`, border: `1px solid ${badge.color}` }}>
         <IconComponent size={12} />
@@ -48,13 +46,25 @@ const getPriorityClass = (priority) => {
     }[priority] || '';
 };
 
-function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick, onEditClick }) {
-  const isOwner = currentUser.id === wish.owner_user_id;
-  const isParent = currentUser.role === 'Szülő' || currentUser.role === 'Családfő';
+// A WishCard komponens mostantól fogad egy onActivate prop-ot is
+function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick, onEditClick, onActivate }) {
+  
+  if (!currentUser || !wish) {
+    return null; 
+  }
+  
+  const hasAlreadyApproved = wish.approvals?.some(a => 
+    Number(a.approver.id) === Number(currentUser.id) && 
+    (a.status === 'approved' || a.status === 'conditional' || a.status === 'rejected')
+  );
 
+  const isOwner = Number(currentUser.id) === Number(wish.owner_user_id);
+  const isParent = currentUser.role === 'Szülő' || currentUser.role === 'Családfő';
+  
+  const canApprove = isParent && !isOwner && wish.status === 'pending' && !hasAlreadyApproved;
   const canSubmit = isOwner && wish.status === 'draft';
-  const canApprove = isParent && !isOwner && wish.status === 'pending';
   const canEdit = isOwner && (wish.status === 'draft' || wish.status === 'modifications_requested');
+  const canActivate = isParent && wish.status === 'conditional'; // Új feltétel
   
   const hasGoalAccount = wish.status === 'approved' && wish.goal_account;
   const progress = hasGoalAccount && wish.goal_account.goal_amount > 0
@@ -65,8 +75,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
     ? wish.approvals?.find(a => a.status === 'modifications_requested')?.feedback 
     : null;
 
-
-
+  const actualApprovers = wish.approvals?.filter(a => a.status === 'approved' || a.status === 'conditional');
 
   return (
     <div 
@@ -112,7 +121,21 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
           ))}
         </div>
       )}
-
+      
+      {/* Jóváhagyók listája */}
+      {wish.status === 'pending' && actualApprovers && actualApprovers.length > 0 && (
+        <div className="approvers-section">
+          <span className="approvers-title">Jóváhagyták:</span>
+          <div className="approvers-list">
+            {actualApprovers.map(approval => (
+              <div key={approval.id} className="approver-avatar" title={approval.approver.display_name}>
+                {approval.approver.display_name.charAt(0)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
       {/* Szülői visszajelzés */}
       {feedback && (
         <div className="wish-feedback">
@@ -124,6 +147,19 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
         </div>
       )}
 
+      {/* Feltétel megjelenítése */}
+      {wish.status === 'conditional' && (
+        <div className="wish-feedback" style={{borderColor: 'var(--accent-secondary)'}}>
+          <Calendar size={16} />
+          <div>
+            <span className="feedback-title">Feltétel:</span>
+            <p className="feedback-text">
+              "{wish.approvals?.find(a => a.status === 'conditional')?.conditional_note || 'Nincs megadva'}"
+            </p>
+          </div>
+        </div>
+      )}
+      
       {/* Progress Bar */}
       {hasGoalAccount && (
           <div className="wish-progress">
@@ -197,6 +233,13 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
                   <XCircle size={14} /> Elutasítom
               </button>
             </>
+          )}
+          
+          {/* ÚJ GOMB: Aktiválás */}
+          {canActivate && (
+            <button className="btn btn-success" onClick={(e) => { e.stopPropagation(); onActivate(wish.id); }}>
+                <CheckCircle size={14} /> Gyűjtés indítása
+            </button>
           )}
       </div>
     </div>

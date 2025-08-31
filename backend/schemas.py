@@ -340,28 +340,6 @@ class WishCreate(WishBase):
     submit_now: bool = False
 
 
-class Wish(WishBase):
-    id: int
-    status: Literal['draft', 'pending', 'approved', 'conditional', 'modifications_requested', 'rejected', 'completed']
-    owner_user_id: int
-    family_id: int
-    goal_account_id: Optional[int] = None
-    
-    owner: UserProfile
-    category: Optional[CategorySimple] = None
-    images: List[WishImage] = []
-    links: List[WishLink] = []
-    approvals: List[WishApproval] = []
-    goal_account: Optional[AccountSimple] = None # <--- EZ AZ ÚJ SOR
-
-    class Config:
-        from_attributes = True
-
-class Notification(BaseModel):
-    type: str
-    message: str
-    link: str
-
 class WishHistory(BaseModel):
     id: int
     user: UserProfile
@@ -372,13 +350,32 @@ class WishHistory(BaseModel):
     class Config:
         from_attributes = True
 
-# Frissítsd a Wish sémát is, hogy tartalmazza az előzményeket
+
 class Wish(WishBase):
-    # ... (meglévő mezők)
-    history: List[WishHistory] = []
+    id: int
+    status: Literal['draft', 'pending', 'approved', 'conditional', 'modifications_requested', 'rejected', 'completed']
+    owner_user_id: int
+    family_id: int
+    goal_account_id: Optional[int] = None
     
+    # Kapcsolódó adatok
+    owner: UserProfile
+    category: Optional[CategorySimple] = None
+    images: List[WishImage] = []
+    links: List[WishLink] = []
+    approvals: List[WishApproval] = []
+    goal_account: Optional[AccountSimple] = None
+    history: List[WishHistory] = []
+
     class Config:
         from_attributes = True
+
+class Notification(BaseModel):
+    type: str
+    message: str
+    link: str
+
+
 # Forward reference frissítések
 Wish.model_rebuild()
 User.model_rebuild() # Ha a User sémába is bekerül a Wish

@@ -3170,14 +3170,23 @@ input:checked + .slider:before {
 }
 .history-timestamp { font-size: 0.75rem; color: var(--text-secondary); }
 
-/* --- Wish Page Layout & Filters --- */
+/* A Kívánságok oldal fő elrendezése */
 .wishes-page-layout {
   display: grid;
+  /* Alapértelmezés (desktop): 2 oszlop - egy 280px-es szűrő és a maradék hely */
   grid-template-columns: 280px 1fr;
   gap: 2rem;
-  align-items: start;
+  align-items: flex-start;
 }
 
+/* Media Query tabletre és mobilra (1024px szélesség alatt) */
+@media (max-width: 1024px) {
+  .wishes-page-layout {
+    /* Felülírjuk a szabályt: 1 oszlop, a szűrő és a tartalom egymás alá kerül */
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
 .filter-panel {
   background: var(--bg-secondary);
   border-radius: 16px;
@@ -3217,16 +3226,7 @@ input:checked + .slider:before {
   color: var(--accent-primary);
 }
 
-/* Media query for smaller screens */
-@media (max-width: 1024px) {
-  .wishes-page-layout {
-    grid-template-columns: 1fr;
-  }
-  .filter-panel {
-    position: static;
-    top: auto;
-  }
-}
+
 /* --- Wish Card Media & Feedback --- */
 .wish-media {
   margin-top: 1rem;
@@ -3311,4 +3311,167 @@ input:checked + .slider:before {
 .btn:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+
+/* frontend/src/index.css fájl végére */
+
+.approvers-section {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.approvers-title {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.approvers-list {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.approver-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border: 2px solid var(--bg-secondary);
+}
+@media (max-width: 768px) {
+  .wishes-grid {
+    grid-template-columns: 1fr; /* Egyetlen oszlopba rendezi a kártyákat */
+  }
+
+  /* A kártyák belsejében lévő elemeket is jobban optimalizáljuk mobilon */
+  .wish-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .wish-amount-section {
+    width: 100%;
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Az oldal általános paddingjét csökkentjük a legkisebb képernyőkön */
+  .page {
+      padding: 1rem;
+  }
+}
+body {
+    overflow-x: hidden;
+}
+
+/* Reszponzív javítások táblagépre és mobilra (1024px alatt) */
+@media (max-width: 1024px) {
+    
+    /* A fő tartalom konténerének igazítása: 
+       Megszüntetjük az asztali nézet oldalsó menüje által hagyott margót. */
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 1rem; /* Kisebb margók mobilon a jobb helykihasználásért */
+    }
+
+    /* A Kívánságok oldal elrendezésének javítása: szűrő és tartalom egymás alá kerül */
+    .wishes-page-layout {
+        grid-template-columns: 1fr; /* Váltás egyhasábos elrendezésre */
+        gap: 1.5rem;
+    }
+}
+
+/* Kifejezetten mobilra optimalizált szabályok (768px alatt) */
+@media (max-width: 768px) {
+
+    /* A kívánság kártyák rácsának egyetlen oszlopba rendezése */
+    .wishes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Általános oldal padding további csökkentése a legkisebb képernyőkön */
+    .page {
+        padding: 1rem 0; /* A vízszintes paddinget a .main-content már kezeli */
+    }
+
+    /* A kártyán belüli elemek (cím, ár, státusz) optimalizálása a jobb olvashatóságért */
+    .wish-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .wish-amount-section {
+        width: 100%;
+        flex-direction: row-reverse;
+        justify-content: space-between;
+        align-items: center;
+    }
+}
+
+/* =============================================== */
+/* === VÉGLEGES RESZPONZIVITÁSI JAVÍTÁSOK      === */
+/* =============================================== */
+
+/* Alapvető PWA viselkedés: a vízszintes görgetés letiltása az egész oldalon.
+   Ez a legfontosabb szabály, ami megakadályozza az oldal "kilógását". */
+body {
+    overflow-x: hidden;
+}
+
+/* A Kívánságok oldal fő elrendezése */
+.wishes-page-layout {
+  display: grid;
+  /* Alapértelmezés (desktop): 2 oszlop - egy 280px-es szűrő és a maradék hely */
+  grid-template-columns: 280px 1fr;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+/* Media Query tabletre és mobilra (1024px szélesség alatt) */
+@media (max-width: 1024px) {
+  .wishes-page-layout {
+    /* Felülírjuk a szabályt: 1 oszlop, a szűrő és a tartalom egymás alá kerül */
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+/* Kifejezetten mobilra optimalizált szabályok (768px alatt) */
+@media (max-width: 768px) {
+
+    /* A kívánság kártyák rácsának egyetlen oszlopba rendezése,
+       ez a legfontosabb javítás, ami megszünteti a túlfolyást. */
+    .wishes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* A kártyán belüli elemek (cím, ár, státusz) optimalizálása a jobb olvashatóságért */
+    .wish-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .wish-amount-section {
+        width: 100%;
+        flex-direction: row-reverse;
+        justify-content: space-between;
+        align-items: center;
+    }
 }

@@ -6,6 +6,7 @@ import CreateWishModal from '../components/wishes/CreateWishModal';
 import ApprovalModal from '../components/wishes/ApprovalModal';
 import WishHistoryLog from '../components/wishes/WishHistoryLog';
 import WishFilterPanel from '../components/wishes/WishFilterPanel';
+import './../components/wishes/WishFilterPanel.css';
 
 function WishesPage() {
   const [activeTab, setActiveTab] = useState('my-wishes');
@@ -25,10 +26,10 @@ function WishesPage() {
 
   useEffect(() => {
     const fetchFilterData = async () => {
-        if(!token) return;
+        if(!token || !user) return;
         try {
             const [membersRes, categoriesRes] = await Promise.all([
-                fetch(`${apiUrl}/api/family/members`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${apiUrl}/api/families/${user.family_id}/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
                 fetch(`${apiUrl}/api/categories`, { headers: { 'Authorization': `Bearer ${token}` } })
             ]);
             if(membersRes.ok) setFamilyMembers(await membersRes.json());
@@ -38,7 +39,7 @@ function WishesPage() {
         }
     };
     fetchFilterData();
-  }, [token, apiUrl]);
+  }, [token, apiUrl, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -55,7 +56,6 @@ function WishesPage() {
         tabFilters = { statuses: ['completed', 'rejected'] };
         break;
       case 'family-wishes':
-        // Itt szándékosan üres, a panelen lehet szűrni a többiekre
         break;
       default:
         break;
@@ -70,7 +70,7 @@ function WishesPage() {
 
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, values]) => {
-      if (values && values.length > 0) {
+      if (values && Array.isArray(values) && values.length > 0) {
         values.forEach(value => params.append(key, value));
       }
     });
@@ -83,7 +83,7 @@ function WishesPage() {
         setAllWishes(await response.json());
       } else {
         console.error("Hiba a kívánságok lekérésekor, státusz:", response.status);
-        setAllWishes([]); // Hiba esetén ürítsük a listát
+        setAllWishes([]);
       }
     } catch (error) { 
       console.error("Hiba a kívánságok lekérésekor:", error); 
@@ -115,7 +115,7 @@ function WishesPage() {
     } catch (error) { 
       console.error("Hiba a beküldéskor:", error); 
       alert(error.message);
-      throw error; // Dobjuk tovább a hibát, hogy a hívó függvény tudjon róla
+      throw error;
     }
   };
 
@@ -125,7 +125,7 @@ function WishesPage() {
     try {
       let wishToSubmitId = wishId;
   
-      if (wishId) { // SZERKESZTÉS
+      if (wishId) { 
         const updateResponse = await fetch(`${apiUrl}/api/wishes/${wishId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -135,11 +135,11 @@ function WishesPage() {
           const errorData = await updateResponse.json();
           throw new Error(`Hiba a szerkesztés során: ${errorData.detail}`);
         }
-      } else { // ÚJ LÉTREHOZÁS
+      } else { 
         const createResponse = await fetch(`${apiUrl}/api/wishes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify(wishData), // A backend már draftként hozza létre
+          body: JSON.stringify(wishData),
         });
   
         if (!createResponse.ok) {
@@ -150,12 +150,10 @@ function WishesPage() {
         wishToSubmitId = newWish.id;
       }
   
-      // HA A "JÓVÁHAGYÁSRA KÜLDÉS" GOMBOT VÁLASZTOTTÁK
       if (action === 'submit' && wishToSubmitId) {
         await handleSubmitWish(wishToSubmitId);
       }
   
-      // MINDEN ESETBEN FRISSÍTJÜK A VÉGÉN A LISTÁT
       fetchWishes();
   
     } catch (error) {
@@ -258,7 +256,9 @@ function WishesPage() {
           {loading ? <p>Kívánságok betöltése...</p> : (
               <div className="wishes-grid">
                   {allWishes.length > 0 ? (
-                    allWishes.map(wish => 
+                    allWishes.map(wish => (
+                      // JAVÍTÁS: Itt van a hiányzó 'key' prop.
+                      // Enélkül a React nem tudja hatékonyan kezelni a listát.
                       <WishCard 
                         key={wish.id} 
                         wish={wish} 
@@ -267,7 +267,8 @@ function WishesPage() {
                         onApproveClick={openApprovalModal}
                         onEditClick={openEditModal}
                         onHistoryClick={handleHistoryClick}
-                      />)
+                      />
+                    ))
                   ) : (
                     <p>Nincsenek a feltételeknek megfelelő kívánságok.</p>
                   )}

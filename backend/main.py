@@ -40,7 +40,7 @@ from .schemas import (
     ExpectedExpenseComplete,
     Transaction as TransactionSchema, TransactionCreate,UpcomingEvent,
     Wish as WishSchema, WishCreate,
-    WishApproval as WishApprovalSchema, Wish as WishSchema,
+    WishApproval as WishApprovalSchema, WishApprovalCreate,
     Notification,
     WishHistory as WishHistorySchema
 
@@ -692,12 +692,15 @@ def submit_wish(
 @app.post("/api/wishes/{wish_id}/approval")
 def decide_on_wish(
     wish_id: int,
-    approval_data: WishApprovalSchema, # Létre kell hoznunk ezt a sémát
+    # JAVÍTÁS: A séma itt WishApprovalCreate-re változik
+    approval_data: WishApprovalCreate, 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """Egy szülő/családfő döntést hoz egy kívánságról (approve, reject, etc.)."""
+    # A hívott crud függvény már a helyes sémát várja, itt nincs teendő
     return process_wish_approval(db=db, wish_id=wish_id, approval_data=approval_data, approver=current_user)
+
 
 @app.get("/api/notifications", response_model=List[Notification])
 def read_notifications(
