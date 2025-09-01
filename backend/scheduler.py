@@ -1,9 +1,10 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
-from datetime import date, timedelta
+from datetime import date, timedelta,datetime
 from . import crud, models
 from .database import SessionLocal
 from dateutil.relativedelta import relativedelta
+from .schemas import TransferCreate,TransactionCreate
 
 
 def get_next_run_date(rule: models.RecurringRule) -> date:
@@ -45,7 +46,7 @@ async def process_recurring_transactions():
             
             # === KIBŐVÍTETT LOGIKA ===
             if rule.type == 'átutalás':
-                transfer_data = schemas.TransferCreate(
+                transfer_data = TransferCreate(
                     from_account_id=rule.from_account_id,
                     to_account_id=rule.to_account_id,
                     amount=rule.amount,
@@ -53,7 +54,7 @@ async def process_recurring_transactions():
                 )
                 crud.create_transfer(db=db, transfer_data=transfer_data, user=owner)
             else: # Bevétel vagy Kiadás
-                transaction_data = schemas.TransactionCreate(
+                transaction_data = TransactionCreate(
                     description=rule.description,
                     amount=rule.amount,
                     type=rule.type,
@@ -73,4 +74,5 @@ async def process_recurring_transactions():
 scheduler = AsyncIOScheduler()
 # Beállítjuk, hogy a 'process_recurring_transactions' fusson le minden nap hajnali 3-kor
 # Teszteléshez átállíthatod, pl. `trigger='interval', seconds=30`
-scheduler.add_job(process_recurring_transactions, trigger='cron', hour=3, minute=0)
+scheduler.add_job(process_recurring_transactions, trigger='interval', hours=3)
+#scheduler.add_job(process_recurring_transactions, trigger='cron', hour=3, minute=0)

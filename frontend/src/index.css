@@ -629,6 +629,7 @@ body {
 .modal-actions {
     margin-top: 1.5rem;
     display: flex;
+    flex-wrap: wrap; /* <-- Add this line */
     justify-content: flex-end;
     gap: 1rem;
 }
@@ -3514,5 +3515,54 @@ body {
   
   .filter-option {
     justify-content: center;
+  }
+}
+
+/* --- Wish Card Actions & Buttons --- */
+.wish-actions {
+  display: flex;
+  flex-wrap: wrap; /* Hozzáadva: Lehetővé teszi a gombok tördelését új sorba */
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.wish-actions .btn {
+  /* flex: 1; <-- EZ A SOR TÖRÖLVE, hogy a gombok a tartalmukhoz igazodjanak */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+/* --- Modal reszponzivitási javítások --- */
+@media (max-width: 768px) {
+  .modal-overlay {
+    align-items: flex-start;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  .modal-content {
+    /* Maximális magasság beállítása, ami a képernyő magasságának 90%-a */
+    max-height: 90vh;
+    /* Ha a tartalom magasabb, megjelenik egy függőleges görgetősáv */
+    overflow-y: auto;
+  }
+}
+/* === MOBILNÉZET JAVÍTÁSA A KÍVÁNSÁG KÁRTYA GOMBJAIHOZ === */
+@media (max-width: 480px) {
+  .wish-actions {
+    flex-direction: column; /* Egymás alá rendezi a gombokat */
+  }
+
+  .wish-actions .btn {
+    width: 100%; /* Mindegyik gomb kitölti a teljes szélességet */
   }
 }

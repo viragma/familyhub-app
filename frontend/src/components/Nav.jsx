@@ -1,10 +1,8 @@
 import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
-// 1. HIÁNYZÓ IMPORT: Be kell importálnunk a useAuth hook-ot
 import { useAuth } from '../context/AuthContext';
 
 function Nav({ theme, toggleTheme }) {
-  // 2. HIÁNYZÓ LOGIKA: Itt kérjük le a felhasználót és a kijelentkezés funkciót
   const { user, logout } = useAuth();
 
   return (
@@ -25,7 +23,7 @@ function Nav({ theme, toggleTheme }) {
               <NavLink to="/manage-family" className="nav-item">Család Kezelése</NavLink>
             </>
           )}
-          <NavLink to="/tasks" className="nav-item">Feladatok</NavLink>
+         
           
 
           {user && <button onClick={logout} className="nav-item" style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)'}}>Kijelentkezés</button>}

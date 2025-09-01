@@ -24,10 +24,7 @@ function MobileNav({ theme, toggleTheme }) { // Itt fogadjuk a prop-okat
           <span className="mobile-nav-label">Kívánságok</span>
         </NavLink>
         
-        <NavLink to="/tasks" className="mobile-nav-item">
-          <span className="mobile-nav-icon">✅</span>
-          <span className="mobile-nav-label">Feladatok</span>
-        </NavLink>
+      
         
         {user && user.role === 'Családfő' && (
           <NavLink to="/manage-family" className="mobile-nav-item">

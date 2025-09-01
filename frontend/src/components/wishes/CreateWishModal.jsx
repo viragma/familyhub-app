@@ -169,6 +169,12 @@ function CreateWishModal({ isOpen, onClose, onSave, wishToEdit = null }) {
             </select>
         </div>
         
+        {/* IDE került be a Határidő mező */}
+        <div className="form-group">
+            <label className="form-label">Határidő (opcionális)</label>
+            <input type="date" name="deadline" className="form-input" onChange={handleChange} value={formData.deadline} />
+        </div>
+        
         <div className="form-group">
             <label className="form-label">Képek</label>
             <div className="image-preview-area">

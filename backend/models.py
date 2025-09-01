@@ -185,7 +185,6 @@ class Wish(Base):
     approved_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
-
     owner = relationship("User", back_populates="wishes", foreign_keys=[owner_user_id])
     family = relationship("Family", back_populates="wishes")
     category = relationship("Category", back_populates="wishes")
