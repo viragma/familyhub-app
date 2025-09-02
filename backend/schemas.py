@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 from datetime import date
 from datetime import datetime
 from decimal import Decimal 
@@ -374,6 +374,10 @@ class Notification(BaseModel):
     type: str
     message: str
     link: str
+
+class WishActivationRequest(BaseModel):
+    goal_account_id: Optional[int] = Field(None, description="ID of an existing goal account to link to.")
+
 
 
 # Forward reference frissítések

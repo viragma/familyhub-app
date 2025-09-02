@@ -90,8 +90,10 @@ class Account(Base):
     owner_user = relationship("User", back_populates="owned_accounts", foreign_keys=[owner_user_id])
     transactions = relationship("Transaction", back_populates="account")
     
-    # JAVÍTOTT KAPCSOLAT: Account -> User (many-to-many)
+ # JAVÍTOTT KAPCSOLAT: Account -> User (many-to-many)
     viewers = relationship("User", secondary=account_visibility_association, back_populates="visible_accounts")
+    # ÚJ SOR: Add hozzá ezt a sort a többi relationship mellé
+    wishes = relationship("Wish", back_populates="goal_account")
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -234,7 +236,7 @@ class WishHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     wish_id = Column(Integer, ForeignKey("wishes.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    action = Column(Enum('created', 'submitted', 'approved', 'rejected', 'modified', 'completed', 'deleted', 'conditional', 'modifications_requested', name='history_action_enum'), nullable=False)
+    action = Column(Enum('created', 'submitted', 'approved', 'rejected', 'modified', 'completed', 'deleted', 'conditional', 'modifications_requested', 'activated', name='history_action_enum'), nullable=False)
     old_values = Column(JSONB, nullable=True)
     new_values = Column(JSONB, nullable=True)
     notes = Column(Text, nullable=True)

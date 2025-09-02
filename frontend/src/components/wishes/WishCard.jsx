@@ -14,8 +14,9 @@ import {
     MessageSquare,
     Link as LinkIcon
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext'; // Hozzáadtam az AuthContext importot
 
-// Segédfüggvény a státusz jelvényekhez
+// Segédfüggvény a státusz jelvényekhez (VÁLTOZATLAN)
 const getStatusBadge = (status) => {
     const cleanStatus = typeof status === 'string' ? status.trim().toLowerCase() : '';
     const badges = {
@@ -37,7 +38,7 @@ const getStatusBadge = (status) => {
     );
 };
 
-// Segédfüggvény a prioritás jelöléséhez
+// Segédfüggvény a prioritás jelöléséhez (VÁLTOZATLAN)
 const getPriorityClass = (priority) => {
     return {
       low: 'priority-low',
@@ -46,7 +47,6 @@ const getPriorityClass = (priority) => {
     }[priority] || '';
 };
 
-// A WishCard komponens mostantól fogad egy onActivate prop-ot is
 function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick, onEditClick, onActivate }) {
   
   if (!currentUser || !wish) {
@@ -64,9 +64,12 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
   const canApprove = isParent && !isOwner && wish.status === 'pending' && !hasAlreadyApproved;
   const canSubmit = isOwner && wish.status === 'draft';
   const canEdit = isOwner && (wish.status === 'draft' || wish.status === 'modifications_requested');
-  const canActivate = isParent && wish.status === 'conditional'; // Új feltétel
   
-  const hasGoalAccount = wish.status === 'approved' && wish.goal_account;
+  // --- EZT A SORT MÓDOSÍTOTTAM A HELYES LOGIKÁRA ---
+  const canActivate = isParent && (wish.status === 'approved' || wish.status === 'conditional') && !wish.goal_account;
+  // ---------------------------------------------------
+  
+  const hasGoalAccount = (wish.status === 'approved' || wish.status === 'conditional') && wish.goal_account;
   const progress = hasGoalAccount && wish.goal_account.goal_amount > 0
     ? (parseFloat(wish.goal_account.balance) / parseFloat(wish.goal_account.goal_amount)) * 100
     : 0;
@@ -82,7 +85,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
       className={`bento-card wish-card ${getPriorityClass(wish.priority)}`}
       onClick={() => onHistoryClick && onHistoryClick(wish)}
     >
-      {/* Header */}
+      {/* Header (VÁLTOZATLAN) */}
       <div className="wish-header">
         <div className="wish-title-section">
           <div className="wish-title-row">
@@ -104,7 +107,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
         </div>
       </div>
 
-      {/* Média (Képek és Linkek) */}
+      {/* Média (VÁLTOZATLAN) */}
       {wish.images && wish.images.length > 0 && (
         <div className="wish-media">
           <img src={wish.images[0].image_url} alt={wish.name} className="wish-image" />
@@ -122,7 +125,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
         </div>
       )}
       
-      {/* Jóváhagyók listája */}
+      {/* Jóváhagyók listája (VÁLTOZATLAN) */}
       {wish.status === 'pending' && actualApprovers && actualApprovers.length > 0 && (
         <div className="approvers-section">
           <span className="approvers-title">Jóváhagyták:</span>
@@ -136,7 +139,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
         </div>
       )}
       
-      {/* Szülői visszajelzés */}
+      {/* Szülői visszajelzés (VÁLTOZATLAN) */}
       {feedback && (
         <div className="wish-feedback">
           <MessageSquare size={16} />
@@ -147,7 +150,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
         </div>
       )}
 
-      {/* Feltétel megjelenítése */}
+      {/* Feltétel megjelenítése (VÁLTOZATLAN) */}
       {wish.status === 'conditional' && (
         <div className="wish-feedback" style={{borderColor: 'var(--accent-secondary)'}}>
           <Calendar size={16} />
@@ -160,7 +163,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
         </div>
       )}
       
-      {/* Progress Bar */}
+      {/* Progress Bar (VÁLTOZATLAN) */}
       {hasGoalAccount && (
           <div className="wish-progress">
             <div className="progress-container">
@@ -182,7 +185,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
           </div>
         )}
 
-      {/* Meta info */}
+      {/* Meta info (VÁLTOZATLAN) */}
       <div className="wish-meta">
         <div className="meta-item">
           <Star size={14} />
@@ -202,7 +205,7 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
         )}
       </div>
       
-      {/* Actions */}
+      {/* Actions (VÁLTOZATLAN STRUKTÚRA) */}
       <div className="wish-actions">
           {canSubmit && (
               <>
@@ -222,22 +225,17 @@ function WishCard({ wish, currentUser, onSubmit, onApproveClick, onHistoryClick,
           )}
 
           {canApprove && (
+            // A te gombjaid a döntéshez, egyetlen onApproveClick hívással
             <>
-              <button className="btn btn-success" onClick={(e) => { e.stopPropagation(); onApproveClick(wish); }}>
-                  <CheckCircle size={14} /> Jóváhagyom
-              </button>
-              <button className="btn btn-secondary" onClick={(e) => { e.stopPropagation(); onApproveClick(wish); }}>
-                  <Edit3 size={14} /> Módosítást kérek
-              </button>
-              <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); onApproveClick(wish); }}>
-                  <XCircle size={14} /> Elutasítom
+              <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); onApproveClick(wish); }}>
+                <CheckCircle size={14} /> Döntés
               </button>
             </>
           )}
           
-          {/* ÚJ GOMB: Aktiválás */}
+          {/* EZ A GOMB MOST MÁR A HELYES FELTÉTELLEL JELENIK MEG */}
           {canActivate && (
-            <button className="btn btn-success" onClick={(e) => { e.stopPropagation(); onActivate(wish.id); }}>
+            <button className="btn btn-success" onClick={(e) => { e.stopPropagation(); onActivate(wish); }}>
                 <CheckCircle size={14} /> Gyűjtés indítása
             </button>
           )}

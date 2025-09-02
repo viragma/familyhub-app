@@ -42,7 +42,9 @@ from .schemas import (
     Wish as WishSchema, WishCreate,
     WishApproval as WishApprovalSchema, WishApprovalCreate,
     Notification,
-    WishHistory as WishHistorySchema
+    WishHistory as WishHistorySchema,
+    WishActivationRequest,
+
 
 )
 from .database import SessionLocal, engine
@@ -163,9 +165,13 @@ def remove_task_endpoint(task_id: int, db: Session = Depends(get_db)):
 
 # === JAVÍTÁS: HIÁNYZÓ GET VÉGPONT HOZZÁADVA ===
 @app.get("/api/accounts", response_model=list[Account])
-def read_accounts(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """ Listázza a kasszákat, a felhasználó szerepköre alapján szűrve. """
-    return get_accounts_by_family(db, user=current_user)
+def read_accounts(
+    type: Optional[str] = Query(None, description="Filter accounts by type (e.g., 'cél')"),
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    """ Listázza a kasszákat, a felhasználó szerepköre alapján és opcionálisan típus szerint szűrve. """
+    return get_accounts_by_family(db, user=current_user, account_type=type)
 
 @app.post("/api/accounts", response_model=Account)
 def create_new_account(
@@ -712,3 +718,17 @@ def add_and_submit_new_wish(
 ):
     """Új kívánság létrehozása és azonnali beküldése jóváhagyásra."""
     return create_and_submit_wish(db=db, wish=wish, user=current_user)
+
+@app.post("/api/wishes/{wish_id}/activate", response_model=WishSchema)
+def activate_wish_funding(
+    wish_id: int,
+    request_data: WishActivationRequest, # A sima requestet cseréljük erre
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Elindítja a gyűjtést egy kívánságra. Ha a goal_account_id meg van adva,
+    hozzárendeli a meglévő kasszához. Ha nincs, újat hoz létre.
+    """
+    from .crud import activate_wish
+    return activate_wish(db=db, wish_id=wish_id, user=current_user, goal_account_id=request_data.goal_account_id)

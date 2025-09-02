@@ -203,7 +203,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('wish_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('action', sa.Enum('created', 'submitted', 'approved', 'rejected', 'modified', 'completed', 'deleted', 'conditional', 'modifications_requested', name='history_action_enum'), nullable=False),
+     sa.Column('action', sa.Enum('created', 'submitted', 'approved', 'rejected', 'modified', 'completed', 'deleted', 'conditional', 'modifications_requested', 'activated', name='history_action_enum'), nullable=False),
     sa.Column('old_values', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('new_values', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('notes', sa.Text(), nullable=True),

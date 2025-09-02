@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Heart, Users, Clock, Target, Plus, SlidersHorizontal, X, Filter } from 'lucide-react';
+import { Heart, Users, Clock, Target, Plus, SlidersHorizontal } from 'lucide-react';
 import WishCard from '../components/wishes/WishCard';
 import CreateWishModal from '../components/wishes/CreateWishModal';
 import ApprovalModal from '../components/wishes/ApprovalModal';
 import WishHistoryLog from '../components/wishes/WishHistoryLog';
+import AssignGoalModal from '../components/wishes/AssignGoalModal'; // ÚJ, SZÜKSÉGES IMPORT
 
 function WishesPage() {
   const [activeTab, setActiveTab] = useState('my-wishes');
@@ -20,6 +21,11 @@ function WishesPage() {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  // --- ÚJ STATE VÁLTOZÓK AZ ÚJ MODALHOZ ---
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedWishForAssign, setSelectedWishForAssign] = useState(null);
+  // ------------------------------------------
 
   const { user, token, apiUrl } = useAuth();
 
@@ -132,11 +138,9 @@ function WishesPage() {
 
   const handleSaveWish = async (wishData, action, wishId) => {
     if (!token) return;
-  
     try {
       let wishToSubmitId = wishId;
-  
-      if (wishId) { 
+      if (wishId) {
         const updateResponse = await fetch(`${apiUrl}/api/wishes/${wishId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -146,13 +150,12 @@ function WishesPage() {
           const errorData = await updateResponse.json();
           throw new Error(`Hiba a szerkesztés során: ${errorData.detail}`);
         }
-      } else { 
+      } else {
         const createResponse = await fetch(`${apiUrl}/api/wishes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(wishData),
         });
-  
         if (!createResponse.ok) {
           const errorData = await createResponse.json();
           throw new Error(`Hiba a vázlat mentése során: ${errorData.detail}`);
@@ -160,18 +163,14 @@ function WishesPage() {
         const newWish = await createResponse.json();
         wishToSubmitId = newWish.id;
       }
-  
       if (action === 'submit' && wishToSubmitId) {
         await handleSubmitWish(wishToSubmitId);
       }
-  
       fetchWishes();
-  
     } catch (error) {
       console.error("Hiba a mentési folyamat során:", error);
       alert(error.message);
     }
-  
     setIsCreateModalOpen(false);
     setWishToEdit(null);
   };
@@ -196,21 +195,18 @@ function WishesPage() {
     }
   };
 
-  const handleActivateWish = async (wishId) => {
-    try {
-      const response = await fetch(`${apiUrl}/api/wishes/${wishId}/activate`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if(response.ok) {
-          fetchWishes();
-      } else {
-          const err = await response.json();
-          alert(`Hiba az aktiválás során: ${err.detail}`);
-      }
-    } catch (error) { 
-      console.error("Hiba az aktiváláskor:", error); 
-    }
+  // --- AZ ÚJ MODAL MEGNITÁSÁÉRT FELELŐS FÜGGVÉNY ---
+  // lecseréli a régi handleActivateWish-t
+  const handleOpenAssignModal = (wish) => {
+    setSelectedWishForAssign(wish);
+    setIsAssignModalOpen(true);
+  };
+
+  // --- AZ ÚJ MODAL BEZÁRÁSÁÉRT ÉS FRISSÍTÉSÉÉRT FELELŐS FÜGGVÉNY ---
+  const handleAssignmentSuccess = () => {
+    setIsAssignModalOpen(false);
+    setSelectedWishForAssign(null);
+    fetchWishes();
   };
   
   const openApprovalModal = (wish) => {
@@ -276,7 +272,7 @@ function WishesPage() {
 
   return (
     <div className="wishes-page">
-      {/* Header */}
+      {/* Header (VÁLTOZATLAN) */}
       <div className="header">
         <div className="greeting-section">
           <h1 className="greeting">Kívánságok 🎁</h1>
@@ -292,7 +288,7 @@ function WishesPage() {
         </button>
       </div>
       
-      {/* Tabs */}
+      {/* Tabs (VÁLTOZATLAN) */}
       <div className="wishes-tabs">
          {tabs.map((tab) => (
             <button
@@ -306,7 +302,7 @@ function WishesPage() {
          ))}
       </div>
 
-      {/* Integrated Filters */}
+      {/* Integrated Filters (VÁLTOZATLAN) */}
       <div className="wishes-filters">
         <div className="filters-header">
           <button 
@@ -318,7 +314,6 @@ function WishesPage() {
             <span className={`toggle-arrow ${showFilters ? 'open' : ''}`}>▼</span>
           </button>
           
-          {/* Active filters indicator */}
           {Object.values(panelFilters).some(arr => arr?.length > 0) && (
             <div className="active-filters-count">
               {Object.values(panelFilters).reduce((sum, arr) => sum + (arr?.length || 0), 0)} aktív
@@ -328,7 +323,7 @@ function WishesPage() {
 
         {showFilters && (
           <div className="filters-content">
-            {/* Status Filter */}
+            {/* Filter Groups... */}
             <div className="filter-group">
               <div className="filter-group-header">
                 <h4>Státusz</h4>
@@ -343,8 +338,6 @@ function WishesPage() {
               </div>
               {renderFilterOptions('statuses', statusOptions, 'value', 'label')}
             </div>
-
-            {/* Owner Filter */}
             <div className="filter-group">
               <div className="filter-group-header">
                 <h4>Tulajdonos</h4>
@@ -359,8 +352,6 @@ function WishesPage() {
               </div>
               {renderFilterOptions('owner_ids', familyMembers, 'id', 'display_name')}
             </div>
-
-            {/* Category Filter */}
             <div className="filter-group">
               <div className="filter-group-header">
                 <h4>Kategória</h4>
@@ -395,7 +386,7 @@ function WishesPage() {
                   onApproveClick={openApprovalModal}
                   onEditClick={openEditModal}
                   onHistoryClick={handleHistoryClick}
-                  onActivate={handleActivateWish}
+                  onActivate={handleOpenAssignModal} // EZ A MÓDOSÍTÁS KÖTI BE AZ ÚJ MODALT
                 />
               ))
             ) : (
@@ -410,7 +401,6 @@ function WishesPage() {
           </div>
         )}
         
-        {/* History Log */}
         {historyData && (
           <WishHistoryLog 
             history={historyData} 
@@ -441,6 +431,17 @@ function WishesPage() {
           wish={selectedWish} 
         />
       )}
+
+      {/* --- AZ ÚJ MODAL BEILLESZTÉSE A MEGLÉVŐ STÍLUSHOZ IGAZÍTVA --- */}
+      {selectedWishForAssign && (
+          <AssignGoalModal
+              isOpen={isAssignModalOpen}
+              onClose={() => setIsAssignModalOpen(false)}
+              wish={selectedWishForAssign}
+              onAssignmentSuccess={handleAssignmentSuccess}
+          />
+      )}
+      {/* ----------------------------------------------------------------- */}
     </div>
   );
 }
