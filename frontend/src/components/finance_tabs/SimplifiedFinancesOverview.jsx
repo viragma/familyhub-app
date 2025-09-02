@@ -22,6 +22,8 @@ import {
 import TransactionModal from '../TransactionModal';
 import TransferModal from '../TransferModal';
 import AccountModal from '../AccountModal';
+// Import az új, javított tranzakció lista komponenshez
+import ModernTransactionsList from './ModernTransactionsList';
 
 // Kassza típus ikonok és színek
 const ACCOUNT_TYPES = {
@@ -72,6 +74,14 @@ function ImprovedFinancesOverview() {
   const [selectedAccountId, setSelectedAccountId] = useState('all');
   const [hideZeroBalances, setHideZeroBalances] = useState(false);
   
+  // ÚJ: Tranzakció szűrő state-ek a ModernTransactionsList számára
+  const [transactionFilters, setTransactionFilters] = useState({
+    accountId: 'all',
+    type: 'all',
+    searchTerm: '',
+    sortBy: 'date_desc'
+  });
+  
   const { user, token, apiUrl } = useAuth();
 
   const fetchData = useCallback(async () => {
@@ -79,10 +89,11 @@ function ImprovedFinancesOverview() {
     
     setLoading(true);
     try {
+      // ÚJ: Több tranzakciót kérünk le a jobb megjelenítés érdekében
       const [accRes, catRes, transRes] = await Promise.all([
         fetch(`${apiUrl}/api/accounts`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${apiUrl}/api/categories/tree`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${apiUrl}/api/transactions?limit=20`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${apiUrl}/api/transactions?limit=50`, { headers: { 'Authorization': `Bearer ${token}` } }),
       ]);
 
       const accData = accRes.ok ? await accRes.json() : [];
@@ -234,10 +245,25 @@ function ImprovedFinancesOverview() {
     });
   };
 
+  // ÚJ: Tranzakció szűrő handler
+  const handleTransactionFilterChange = (filterName, value) => {
+    setTransactionFilters(prevFilters => ({
+      ...prevFilters,
+      [filterName]: value
+    }));
+  };
+
   // Modal handlers (ugyanazok mint előtte)
   const openModalForNew = (type, accountId, accountName) => {
     setEditingTransaction(null);
     setModalConfig({ type, accountId, accountName });
+    setIsTransactionModalOpen(true);
+  };
+
+  const openModalForEdit = (transaction) => {
+    setEditingTransaction(transaction);
+    const account = accounts.find(acc => acc.id === transaction.account_id);
+    setModalConfig({ type: transaction.type, accountId: transaction.account_id, accountName: account?.name || '' });
     setIsTransactionModalOpen(true);
   };
 
@@ -266,6 +292,23 @@ function ImprovedFinancesOverview() {
       }
     } catch (error) { 
       console.error("Hiba a tranzakció mentésekor:", error); 
+    }
+  };
+
+  const handleDeleteTransaction = async (transactionId) => {
+    if (!window.confirm("Biztosan törölni szeretnéd ezt a tranzakciót?")) return;
+    try {
+      const response = await fetch(`${apiUrl}/api/transactions/${transactionId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        fetchData();
+      } else { 
+        alert('Hiba a törlés során!'); 
+      }
+    } catch (error) { 
+      console.error("Hiba a tranzakció törlésekor:", error); 
     }
   };
 
@@ -328,20 +371,6 @@ function ImprovedFinancesOverview() {
       console.error("Hiba az ismétlődő szabály mentésekor:", error);
     }
   };
-
-  // Filtered transactions
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      const matchesSearch = !searchTerm || 
-        tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.creator?.display_name?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesAccount = selectedAccountId === 'all' || 
-        tx.account_id?.toString() === selectedAccountId;
-      
-      return matchesSearch && matchesAccount;
-    });
-  }, [transactions, searchTerm, selectedAccountId]);
 
   const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || 0), 0);
   const myPersonalAccount = accounts.find(acc => acc.owner_user_id === user?.id && acc.type === 'személyes');
@@ -611,52 +640,15 @@ function ImprovedFinancesOverview() {
         )}
       </div>
 
-      {/* Legutóbbi tranzakciók egyszerűsített verzió */}
-      <div className="recent-transactions-enhanced">
-        <div className="transactions-header-enhanced">
-          <h3 className="section-title">
-            <TrendingUp size={24} />
-            Legutóbbi tranzakciók
-          </h3>
-        </div>
-        
-        <div className="transactions-list-enhanced">
-          {filteredTransactions.length === 0 ? (
-            <div className="empty-transactions-enhanced">
-              <span>Nincsenek tranzakciók</span>
-            </div>
-          ) : (
-            filteredTransactions.slice(0, 5).map(tx => (
-              <div key={tx.id} className="transaction-item-enhanced">
-                <div className={`transaction-icon-enhanced ${tx.type}`}>
-                  {tx.type === 'bevétel' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-                </div>
-                
-                <div className="transaction-details-enhanced">
-                  <div className="transaction-description-enhanced">
-                    {tx.description || 'Nincs leírás'}
-                  </div>
-                  <div className="transaction-meta-enhanced">
-                    {tx.creator?.display_name} • {new Date(tx.date).toLocaleDateString('hu-HU')}
-                    {tx.category && ` • ${tx.category.name}`}
-                  </div>
-                </div>
-                
-                <div className={`transaction-amount-enhanced ${tx.type}`}>
-                  {tx.type === 'bevétel' ? '+' : '-'}
-                  {parseFloat(tx.amount).toLocaleString('hu-HU')} Ft
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        
-        {filteredTransactions.length > 20 && (
-          <div className="show-more-enhanced">
-            <span>...és még {filteredTransactions.length - 5} tranzakció</span>
-          </div>
-        )}
-      </div>
+      {/* ÚJ: ModernTransactionsList komponens használata */}
+      <ModernTransactionsList 
+        transactions={transactions}
+        filters={transactionFilters}
+        onFilterChange={handleTransactionFilterChange}
+        onEditTransaction={openModalForEdit}
+        onDeleteTransaction={handleDeleteTransaction}
+        user={user}
+      />
 
       {/* Modals */}
       <AccountModal

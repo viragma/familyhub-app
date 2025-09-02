@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Calendar, User, Users, CheckCircle, Clock, RefreshCw, AlertCircle, PieChart as PieChartIcon, BarChart3 } from 'lucide-react';
+import { Target, TrendingUp, Calendar, User, Users, CheckCircle, Clock, RefreshCw, AlertCircle, PieChart as PieChartIcon, BarChart3, Eye, ArrowRight } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,219 @@ import ForecastCard from '../components/ForecastCard';
 import UpcomingEventsCard from '../components/UpcomingEventsCard';
 import NotificationBar from '../components/NotificationBar';
 
-// Kategória költés kártya
+// Kompakt Cél Kártya komponens
+const CompactGoalCard = ({ goal, type = "personal" }) => {
+  const navigate = useNavigate();
+  const isFamily = type === "family";
+  const balance = goal.balance || 0;
+  const goalAmount = goal.goal_amount || 0;
+  const progress = goalAmount > 0 ? Math.min((balance / goalAmount) * 100, 100) : 0;
+  const remainingAmount = Math.max(goalAmount - balance, 0);
+  
+  const handleCardClick = () => {
+    navigate(`/finances/account/${goal.id}`);
+  };
+
+  return (
+    <div className="compact-goal-card" onClick={handleCardClick}>
+      <div className="compact-goal-header">
+        <div className="compact-goal-info">
+          <div className={`compact-goal-icon ${isFamily ? 'family' : 'personal'}`}>
+            {isFamily ? <Users size={18} /> : <Target size={18} />}
+          </div>
+          <div className="compact-goal-details">
+            <h4 className="compact-goal-name">{goal.name}</h4>
+            {goal.owner_user && (
+              <span className="compact-goal-owner">
+                <User size={12} />
+                {goal.owner_user.display_name}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="compact-goal-amount-section">
+          <div className="compact-goal-current">
+            {balance.toLocaleString('hu-HU')} Ft
+          </div>
+          <div className="compact-goal-target">
+            / {goalAmount.toLocaleString('hu-HU')} Ft
+          </div>
+        </div>
+      </div>
+      
+      <div className="compact-goal-progress">
+        <div className="compact-progress-bar">
+          <div 
+            className={`compact-progress-fill ${isFamily ? 'family' : 'personal'}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="compact-progress-info">
+          <span className="compact-progress-percentage">{progress.toFixed(0)}%</span>
+          {goal.goal_date && (
+            <span className="compact-goal-date">
+              <Calendar size={12} />
+              {new Date(goal.goal_date).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {remainingAmount > 0 && (
+        <div className="compact-goal-remaining">
+          Még szükséges: <strong>{remainingAmount.toLocaleString('hu-HU')} Ft</strong>
+        </div>
+      )}
+
+      {progress >= 100 && (
+        <div className="compact-goal-completed">
+          <CheckCircle size={16} />
+          Cél teljesítve!
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Célok Csoportosító Kártya
+const GoalsGroupCard = ({ title, goals, type, showAll, onToggleShowAll, maxDisplay = 2 }) => {
+  const navigate = useNavigate();
+  
+  if (!goals || goals.length === 0) return null;
+
+  const displayedGoals = showAll ? goals : goals.slice(0, maxDisplay);
+  const hasMore = goals.length > maxDisplay;
+
+  return (
+    <div className="dashboard-card goals-group-card">
+      <div className="goals-group-header">
+        <div className="goals-group-title-section">
+          <h3 className="goals-group-title">{title}</h3>
+          <span className="goals-count-badge">{goals.length}</span>
+        </div>
+        
+        <div className="goals-group-actions">
+          {hasMore && (
+            <button 
+              className="toggle-goals-btn"
+              onClick={onToggleShowAll}
+            >
+              <Eye size={16} />
+              {showAll ? 'Kevesebb' : `+${goals.length - maxDisplay} további`}
+            </button>
+          )}
+          <button 
+            className="view-all-goals-btn"
+            onClick={() => navigate('/finances')}
+          >
+            <ArrowRight size={16} />
+            Mind
+          </button>
+        </div>
+      </div>
+      
+      <div className="compact-goals-grid">
+        {displayedGoals.map(goal => (
+          <CompactGoalCard 
+            key={goal.id} 
+            goal={goal} 
+            type={type}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Javított Pénzügyi Összefoglaló Kártya
+const EnhancedFinancialCard = ({ financialSummary }) => {
+  if (!financialSummary) return null;
+
+  const totalBalance = financialSummary.total_balance || 0;
+  const personalBalance = financialSummary.personal_balance || 0;
+  const monthlyIncome = financialSummary.monthly_income || 0;
+  const monthlyExpense = financialSummary.monthly_expense || 0;
+  const monthlySavings = financialSummary.monthly_savings || 0;
+  
+  const savingsRate = monthlyIncome > 0 ? ((monthlySavings / monthlyIncome) * 100) : 0;
+  const isParentView = financialSummary.view_type === 'parent';
+
+  return (
+    <div className="dashboard-card enhanced-financial-card">
+      <div className="enhanced-financial-header">
+        <div className="financial-title-section">
+          <h3 className="enhanced-financial-title">Pénzügyi Áttekintés</h3>
+          <div className="financial-period-badge">
+            <Calendar size={14} />
+            Aktuális hónap
+          </div>
+        </div>
+        <TrendingUp className="enhanced-financial-icon" />
+      </div>
+
+      {/* Egyenlegek szekció */}
+      <div className="enhanced-balance-section">
+        <div className="primary-balance">
+          <span className="balance-label">
+            {isParentView ? 'Családi egyenleg' : 'Egyenleg'}
+          </span>
+          <span className="balance-amount-large">
+            {totalBalance.toLocaleString('hu-HU')} Ft
+          </span>
+        </div>
+        
+        {isParentView && personalBalance !== null && (
+          <div className="secondary-balance">
+            <span className="personal-balance-label">Saját egyenleg</span>
+            <span className="personal-balance-amount">
+              {personalBalance.toLocaleString('hu-HU')} Ft
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Statisztikák rács */}
+      <div className="enhanced-stats-grid">
+        <div className="enhanced-stat-card positive">
+          <div className="stat-icon">📈</div>
+          <div className="stat-info">
+            <span className="stat-label">Bevétel</span>
+            <span className="stat-value">+{monthlyIncome.toLocaleString('hu-HU')} Ft</span>
+          </div>
+        </div>
+
+        <div className="enhanced-stat-card negative">
+          <div className="stat-icon">📉</div>
+          <div className="stat-info">
+            <span className="stat-label">Kiadás</span>
+            <span className="stat-value">-{monthlyExpense.toLocaleString('hu-HU')} Ft</span>
+          </div>
+        </div>
+
+        <div className={`enhanced-stat-card savings ${monthlySavings >= 0 ? 'positive' : 'negative'}`}>
+          <div className="stat-icon">{monthlySavings >= 0 ? '💰' : '⚠️'}</div>
+          <div className="stat-info">
+            <span className="stat-label">Megtakarítás</span>
+            <span className="stat-value">
+              {monthlySavings >= 0 ? '+' : ''}{monthlySavings.toLocaleString('hu-HU')} Ft
+            </span>
+          </div>
+        </div>
+
+        <div className="enhanced-stat-card rate">
+          <div className="stat-icon">📊</div>
+          <div className="stat-info">
+            <span className="stat-label">Megtakarítási ráta</span>
+            <span className="stat-value">{savingsRate.toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Kategória költés kártya (rövidített)
 const CategorySpendingCard = ({ data, onClick }) => {
   if (!data || !data.length) {
     return (
@@ -28,145 +240,123 @@ const CategorySpendingCard = ({ data, onClick }) => {
   const totalAmount = data.reduce((sum, item) => sum + item.amount, 0);
 
   return (
-    <div className="dashboard-card analytics-card" onClick={onClick}>
+    <div className="dashboard-card analytics-card compact-analytics" onClick={onClick}>
       <div className="dashboard-card-header">
         <h3 className="dashboard-card-title">Kategóriás költések</h3>
         <PieChartIcon className="dashboard-card-icon" />
       </div>
       
-      <div className="analytics-chart-container">
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={40}
-              outerRadius={80}
-              dataKey="amount"
-              nameKey="name"
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip 
-              formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Költés']}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+      <div className="compact-chart-section">
+        <div className="compact-chart-container">
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={data.slice(0, 5)}
+                cx="50%"
+                cy="50%"
+                innerRadius={30}
+                outerRadius={60}
+                dataKey="amount"
+                nameKey="name"
+              >
+                {data.slice(0, 5).map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Költés']} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
 
-      <div className="analytics-legend">
-        {data.slice(0, 4).map((item, index) => (
-          <div key={index} className="analytics-legend-item">
-            <div 
-              className="analytics-legend-color" 
-              style={{ backgroundColor: item.color }}
-            ></div>
-            <div className="analytics-legend-info">
-              <span className="analytics-legend-name">{item.name}</span>
-              <span className="analytics-legend-amount">
-                {item.amount.toLocaleString('hu-HU')} Ft
-              </span>
-              <span className="analytics-legend-percent">
-                {totalAmount > 0 ? ((item.amount / totalAmount) * 100).toFixed(1) : 0}%
-              </span>
+        <div className="compact-legend">
+          {data.slice(0, 3).map((item, index) => (
+            <div key={index} className="compact-legend-item">
+              <div className="legend-color" style={{ backgroundColor: item.color }} />
+              <span className="legend-name">{item.name}</span>
+              <span className="legend-amount">{((item.amount / totalAmount) * 100).toFixed(0)}%</span>
             </div>
-          </div>
-        ))}
-        {data.length > 4 && (
-          <div className="analytics-legend-more">
-            +{data.length - 4} további kategória
-          </div>
-        )}
+          ))}
+          {data.length > 3 && (
+            <div className="legend-more">+{data.length - 3} további</div>
+          )}
+        </div>
       </div>
 
       <div className="analytics-click-hint">
-        Kattints a részletes nézetért
+        <ArrowRight size={14} />
+        Részletek
       </div>
     </div>
   );
 };
 
-// Havi megtakarítás trend kártya
+// Havi megtakarítás trend kártya (rövidített)
 const SavingsTrendCard = ({ data, onClick }) => {
-    if (!data || !data.length) {
-      return (
-        <div className="dashboard-card analytics-card" onClick={onClick}>
-          <div className="dashboard-card-header">
-            <h3 className="dashboard-card-title">Havi megtakarítás trend</h3>
-            <BarChart3 className="dashboard-card-icon" />
-          </div>
-          <div className="analytics-empty">
-            <div className="analytics-empty-icon">📈</div>
-            <p>Nincs adat az aktuális évre</p>
-          </div>
-        </div>
-      );
-    }
-  
-    const latestSavings = data.length > 0 ? data[data.length - 1]?.savings || 0 : 0;
-    const previousSavings = data.length > 1 ? data[data.length - 2]?.savings || 0 : 0;
-    const trend = latestSavings >= previousSavings ? 'up' : 'down';
-  
+  if (!data || !data.length) {
     return (
       <div className="dashboard-card analytics-card" onClick={onClick}>
         <div className="dashboard-card-header">
-          <h3 className="dashboard-card-title">Havi megtakarítás trend</h3>
+          <h3 className="dashboard-card-title">Megtakarítás trend</h3>
           <BarChart3 className="dashboard-card-icon" />
         </div>
-  
-        <div className="analytics-trend-summary">
-          <div className="analytics-trend-current">
-            <span className="analytics-trend-label">Aktuális hónap</span>
-            <span className={`analytics-trend-value ${trend === 'up' ? 'positive' : 'negative'}`}>
-              {latestSavings >= 0 ? '+' : ''}{latestSavings.toLocaleString('hu-HU')} Ft
-            </span>
-          </div>
-          <div className={`analytics-trend-indicator ${trend}`}>
-            {trend === 'up' ? '↗' : '↘'} 
-            {Math.abs(latestSavings - previousSavings).toLocaleString('hu-HU')} Ft
-          </div>
-        </div>
-  
-        <div className="analytics-chart-container">
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={data}>
-              <XAxis 
-                dataKey="month" 
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12, fill: '#a0aec0' }}
-              />
-              <YAxis hide />
-              <Tooltip 
-                formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Megtakarítás']}
-                labelStyle={{ color: '#e2e8f0' }}
-                contentStyle={{ 
-                  backgroundColor: '#2d3748', 
-                  border: '1px solid #4a5568',
-                  borderRadius: '6px'
-                }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="savings" 
-                stroke="#4299e1" 
-                strokeWidth={3}
-                dot={{ fill: '#4299e1', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, stroke: '#4299e1', strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-  
-        <div className="analytics-click-hint">
-          Kattints a részletes nézetért
+        <div className="analytics-empty">
+          <div className="analytics-empty-icon">📈</div>
+          <p>Nincs adat az aktuális évre</p>
         </div>
       </div>
     );
-  };
+  }
+
+  const latestSavings = data.length > 0 ? data[data.length - 1]?.savings || 0 : 0;
+  const previousSavings = data.length > 1 ? data[data.length - 2]?.savings || 0 : 0;
+  const trend = latestSavings >= previousSavings ? 'up' : 'down';
+
+  return (
+    <div className="dashboard-card analytics-card compact-analytics" onClick={onClick}>
+      <div className="dashboard-card-header">
+        <h3 className="dashboard-card-title">Megtakarítás trend</h3>
+        <BarChart3 className="dashboard-card-icon" />
+      </div>
+
+      <div className="compact-trend-summary">
+        <div className="trend-current">
+          <span className="trend-label">Ez a hónap</span>
+          <span className={`trend-value ${trend === 'up' ? 'positive' : 'negative'}`}>
+            {latestSavings >= 0 ? '+' : ''}{latestSavings.toLocaleString('hu-HU')} Ft
+          </span>
+        </div>
+        <div className={`trend-indicator ${trend}`}>
+          {trend === 'up' ? '↗' : '↘'} 
+          <span className="trend-change">
+            {Math.abs(latestSavings - previousSavings).toLocaleString('hu-HU')} Ft
+          </span>
+        </div>
+      </div>
+
+      <div className="compact-chart-container">
+        <ResponsiveContainer width="100%" height={120}>
+          <LineChart data={data.slice(-6)}>
+            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+            <YAxis hide />
+            <Tooltip formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Megtakarítás']} />
+            <Line 
+              type="monotone" 
+              dataKey="savings" 
+              stroke="#4299e1" 
+              strokeWidth={2}
+              dot={{ fill: '#4299e1', r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="analytics-click-hint">
+        <ArrowRight size={14} />
+        Részletek
+      </div>
+    </div>
+  );
+};
 
 const DashboardPage = () => {
   const { token, apiUrl, logout } = useAuth();
@@ -176,10 +366,12 @@ const DashboardPage = () => {
     categorySpending: null,
     savingsTrend: null
   });
-  const [upcomingEvents, setUpcomingEvents] = useState([]); // ÚJ STATE
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState(null);
+  const [showAllFamilyGoals, setShowAllFamilyGoals] = useState(false);
+  const [showAllPersonalGoals, setShowAllPersonalGoals] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -190,13 +382,12 @@ const DashboardPage = () => {
         throw new Error('Nincs bejelentkezett felhasználó');
       }
 
-      // Adatok párhuzamos lekérése
-        const [dashboardResponse, categoryResponse, savingsResponse, upcomingEventsResponse, notificationsResponse] = await Promise.all([ // <--- ÚJ LEKÉRÉS
+      const [dashboardResponse, categoryResponse, savingsResponse, upcomingEventsResponse, notificationsResponse] = await Promise.all([
         fetch(`${apiUrl}/api/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${apiUrl}/api/analytics/category-spending`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${apiUrl}/api/analytics/savings-trend`, { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch(`${apiUrl}/api/upcoming-events`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${apiUrl}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } }) // <--- ÚJ LEKÉRÉS
+        fetch(`${apiUrl}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       if (!dashboardResponse.ok) {
@@ -210,16 +401,15 @@ const DashboardPage = () => {
       const dashboardData = await dashboardResponse.json();
       const categoryData = categoryResponse.ok ? await categoryResponse.json() : [];
       const savingsData = savingsResponse.ok ? await savingsResponse.json() : [];
-      const upcomingEventsData = upcomingEventsResponse.ok ? await upcomingEventsResponse.json() : []; // ÚJ ADAT FELDOLGOZÁSA
+      const upcomingEventsData = upcomingEventsResponse.ok ? await upcomingEventsResponse.json() : [];
 
       setDashboardData(dashboardData);
       setAnalyticsData({
         categorySpending: categoryData,
         savingsTrend: savingsData
       });
-      setUpcomingEvents(upcomingEventsData); // ÚJ STATE BEÁLLÍTÁSA
-      setNotifications(notificationsResponse.ok ? await notificationsResponse.json() : []); // <--- ÚJ STATE BEÁLLÍTÁSA
-
+      setUpcomingEvents(upcomingEventsData);
+      setNotifications(notificationsResponse.ok ? await notificationsResponse.json() : []);
 
     } catch (err) {
       console.error('Hiba a dashboard adatok lekérésekor:', err);
@@ -267,7 +457,6 @@ const DashboardPage = () => {
         <div className="loading-content">
           <div className="loading-spinner"></div>
           <p className="loading-message">Dashboard betöltése...</p>
-          <p className="dashboard-api-info">API: {apiUrl}</p>
         </div>
       </div>
     );
@@ -280,10 +469,6 @@ const DashboardPage = () => {
           <AlertCircle className="error-icon" />
           <h2 className="error-title">Hiba történt</h2>
           <p className="error-message">{error}</p>
-          <div className="error-debug">
-            <p>API URL: {apiUrl}</p>
-            <p>Token: {token ? '✅ Van' : '❌ Nincs'}</p>
-          </div>
           <button 
             onClick={fetchData}
             className="error-retry-btn"
@@ -298,69 +483,16 @@ const DashboardPage = () => {
   }
   
   const forecast = dashboardData?.next_month_forecast;
+  const familyGoals = dashboardData?.goals?.family_goals || [];
+  const personalGoals = dashboardData?.goals?.personal_goals || [];
 
   return (
-    <div className="">
-          {/* --- ÚJ ÉRTESÍTÉSI SÁV --- */}
+    <div className="enhanced-dashboard">
       <NotificationBar notifications={notifications} />
+      
+      <div className="dashboard-section-title">Pénzügyi Áttekintés</div>
       <div className="dashboard-grid">
-        
-        <UpcomingEventsCard events={upcomingEvents} /> {/* ÚJ KÁRTYA MEGJELENÍTÉSE */}
-
-        {dashboardData?.financial_summary && (
-          <div className="dashboard-card financial-card-wide">
-            <div className="dashboard-card-header">
-              <h3 className="dashboard-card-title">
-                {dashboardData.financial_summary.balance_title || "Pénzügyi összefoglaló"}
-              </h3>
-              <TrendingUp className="dashboard-card-icon" />
-            </div>
-            
-            <div className="financial-balance-row">
-              <span className="financial-balance-label">Családi egyenleg</span>
-              <span className="financial-balance-amount">
-                {dashboardData.financial_summary.total_balance?.toLocaleString('hu-HU') || '0'} Ft
-              </span>
-            </div>
-            {dashboardData.financial_summary.view_type === 'parent' && (
-              <div className="balance-sub-list">
-                <div className="sub-list-item available">
-                  <span>Saját egyenleg</span>
-                  <strong className="available-amount">
-                    <strong>{dashboardData.financial_summary.personal_balance?.toLocaleString('hu-HU') || '0'} Ft</strong>
-                  </strong>
-                </div>
-              </div>
-            )}
-            <div className="financial-stats-grid">
-              <div className="financial-stat-item">
-                <span className="financial-stat-label">Havi bevétel</span>
-                <p className="financial-stat-value financial-income">
-                  +{dashboardData.financial_summary.monthly_income?.toLocaleString('hu-HU') || '0'} Ft
-                </p>
-              </div>
-              <div className="financial-stat-item">
-                <span className="financial-stat-label">Havi kiadás</span>
-                <p className="financial-stat-value financial-expense">
-                  -{dashboardData.financial_summary.monthly_expense?.toLocaleString('hu-HU') || '0'} Ft
-                </p>
-              </div>
-            </div>
-            
-            <div>
-              <span className="financial-stat-label">Havi megtakarítás</span>
-              <p className={`financial-savings ${
-                (dashboardData.financial_summary.monthly_savings || 0) >= 0 
-                  ? 'financial-savings-positive' 
-                  : 'financial-savings-negative'
-              }`}>
-
-                {(dashboardData.financial_summary.monthly_savings || 0) >= 0 ? '+' : ''}
-                {dashboardData.financial_summary.monthly_savings?.toLocaleString('hu-HU') || '0'} Ft
-              </p>
-            </div>
-          </div>
-        )}
+        <EnhancedFinancialCard financialSummary={dashboardData?.financial_summary} />
         
         {forecast?.personal && (
           <ForecastCard 
@@ -375,7 +507,35 @@ const DashboardPage = () => {
             title="Családi Előrejelzés" 
           />
         )}
-        
+      </div>
+
+      {(familyGoals.length > 0 || personalGoals.length > 0) && (
+        <>
+          <div className="dashboard-section-title">Célkasszák</div>
+          <div className="dashboard-grid">
+            <GoalsGroupCard 
+              title="Családi Célok"
+              goals={familyGoals}
+              type="family"
+              showAll={showAllFamilyGoals}
+              onToggleShowAll={() => setShowAllFamilyGoals(!showAllFamilyGoals)}
+              maxDisplay={2}
+            />
+            
+            <GoalsGroupCard 
+              title="Személyes Célok"
+              goals={personalGoals}
+              type="personal"
+              showAll={showAllPersonalGoals}
+              onToggleShowAll={() => setShowAllPersonalGoals(!showAllPersonalGoals)}
+              maxDisplay={2}
+            />
+          </div>
+        </>
+      )}
+
+      <div className="dashboard-section-title">Statisztikák</div>
+      <div className="dashboard-grid">
         <CategorySpendingCard 
           data={analyticsData.categorySpending}
           onClick={handleCategoryAnalyticsClick}
@@ -385,78 +545,8 @@ const DashboardPage = () => {
           data={analyticsData.savingsTrend}
           onClick={handleSavingsAnalyticsClick}
         />
- 
-        {dashboardData?.goals?.family_goals?.map(goal => {
-          const balance = goal.balance || 0;
-          const goalAmount = goal.goal_amount || 0;
-          const progress = goalAmount > 0 ? Math.min((balance / goalAmount) * 100, 100) : 0;
-          const remainingAmount = Math.max(goalAmount - balance, 0);
-          
-          return (
-            <div key={`family-${goal.id}`} className="dashboard-card">
-              <div className="goal-header">
-                <div className="goal-info">
-                  <div className="goal-icon-container goal-icon-family">
-                    <Users className="goal-icon goal-icon-family-color" />
-                  </div>
-                  <div className="goal-details">
-                    <h4>{goal.name}</h4>
-                    <div className="goal-meta">
-                      <span className="goal-badge">Családi cél</span>
-                      {goal.owner_user && (
-                        <div className="goal-owner">
-                          <User className="goal-owner-icon" />
-                          <span>{goal.owner_user.display_name}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="goal-amount">
-                  <span className="goal-amount-main">
-                    {balance.toLocaleString('hu-HU')} Ft
-                  </span>
-                  <p className="goal-amount-total">
-                    / {goalAmount.toLocaleString('hu-HU')} Ft
-                  </p>
-                </div>
-              </div>
-              
-              <div className="goal-progress">
-                <div className="goal-progress-header">
-                  <span>Haladás</span>
-                  <span>{progress.toFixed(1)}%</span>
-                </div>
-                <div className="goal-progress-bar">
-                  <div 
-                    className="goal-progress-fill goal-progress-fill-family"
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
-              </div>
-              
-              <div className="goal-footer">
-                <div>
-                  <span className="goal-remaining">Hiányzik még</span>
-                  <span className="goal-remaining-amount">
-                    {remainingAmount.toLocaleString('hu-HU')} Ft
-                  </span>
-                </div>
-                
-                {goal.goal_date && (
-                  <div className="goal-date">
-                    <Calendar className="goal-date-icon" />
-                    <span>Cél dátum</span>
-                    <span className="goal-date-value">
-                      {new Date(goal.goal_date).toLocaleDateString('hu-HU')}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        
+        <UpcomingEventsCard events={upcomingEvents} />
       </div>
     </div>
   );

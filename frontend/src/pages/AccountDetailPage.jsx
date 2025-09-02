@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ModernTransactionsList from '../components/finance_tabs/ModernTransactionsList';
 import './AccountDetailPage.css'; // <-- FONTOS: Az új CSS importálása
+import CloseGoalModal from '../components/CloseGoalModal'; // ÚJ
 
 // Az oldal tetejére, a többi import alá
 import { FaPlus, FaTrophy, FaArchive } from 'react-icons/fa';
@@ -47,7 +48,7 @@ const HistoryTimeline = ({ history }) => {
 
 
 // Komponens az Archivált kassza nézetéhez
-const ArchivedAccountView = ({ account, transactions }) => {
+const ArchivedAccountView = ({ account, transactions, filters, onFilterChange, onEditTransaction, onDeleteTransaction, user }) => {
     // Keressük meg a lezárási eseményt a történetben, hogy megtudjuk a végső összeget
     const closingEvent = account.history_entries.find(e => e.action === 'archived');
     const finalAmount = closingEvent?.details?.final_amount || 0;
@@ -84,14 +85,21 @@ const ArchivedAccountView = ({ account, transactions }) => {
 
             <div className="bento-card" style={{marginTop: '2rem'}}>
                 <h3>Kapcsolódó Tranzakciók</h3>
-                <ModernTransactionsList transactions={transactions} />
+                <ModernTransactionsList 
+                    transactions={transactions}
+                    filters={filters}
+                    onFilterChange={onFilterChange}
+                    onEditTransaction={onEditTransaction}
+                    onDeleteTransaction={onDeleteTransaction}
+                    user={user}
+                />
             </div>
         </div>
     );
 };
 
 // Komponens az Aktív kassza nézetéhez (a régi tartalom)
-const ActiveAccountView = ({ account, transactions, onOpenCloseModal }) => {
+const ActiveAccountView = ({ account, transactions, onOpenCloseModal, filters, onFilterChange, onEditTransaction, onDeleteTransaction, user }) => {
     const isParent = useAuth().user.role === 'Szülő' || useAuth().user.role === 'Családfő';
     const goalReached = account.goal_amount && parseFloat(account.balance) >= parseFloat(account.goal_amount);
 
@@ -121,7 +129,14 @@ const ActiveAccountView = ({ account, transactions, onOpenCloseModal }) => {
 
             <div className="bento-card">
                  <h3>Tranzakciók</h3>
-                <ModernTransactionsList transactions={transactions} />
+                <ModernTransactionsList 
+                    transactions={transactions}
+                    filters={filters}
+                    onFilterChange={onFilterChange}
+                    onEditTransaction={onEditTransaction}
+                    onDeleteTransaction={onDeleteTransaction}
+                    user={user}
+                />
             </div>
         </div>
     );
@@ -140,6 +155,12 @@ function AccountDetailPage() {
     const [categories, setCategories] = useState([]);
     const [apiError, setApiError] = useState('');
     const navigate = useNavigate();
+    const [filters, setFilters] = useState({
+      accountId: accountId,
+      type: 'all',
+      searchTerm: '',
+      sortBy: 'date_desc'
+    });
 
     const fetchData = useCallback(async () => {
         if (!token) return;
@@ -168,6 +189,10 @@ function AccountDetailPage() {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+    
+    const handleFilterChange = (key, value) => {
+        setFilters(prev => ({...prev, [key]: value}))
+    }
 
     const handleCloseSubmit = async (formData) => {
         setApiError('');
@@ -196,9 +221,22 @@ function AccountDetailPage() {
     return (
         <div className="page-container">
             {account.status === 'archived' ? (
-                <ArchivedAccountView account={account} transactions={transactions} />
+                <ArchivedAccountView 
+                  account={account} 
+                  transactions={transactions}
+                  filters={filters}
+                  onFilterChange={handleFilterChange}
+                  user={user}
+                />
             ) : (
-                <ActiveAccountView account={account} transactions={transactions} onOpenCloseModal={() => setIsCloseModalOpen(true)} />
+                <ActiveAccountView 
+                  account={account} 
+                  transactions={transactions} 
+                  onOpenCloseModal={() => setIsCloseModalOpen(true)}
+                  filters={filters}
+                  onFilterChange={handleFilterChange}
+                  user={user}
+                />
             )}
 
             {isCloseModalOpen && (

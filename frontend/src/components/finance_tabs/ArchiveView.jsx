@@ -13,7 +13,7 @@ const ArchivedAccountCard = ({ account }) => {
         : 'Ismeretlen';
 
     return (
-        <div className="archived-card" onClick={() => navigate(`/accounts/${account.id}`)}>
+        <div className="archived-card" onClick={() => navigate(`/finances/account/${account.id}`)}>
             <div className="archived-card-header">
                 <span className="archived-card-icon">🏆</span>
                 <div className="archived-card-title-wrapper">

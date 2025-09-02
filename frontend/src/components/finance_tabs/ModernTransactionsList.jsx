@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowUpRight, ArrowDownLeft, TrendingUp, TrendingDown, Send, Calendar, User, Tag, MessageSquare } from 'lucide-react';
 
 function ModernTransactionsList({ transactions, filters, onFilterChange, onEditTransaction, onDeleteTransaction, user }) {
   
@@ -17,16 +18,61 @@ function ModernTransactionsList({ transactions, filters, onFilterChange, onEditT
     }
   };
 
-  const getTransactionIcon = (transaction) => {
+  const getTransactionTypeInfo = (transaction) => {
     if (transaction.transfer_id) {
-      return transaction.type === 'bevétel' ? '⬇️' : '⬆️';
+      // Ez egy átutalás
+      if (transaction.type === 'bevétel') {
+        return {
+          type: 'transfer_in',
+          icon: <ArrowDownLeft size={20} />,
+          label: 'Bejövő utalás',
+          color: 'transfer-in'
+        };
+      } else {
+        return {
+          type: 'transfer_out',
+          icon: <ArrowUpRight size={20} />,
+          label: 'Kimenő utalás', 
+          color: 'transfer-out'
+        };
+      }
     }
-    return transaction.type === 'bevétel' ? '💰' : '💸';
+    
+    if (transaction.type === 'bevétel') {
+      return {
+        type: 'income',
+        icon: <TrendingUp size={20} />,
+        label: 'Bevétel',
+        color: 'income'
+      };
+    } else {
+      return {
+        type: 'expense',
+        icon: <TrendingDown size={20} />,
+        label: 'Kiadás',
+        color: 'expense'
+      };
+    }
   };
 
-  const getCategoryIcon = (category) => {
-    if (!category) return '📄';
-    return category.icon || '📄';
+  const getTransferDetails = (transaction) => {
+    if (!transaction.transfer_id) return null;
+
+    // Itt kellene az átutalás részleteit lekérni
+    // Most egy egyszerű megoldással dolgozunk
+    if (transaction.type === 'bevétel') {
+      return {
+        direction: 'from',
+        otherParty: transaction.from_account_name || 'Másik kassza',
+        message: 'Beérkezett'
+      };
+    } else {
+      return {
+        direction: 'to', 
+        otherParty: transaction.to_account_name || 'Célkassza',
+        message: 'Elküldve'
+      };
+    }
   };
 
   return (
@@ -101,8 +147,8 @@ function ModernTransactionsList({ transactions, filters, onFilterChange, onEditT
         </div>
       </div>
 
-      {/* Transactions List */}
-      <div className="modern-transactions-list">
+      {/* Enhanced Transactions List */}
+      <div className="enhanced-transactions-list">
         {transactions.length === 0 ? (
           <div className="empty-transactions">
             <div className="empty-icon">🤷</div>
@@ -110,70 +156,113 @@ function ModernTransactionsList({ transactions, filters, onFilterChange, onEditT
             <p>Próbálj meg más szűrőbeállításokat használni!</p>
           </div>
         ) : (
-          transactions.map(tx => (
-            <div className="modern-transaction-card" key={tx.id}>
-              <div className="transaction-icon-area">
-                <div className={`transaction-icon ${tx.type}`}>
-                  {getTransactionIcon(tx)}
-                </div>
-              </div>
+          transactions.map(tx => {
+            const typeInfo = getTransactionTypeInfo(tx);
+            const transferDetails = getTransferDetails(tx);
 
-              <div className="transaction-content">
-                <div className="transaction-primary-info">
-                  <h4 className="transaction-description">
-                    {tx.description || 'Nincs leírás'}
-                  </h4>
-                  <div className={`transaction-amount ${tx.type}`}>
-                    {tx.type === 'bevétel' ? '+' : '-'}
-                    {parseFloat(tx.amount).toLocaleString('hu-HU')} Ft
-                  </div>
-                </div>
-
-                <div className="transaction-meta-info">
-                  <div className="meta-item">
-                    <span className="meta-icon">👤</span>
-                    <span className="meta-text">{tx.creator?.display_name || 'Ismeretlen'}</span>
-                  </div>
-                  
-                  <div className="meta-item">
-                    <span className="meta-icon">📅</span>
-                    <span className="meta-text">{formatDate(tx.date)}</span>
-                  </div>
-                  
-                  <div className="meta-item">
-                    <span className="meta-icon">{getCategoryIcon(tx.category)}</span>
-                    <span className="meta-text">{tx.category ? tx.category.name : 'Nincs kategória'}</span>
+            return (
+              <div className={`enhanced-transaction-card ${typeInfo.color}`} key={tx.id}>
+                {/* Transaction Type Indicator */}
+                <div className="transaction-type-bar"></div>
+                
+                <div className="transaction-main-content">
+                  {/* Icon and Type */}
+                  <div className={`transaction-icon-enhanced ${typeInfo.color}`}>
+                    {typeInfo.icon}
                   </div>
 
-                  {tx.transfer_id && (
-                    <div className="meta-item transfer">
-                      <span className="meta-icon">🔄</span>
-                      <span className="meta-text">Átutalás</span>
+                  {/* Transaction Details */}
+                  <div className="transaction-details-enhanced">
+                    {/* Primary Info Row */}
+                    <div className="transaction-primary-row">
+                      <div className="transaction-title-section">
+                        <h4 className="transaction-description-enhanced">
+                          {tx.description || 'Nincs leírás'}
+                        </h4>
+                        <div className="transaction-type-label">
+                          <span className={`type-badge ${typeInfo.color}`}>
+                            {typeInfo.label}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className={`transaction-amount-enhanced ${typeInfo.color}`}>
+                        <span className="amount-sign">
+                          {typeInfo.type === 'income' || typeInfo.type === 'transfer_in' ? '+' : '-'}
+                        </span>
+                        <span className="amount-value">
+                          {parseFloat(tx.amount).toLocaleString('hu-HU')} Ft
+                        </span>
+                      </div>
                     </div>
-                  )}
+
+                    {/* Transfer Details Row */}
+                    {transferDetails && (
+                      <div className="transfer-details-row">
+                        <div className="transfer-info">
+                          <Send size={16} className="transfer-arrow" />
+                          <span className="transfer-text">
+                            {transferDetails.direction === 'from' ? 'Feladó: ' : 'Címzett: '}
+                            <strong>{transferDetails.otherParty}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Meta Information Row */}
+                    <div className="transaction-meta-row">
+                      <div className="meta-items-left">
+                        <div className="meta-item">
+                          <User size={14} />
+                          <span>{tx.creator?.display_name || 'Ismeretlen'}</span>
+                        </div>
+                        
+                        <div className="meta-item">
+                          <Calendar size={14} />
+                          <span>{formatDate(tx.date)}</span>
+                        </div>
+                        
+                        {tx.category && (
+                          <div className="meta-item">
+                            <Tag size={14} />
+                            <span>{tx.category.name}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      {user && ['Szülő', 'Családfő'].includes(user.role) && (
+                        <div className="transaction-actions-enhanced">
+                          <button 
+                            className="action-btn-enhanced edit" 
+                            onClick={() => onEditTransaction(tx)}
+                            title="Szerkesztés"
+                          >
+                            ✏️
+                          </button>
+                          <button 
+                            className="action-btn-enhanced delete" 
+                            onClick={() => onDeleteTransaction(tx.id)}
+                            title="Törlés"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Description/Comment Row (if different from title) */}
+                    {tx.description && tx.description !== (tx.title || '') && (
+                      <div className="transaction-comment-row">
+                        <MessageSquare size={14} />
+                        <span className="comment-text">{tx.description}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              {user && ['Szülő', 'Családfő'].includes(user.role) && (
-                <div className="transaction-actions">
-                  <button 
-                    className="action-btn-icon modern-edit" 
-                    onClick={() => onEditTransaction(tx)}
-                    title="Szerkesztés"
-                  >
-                    ✏️
-                  </button>
-                  <button 
-                    className="action-btn-icon modern-delete" 
-                    onClick={() => onDeleteTransaction(tx.id)}
-                    title="Törlés"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
