@@ -148,6 +148,7 @@ class Account(AccountBase):
     status: Literal['active', 'archived']
     # === EZ AZ ÚJ SOR ===
     wishes: List[Wish] = []
+    history_entries: List[AccountHistory] = [] 
 
     class Config:
         from_attributes = True

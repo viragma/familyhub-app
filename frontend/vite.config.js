@@ -1,36 +1,39 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
+import fs from 'fs';
+import path from 'path';
+
+// A .env fájl betöltése a megfelelő helyről
+const envPath = path.resolve(__dirname, '.env');
+const envConfig = fs.existsSync(envPath) ? parseEnv(fs.readFileSync(envPath, 'utf-8')) : {};
+
+function parseEnv(envContent) {
+  const env = {};
+  envContent.split('\n').forEach(line => {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (match) {
+      env[match[1]] = match[2] || '';
+    }
+  });
+  return env;
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    VitePWA({ 
-      registerType: 'autoUpdate',
-      // Mivel a manifestet már itt definiáljuk, a public mappából törölhetjük
-      // a manifest.json-t a későbbi félreértések elkerülése érdekében.
-      manifest: {
-        name: 'FamilyHub',
-        short_name: 'FamilyHub',
-        description: 'Családi Pénzügyi és Menedzsment Platform',
-        start_url: '/',
-        display: 'standalone', // <-- EZ A LEGFONTOSABB SOR
-        background_color: '#f8fafc',
-        theme_color: '#6366f1',
-        icons: [
-          {
-            src: 'icon-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
+  plugins: [react()],
+  server: {
+    // Ez a rész a lényeg!
+    historyApiFallback: true,
+    // Opcionális, de hasznos a hálózaton keresztüli fejlesztéshez
+    host: '0.0.0.0', 
+    port: 5173,
+    // Ha a backend és a frontend más-más porton fut,
+    // a proxy segít elkerülni a CORS hibákat.
+    proxy: {
+      '/api': {
+        target: envConfig.VITE_API_URL || 'http://localhost:8000',
+        changeOrigin: true,
       }
-    })
-  ]
+    }
+  }
 })

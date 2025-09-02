@@ -129,37 +129,43 @@ def delete_user(db: Session, user_id: int):
 def get_account(db: Session, account_id: int, user: models.User):
     account = db.query(models.Account).options(
         selectinload(models.Account.wishes).selectinload(models.Wish.owner),
-        selectinload(models.Account.wishes).selectinload(models.Wish.category)
+        selectinload(models.Account.wishes).selectinload(models.Wish.category),
+        selectinload(models.Account.history_entries).selectinload(models.AccountHistory.user)
     ).filter(models.Account.id == account_id).first()
 
-    if account:
-        visible_accounts = get_accounts_by_family(db, user=user)
-        is_visible = any(acc.id == account.id for acc in visible_accounts)
+    if not account:
+        raise HTTPException(status_code=404, detail="Kassza nem található.")
 
-        if not is_visible:
-            raise HTTPException(status_code=403, detail="Nincs jogosultságod megtekinteni ezt a kasszát.")
+    # A jogosultság ellenőrzéséhez lekérjük az ÖSSZES (aktív és archivált) kasszát, amihez hozzáfér
+    visible_accounts = get_accounts_by_family(db, user=user, status=None)
+    is_visible = any(acc.id == account.id for acc in visible_accounts)
+
+    if not is_visible:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod megtekinteni ezt a kasszát.")
 
     return account
-
-def get_accounts_by_family(db: Session, user: models.User, account_type: Optional[str] = None):
+def get_accounts_by_family(db: Session, user: models.User, account_type: Optional[str] = None, status: Optional[str] = 'active'):
     """
-    Listázza a kasszákat a felhasználó jogosultságai alapján.
-    Képes szűrni kassza típusra is (`account_type`).
+    Listázza a kasszákat jogosultság alapján. Képes szűrni típusra és státuszra.
+    Ha a status=None, akkor minden állapotú kasszát visszaad.
     """
-    # A láthatósági logika alapja ugyanaz marad
     query_options = joinedload(models.Account.owner_user)
+    
+    base_query = db.query(models.Account).options(query_options)
+    # Csak akkor szűrünk státuszra, ha az meg van adva
+    if status:
+        base_query = base_query.filter(models.Account.status == status)
 
-    # ... (a jogosultsági logika innen változatlan)
+    # ... a többi jogosultsági logika változatlan ...
     if user.role == "Családfő":
-        accounts_query = db.query(models.Account).options(query_options).filter(models.Account.family_id == user.family_id)
+        accounts_query = base_query.filter(models.Account.family_id == user.family_id)
     elif user.role == "Szülő":
         children_ids_query = db.query(models.User.id).filter(
             models.User.family_id == user.family_id,
             models.User.role.in_(["Gyerek", "Tizenéves"])
         )
         children_ids = [row[0] for row in children_ids_query.all()]
-
-        accounts_query = db.query(models.Account).options(query_options).filter(
+        accounts_query = base_query.filter(
             models.Account.family_id == user.family_id,
             (
                 (models.Account.type != 'személyes') |
@@ -167,34 +173,30 @@ def get_accounts_by_family(db: Session, user: models.User, account_type: Optiona
                 (models.Account.owner_user_id.in_(children_ids))
             )
         )
-    else: # Gyerek vagy Tizenéves
-        # A gyerekek csak a számukra explicit módon látható kasszákat látják
+    else:
         account_ids = [acc.id for acc in user.visible_accounts]
-        accounts_query = db.query(models.Account).options(query_options).filter(models.Account.id.in_(account_ids))
+        accounts_query = base_query.filter(models.Account.id.in_(account_ids))
 
-    # --- EZ AZ ÚJ RÉSZ ---
-    # Ha a híváskor megadtak típust, itt alkalmazzuk a szűrést
     if account_type:
         accounts_query = accounts_query.filter(models.Account.type == account_type)
-    # ----------------------
 
     accounts = accounts_query.all()
 
-    # A megosztott kasszák hozzáadása (szülők esetén)
     if user.role == "Szülő":
         shared_query = db.query(models.Account).join(models.account_visibility_association).filter(
             models.account_visibility_association.c.user_id == user.id
-        ).options(query_options)
-
+        )
+        if status:
+            shared_query = shared_query.filter(models.Account.status == status)
+        
         if account_type:
             shared_query = shared_query.filter(models.Account.type == account_type)
 
-        shared_accounts = shared_query.all()
+        shared_accounts = shared_query.options(query_options).all()
 
-        # Duplikációk elkerülése
-        account_ids = {acc.id for acc in accounts}
+        account_ids_set = {acc.id for acc in accounts}
         for acc in shared_accounts:
-            if acc.id not in account_ids:
+            if acc.id not in account_ids_set:
                 accounts.append(acc)
 
     return accounts
@@ -1721,6 +1723,7 @@ def submit_wish_for_approval(db: Session, wish_id: int, user: models.User):
 def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.WishApprovalCreate, approver: models.User):
     """
     Feldolgozza a szülői döntést egy kívánságról, de már NEM hoz létre automatikusan kasszát.
+    (JAVÍTOTT VERZIÓ A DUPLIKÁCIÓ ELKERÜLÉSÉRE)
     """
     if approver.role not in ["Családfő", "Szülő"]:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod döntést hozni.")
@@ -1740,7 +1743,6 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
     ).first()
 
     if existing_approval:
-        # Ha korábban módosítást kért, de most dönt, a régi törölhető
         if existing_approval.status == 'modifications_requested':
             db.delete(existing_approval)
             db.flush()
@@ -1761,19 +1763,16 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
     if approval_data.status in ['rejected', 'modifications_requested']:
         db_wish.status = approval_data.status
     elif approval_data.status in ['approved', 'conditional']:
-        # Számoljuk ki, hány jóváhagyás kell
         parents = db.query(models.User).filter(
             models.User.family_id == db_wish.family_id,
             models.User.role.in_(['Családfő', 'Szülő'])
         ).all()
         
-        # A tulajdonos nem szavazhat, így őt nem számoljuk a szülők közé, ha szülő
         approving_parents = [p for p in parents if p.id != db_wish.owner_user_id]
         required_approvals = len(approving_parents)
         if required_approvals == 0 and db_wish.owner.role in ['Szülő', 'Családfő']:
-             required_approvals = 1 # Ha egy szülő a tulaj, akkor csak 1 szavazat kell (a másiké)
+             required_approvals = 1
 
-        # Számoljuk össze a jelenlegi támogató szavazatokat (az újjal együtt)
         current_approvals_count = db.query(models.WishApproval).filter(
             models.WishApproval.wish_id == wish_id,
             models.WishApproval.status.in_(['approved', 'conditional'])
@@ -1781,7 +1780,6 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
 
         is_fully_supported = current_approvals_count >= required_approvals
 
-        # Ha megvan a kellő számú jóváhagyás
         if is_fully_supported:
             has_conditional = db.query(models.WishApproval).filter(
                 models.WishApproval.wish_id == wish_id,
@@ -1791,7 +1789,7 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
             db_wish.status = 'conditional' if has_conditional else 'approved'
             db_wish.approved_at = datetime.utcnow()
             
-            # === A LÉNYEG: NINCS TÖBBÉ AUTOMATIKUS KASSZA LÉTREHOZÁS ===
+            # === A LÉNYEG: Itt már NINCS automatikus kassza létrehozás ===
 
     # Előzmény bejegyzés létrehozása
     notes = f"Döntés: {approval_data.status}."

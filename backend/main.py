@@ -166,14 +166,17 @@ def remove_task_endpoint(task_id: int, db: Session = Depends(get_db)):
     return db_task
 
 # === JAVÍTÁS: HIÁNYZÓ GET VÉGPONT HOZZÁADVA ===
-@app.get("/api/accounts", response_model=list[Account])
+@app.get("/api/accounts", response_model=List[Account])
 def read_accounts(
-    type: Optional[str] = Query(None, description="Filter accounts by type (e.g., 'cél')"),
-    current_user: models.User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    type: Optional[str] = None,
+    status: Optional[str] = 'active', # Új, opcionális paraméter
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
-    """ Listázza a kasszákat, a felhasználó szerepköre alapján és opcionálisan típus szerint szűrve. """
-    return get_accounts_by_family(db, user=current_user, account_type=type)
+    """
+    Listázza a kasszákat típus és státusz alapján a felhasználó jogosultságainak megfelelően.
+    """
+    return get_accounts_by_family(db, user=current_user, account_type=type, status=status)
 
 @app.post("/api/accounts", response_model=Account)
 def create_new_account(

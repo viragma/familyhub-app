@@ -1,0 +1,105 @@
+/* frontend/src/pages/FinancesPage.css */
+
+.finances-page {
+    /* Alapértelmezett elrendezés a pénzügyi oldalnak */
+    padding: 20px;
+    max-width: 1200px; /* Vagy amilyen széles az oldalad */
+    margin: 0 auto;
+}
+
+.finances-tabs-container {
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color); /* Vagy a kívánt elválasztó szín */
+}
+
+.finances-tabs {
+    display: flex;
+    gap: 10px; /* Rések a fülek között */
+}
+
+.finances-tab {
+    background: none;
+    border: none;
+    padding: 12px 20px;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease, border-bottom 0.2s ease;
+    border-bottom: 3px solid transparent; /* Alapértelmezett, átlátszó aláhúzás */
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Ikon és szöveg közötti rés */
+}
+
+.finances-tab:hover {
+    color: var(--text-primary);
+}
+
+.finances-tab.active {
+    color: var(--primary-color); /* Aktív fül kiemelése */
+    border-bottom-color: var(--primary-color); /* Aktív fül aláhúzása */
+}
+
+.tab-icon {
+    font-size: 1.2rem;
+}
+
+.finances-content {
+    margin-top: 20px;
+}
+
+.finances-tab-content {
+    display: none; /* Alapértelmezetten rejtett */
+}
+
+.finances-tab-content.active {
+    display: block; /* Aktív fül látható */
+}
+
+
+/* --- ÚJ STÍLUSOK AZ AKTÍV/ARCHÍV VÁLTÓHOZ --- */
+.view-switcher {
+    display: flex;
+    margin-bottom: 25px; /* Alulról elválasztja a tartalmat */
+    background-color: var(--bg-secondary); /* Enyhén eltérő háttér, mint az oldal */
+    border-radius: var(--border-radius); /* Lekerekített sarkok */
+    padding: 5px; /* Kisebb belső tér */
+    box-shadow: var(--shadow-small); /* Finom árnyék */
+    width: fit-content; /* Csak annyi helyet foglal, amennyi kell */
+    margin-left: auto; /* Jobbra igazítás */
+    margin-right: auto; /* Középre igazítás (ha nincs más eleme a sorban) */
+}
+
+.view-switcher button {
+    flex: 1; /* Egyforma szélességű gombok */
+    background-color: transparent; /* Alapból átlátszó */
+    border: none;
+    padding: 8px 15px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--border-radius-small); /* Kicsit kerekebb gombok */
+    transition: all 0.2s ease;
+    white-space: nowrap; /* Ne törjön sorba a szöveg */
+}
+
+.view-switcher button:hover {
+    color: var(--text-primary);
+    background-color: var(--hover-color); /* Enyhe háttér a hoverhez */
+}
+
+.view-switcher button.active {
+    background-color: var(--primary-color); /* Aktív gomb színe */
+    color: var(--text-on-primary); /* Szöveg színe az aktív gombon */
+    box-shadow: var(--shadow-btn); /* Kiemeli az aktív gombot */
+}
+
+/* Ha használsz FinancialSummaryCard komponenst: */
+.financial-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}

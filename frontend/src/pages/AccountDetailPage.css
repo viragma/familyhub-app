@@ -1,0 +1,104 @@
+/* frontend/src/pages/AccountDetailPage.css */
+
+.archived-header {
+    background: linear-gradient(45deg, var(--bg-secondary), color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary)));
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    text-align: center;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+}
+
+.status-chip {
+    display: inline-block;
+    background-color: var(--accent-primary);
+    color: var(--text-on-primary);
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-top: 1rem;
+    letter-spacing: 0.5px;
+}
+
+.archived-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summary-item {
+    background-color: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border);
+}
+
+.summary-item .label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.summary-item .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.summary-item .value.positive { color: var(--success); }
+.summary-item .value.negative { color: var(--danger); }
+
+
+.history-timeline {
+    position: relative;
+    padding: 1rem 0;
+}
+
+.history-timeline::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: var(--border);
+    border-radius: 2px;
+}
+
+.history-item {
+    position: relative;
+    margin-left: 60px;
+    margin-bottom: 2rem;
+}
+
+.history-icon {
+    position: absolute;
+    left: -40px;
+    top: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background-color: var(--bg-secondary);
+    border: 3px solid var(--border);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.history-content h4 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.history-content p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}

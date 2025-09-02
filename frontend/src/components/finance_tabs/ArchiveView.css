@@ -1,0 +1,93 @@
+/* frontend/src/components/finance_tabs/ArchiveView.css */
+
+.archive-view {
+    padding-top: 1rem;
+}
+
+/* Rács elrendezés a kártyáknak */
+.archived-grid {
+    display: grid;
+    /* Automatikusan annyi oszlopot hoz létre, amennyi elfér, de egy oszlop min. 320px */
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+/* Egyedi kártya stílus az archivált elemeknek */
+.archived-card {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.archived-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.archived-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.archived-card-icon {
+    font-size: 1.5rem;
+    margin-top: 2px;
+    background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+    color: var(--accent-primary);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.archived-card-title-wrapper {
+    flex: 1;
+}
+
+.archived-card-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.archived-card-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.archived-card-footer {
+    margin-top: auto; /* Lenyomja a láblécet a kártya aljára */
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Stílus, ha üres az archívum */
+.empty-archive-message {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: var(--bg-secondary);
+    border-radius: var(--border-radius-lg);
+    border: 1px dashed var(--border);
+}
+
+.empty-archive-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+    opacity: 0.6;
+}
