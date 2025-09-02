@@ -1,12 +1,57 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, TrendingUp, TrendingDown, ArrowUpRight, Search, Filter } from 'lucide-react';
+import { 
+  Plus, 
+  TrendingUp, 
+  TrendingDown, 
+  ArrowUpRight, 
+  Search, 
+  Filter,
+  Eye,
+  EyeOff,
+  PiggyBank,
+  Target,
+  AlertTriangle,
+  Users,
+  User,
+  Home,
+  ChevronDown,
+  Send
+} from 'lucide-react';
 import TransactionModal from '../TransactionModal';
 import TransferModal from '../TransferModal';
 import AccountModal from '../AccountModal';
 
-function SimplifiedFinancesOverview() {
+// Kassza típus ikonok és színek
+const ACCOUNT_TYPES = {
+  'személyes': {
+    icon: <User size={16} />,
+    color: '#4299e1', // Kék
+    bgColor: 'rgba(66, 153, 225, 0.1)',
+    borderColor: '#4299e1'
+  },
+  'közös': {
+    icon: <Home size={16} />,
+    color: '#48bb78', // Zöld
+    bgColor: 'rgba(72, 187, 120, 0.1)',
+    borderColor: '#48bb78'
+  },
+  'cél': {
+    icon: <Target size={16} />,
+    color: '#ed8936', // Narancs
+    bgColor: 'rgba(237, 137, 54, 0.1)',
+    borderColor: '#ed8936'
+  },
+  'vész': {
+    icon: <AlertTriangle size={16} />,
+    color: '#f56565', // Piros
+    bgColor: 'rgba(245, 101, 101, 0.1)',
+    borderColor: '#f56565'
+  }
+};
+
+function ImprovedFinancesOverview() {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -21,10 +66,11 @@ function SimplifiedFinancesOverview() {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [modalConfig, setModalConfig] = useState({ type: '', accountId: null, accountName: '' });
   
-  // Simple filter states
+  // UI states
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('all');
+  const [hideZeroBalances, setHideZeroBalances] = useState(false);
   
   const { user, token, apiUrl } = useAuth();
 
@@ -57,21 +103,138 @@ function SimplifiedFinancesOverview() {
     fetchData();
   }, [fetchData]);
 
-  // Filtered transactions
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      const matchesSearch = !searchTerm || 
-        tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.creator?.display_name?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesAccount = selectedAccountId === 'all' || 
-        tx.account_id?.toString() === selectedAccountId;
-      
-      return matchesSearch && matchesAccount;
-    });
-  }, [transactions, searchTerm, selectedAccountId]);
+  // Kasszák csoportosítása továbbfejlesztett logikával
+  const groupedAccounts = useMemo(() => {
+    if (!user || !Array.isArray(accounts) || accounts.length === 0) return [];
 
-  // Quick action handlers
+    let filteredAccounts = accounts;
+    
+    // Szűrés nulla egyenlegűekre
+    if (hideZeroBalances) {
+      filteredAccounts = filteredAccounts.filter(acc => parseFloat(acc.balance) !== 0);
+    }
+
+    const groups = [];
+    
+    // Saját kasszák (személyes + cél + vész ahol owner = user)
+    const myPersonalAccounts = filteredAccounts.filter(acc => 
+      acc.owner_user_id === user.id && acc.type === 'személyes'
+    );
+    const myGoalAccounts = filteredAccounts.filter(acc => 
+      acc.owner_user_id === user.id && acc.type === 'cél'
+    );
+    const myEmergencyAccounts = filteredAccounts.filter(acc => 
+      acc.owner_user_id === user.id && acc.type === 'vész'
+    );
+
+    // Közös kasszák
+    const commonAccounts = filteredAccounts.filter(acc => acc.type === 'közös');
+
+    // Családtagok kasszái (nem saját)
+    const familyAccountsByOwner = filteredAccounts
+      .filter(acc => acc.owner_user_id !== user.id && acc.owner_user_id !== null)
+      .reduce((acc, current) => {
+        const ownerName = current.owner_user?.display_name || 'Ismeretlen';
+        if (!acc[ownerName]) acc[ownerName] = [];
+        acc[ownerName].push(current);
+        return acc;
+      }, {});
+
+    // Saját kasszák csoportok
+    if (myPersonalAccounts.length > 0) {
+      groups.push({
+        id: 'my-personal',
+        title: 'Saját kasszáim',
+        icon: <User size={20} />,
+        accounts: myPersonalAccounts,
+        priority: 1,
+        isOwner: true
+      });
+    }
+
+    if (myGoalAccounts.length > 0) {
+      groups.push({
+        id: 'my-goals',
+        title: 'Saját céljaim',
+        icon: <Target size={20} />,
+        accounts: myGoalAccounts,
+        priority: 2,
+        isOwner: true
+      });
+    }
+
+    if (myEmergencyAccounts.length > 0) {
+      groups.push({
+        id: 'my-emergency',
+        title: 'Vészkasszáim',
+        icon: <AlertTriangle size={20} />,
+        accounts: myEmergencyAccounts,
+        priority: 3,
+        isOwner: true
+      });
+    }
+
+    // Közös kasszák
+    if (commonAccounts.length > 0) {
+      groups.push({
+        id: 'common',
+        title: 'Közös kasszák', 
+        icon: <Home size={20} />,
+        accounts: commonAccounts,
+        priority: 4,
+        isOwner: false
+      });
+    }
+
+    // Családtagok kasszái
+    Object.entries(familyAccountsByOwner).forEach(([ownerName, ownerAccounts], index) => {
+      groups.push({
+        id: `family-${ownerName}`,
+        title: `${ownerName} kasszái`,
+        icon: <Users size={20} />,
+        accounts: ownerAccounts,
+        priority: 5 + index,
+        isOwner: false
+      });
+    });
+
+    return groups.sort((a, b) => a.priority - b.priority);
+  }, [accounts, user, hideZeroBalances]);
+
+  // Összecsukható csoportok kezelése
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile && groupedAccounts.length > 1) {
+        // Mobil nézetben az első csoport kivételével mindent összecsukunk
+        const toCollapse = groupedAccounts.slice(1).map(group => group.id);
+        setCollapsedGroups(new Set(toCollapse));
+      } else if (!isMobile) {
+        // Asztali nézetben mindent kinyitunk
+        setCollapsedGroups(new Set());
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [groupedAccounts]);
+  
+  const toggleGroup = (groupId) => {
+    setCollapsedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
+
+  // Modal handlers (ugyanazok mint előtte)
   const openModalForNew = (type, accountId, accountName) => {
     setEditingTransaction(null);
     setModalConfig({ type, accountId, accountName });
@@ -166,132 +329,19 @@ function SimplifiedFinancesOverview() {
     }
   };
 
-  // Kasszák csoportosítása
-  const groupedAccounts = useMemo(() => {
-    if (!user || !Array.isArray(accounts) || accounts.length === 0) return [];
-
-    const groups = [];
-    
-    // Saját kasszák
-    const myAccounts = accounts.filter(acc => acc.owner_user_id === user.id && acc.type !== 'cél');
-    if (myAccounts.length > 0) {
-      groups.push({
-        id: 'my-accounts',
-        title: 'Saját kasszáim',
-        icon: '👤',
-        accounts: myAccounts,
-        priority: 1
-      });
-    }
-
-    // Közös kasszák
-    const commonAccounts = accounts.filter(acc => acc.type === 'közös');
-    if (commonAccounts.length > 0) {
-      groups.push({
-        id: 'common-accounts', 
-        title: 'Közös kasszák',
-        icon: '🏠',
-        accounts: commonAccounts,
-        priority: 2
-      });
-    }
-
-    // Cél kasszák
-    const goalAccounts = accounts.filter(acc => acc.type === 'cél');
-    if (goalAccounts.length > 0) {
-      // Cél kasszák tulajdonos szerint csoportosítva
-      const goalsByOwner = goalAccounts.reduce((acc, current) => {
-        const ownerName = current.owner_user?.display_name || 'Ismeretlen';
-        const isMyGoal = current.owner_user_id === user.id;
-        const key = isMyGoal ? 'Saját céljaim' : `${ownerName} céljai`;
-        
-        if (!acc[key]) {
-          acc[key] = {
-            id: `goals-${isMyGoal ? 'my' : current.owner_user_id}`,
-            title: key,
-            icon: isMyGoal ? '🎯' : '👥',
-            accounts: [],
-            priority: isMyGoal ? 3 : 4
-          };
-        }
-        acc[key].accounts.push(current);
-        return acc;
-      }, {});
-
-      groups.push(...Object.values(goalsByOwner));
-    }
-
-    // Vész kasszák
-    const emergencyAccounts = accounts.filter(acc => acc.type === 'vész');
-    if (emergencyAccounts.length > 0) {
-      groups.push({
-        id: 'emergency-accounts',
-        title: 'Vészkasszák', 
-        icon: '🚨',
-        accounts: emergencyAccounts,
-        priority: 5
-      });
-    }
-
-    // Más családtagok kasszái (személyes)
-    const otherPersonalAccounts = accounts.filter(acc => 
-      acc.type === 'személyes' && acc.owner_user_id !== user.id
-    );
-    
-    if (otherPersonalAccounts.length > 0) {
-      const otherAccountsByOwner = otherPersonalAccounts.reduce((acc, current) => {
-        const ownerName = current.owner_user?.display_name || 'Ismeretlen';
-        if (!acc[ownerName]) {
-          acc[ownerName] = {
-            id: `other-${current.owner_user_id}`,
-            title: `${ownerName} kasszái`,
-            icon: '👶',
-            accounts: [],
-            priority: 6
-          };
-        }
-        acc[ownerName].accounts.push(current);
-        return acc;
-      }, {});
-
-      groups.push(...Object.values(otherAccountsByOwner));
-    }
-
-    return groups.sort((a, b) => a.priority - b.priority);
-  }, [accounts, user]);
-
-  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
-  
-  // Mobil nézetben alapból összecsukjuk a nem első csoportokat
-  useEffect(() => {
-    const handleResize = () => {
-      const isMobile = window.innerWidth <= 768;
-      if (isMobile && groupedAccounts.length > 1) {
-        // Mobil nézetben az első csoport kivételével mindent összecsukunk
-        const toCollapse = groupedAccounts.slice(1).map(group => group.id);
-        setCollapsedGroups(new Set(toCollapse));
-      } else if (!isMobile) {
-        // Asztali nézetben mindent kinyitunk
-        setCollapsedGroups(new Set());
-      }
-    };
-
-    handleResize(); // Kezdeti beállítás
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [groupedAccounts]);
-  
-  const toggleGroup = (groupId) => {
-    setCollapsedGroups(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(groupId)) {
-        newSet.delete(groupId);
-      } else {
-        newSet.add(groupId);
-      }
-      return newSet;
+  // Filtered transactions
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(tx => {
+      const matchesSearch = !searchTerm || 
+        tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tx.creator?.display_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesAccount = selectedAccountId === 'all' || 
+        tx.account_id?.toString() === selectedAccountId;
+      
+      return matchesSearch && matchesAccount;
     });
-  };
+  }, [transactions, searchTerm, selectedAccountId]);
 
   const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || 0), 0);
   const myPersonalAccount = accounts.find(acc => acc.owner_user_id === user?.id && acc.type === 'személyes');
@@ -306,9 +356,9 @@ function SimplifiedFinancesOverview() {
   }
 
   return (
-    <div className="simplified-finances">
-      {/* Egyenleg áttekintő */}
-      <div className="balance-overview-card">
+    <div className="improved-finances">
+      {/* Egyenleg áttekintő fejlesztett verzió */}
+      <div className="balance-overview-enhanced">
         <div className="balance-main">
           <h2 className="balance-title">Teljes egyenleg</h2>
           <div className="balance-amount-large">
@@ -324,211 +374,275 @@ function SimplifiedFinancesOverview() {
             </span>
           </div>
         )}
-      </div>
 
-      {/* Gyors műveletek */}
-      <div className="quick-actions-simple">
-        <h3 className="section-title">
-          <span className="title-icon">⚡</span>
-          Gyors műveletek
-        </h3>
-        
-        <div className="actions-grid">
+        {/* Gyors műveletek panel */}
+        <div className="quick-actions-enhanced">
           <button 
-            className="action-card income"
+            className="quick-action-btn income"
             onClick={() => myPersonalAccount && openModalForNew('bevétel', myPersonalAccount.id, myPersonalAccount.name)}
             disabled={!myPersonalAccount}
           >
-            <TrendingUp size={24} />
+            <TrendingUp size={20} />
             <span>Bevétel</span>
           </button>
           
           <button 
-            className="action-card expense"
+            className="quick-action-btn expense"
             onClick={() => myPersonalAccount && openModalForNew('kiadás', myPersonalAccount.id, myPersonalAccount.name)}
             disabled={!myPersonalAccount}
           >
-            <TrendingDown size={24} />
+            <TrendingDown size={20} />
             <span>Kiadás</span>
           </button>
           
           <button 
-            className="action-card transfer"
+            className="quick-action-btn transfer"
             onClick={() => myPersonalAccount && openTransferModal(myPersonalAccount)}
             disabled={!myPersonalAccount}
           >
-            <ArrowUpRight size={24} />
+            <Send size={20} />
             <span>Átutalás</span>
           </button>
           
           <button 
-            className="action-card new-account"
+            className="quick-action-btn new-account"
             onClick={() => setIsAccountModalOpen(true)}
           >
-            <Plus size={24} />
+            <Plus size={20} />
             <span>Új kassza</span>
           </button>
         </div>
       </div>
 
-      {/* Kasszák csoportok szerint */}
-      <div className="accounts-simple">
-        <h3 className="section-title">
-          <span className="title-icon">💰</span>
-          Kasszáim ({accounts.length})
-        </h3>
-        
-        <div className="account-groups">
-          {groupedAccounts.map(group => (
-            <div key={group.id} className="account-group-section">
-              <div 
-                className="group-header"
-                onClick={() => toggleGroup(group.id)}
-              >
-                <div className="group-header-left">
-                  <span className="group-icon">{group.icon}</span>
-                  <span className="group-title">{group.title}</span>
-                  <span className="group-count">({group.accounts.length})</span>
-                </div>
-                <div className={`group-toggle ${collapsedGroups.has(group.id) ? 'collapsed' : ''}`}>
-                  ▼
-                </div>
-              </div>
-              
-              <div className={`group-content ${collapsedGroups.has(group.id) ? 'collapsed' : ''}`}>
-                <div className="accounts-list">
-                  {group.accounts.map(account => {
-                    const isGoal = account.type === 'cél';
-                    const progress = isGoal && account.goal_amount > 0 
-                      ? (parseFloat(account.balance) / parseFloat(account.goal_amount)) * 100 
-                      : 0;
-                    
-                    return (
-                      <div 
-                        key={account.id} 
-                        className="account-item-simple"
-                        onClick={() => navigate(`/finances/account/${account.id}`)}
-                      >
-                        <div className="account-info">
-                          <div className="account-header">
-                            <span className="account-name">{account.name}</span>
-                            <div className="account-badges">
-                              <span className={`account-type-tag ${account.type}`}>
-                                {account.type}
-                              </span>
-                              {account.owner_user && account.owner_user_id !== user?.id && (
-                                <span className="owner-badge">
-                                  {account.owner_user.display_name}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="account-balance">
-                            {parseFloat(account.balance).toLocaleString('hu-HU')} Ft
-                          </div>
-                          
-                          {isGoal && account.goal_amount && (
-                            <div className="goal-progress-simple">
-                              <div className="progress-text">
-                                Cél: {parseFloat(account.goal_amount).toLocaleString('hu-HU')} Ft • {progress.toFixed(0)}%
-                              </div>
-                              <div className="progress-bar-simple">
-                                <div 
-                                  className="progress-fill-simple" 
-                                  style={{ width: `${Math.min(progress, 100)}%` }}
-                                />
-                              </div>
-                              {account.goal_date && (
-                                <div className="goal-deadline">
-                                  Határidő: {new Date(account.goal_date).toLocaleDateString('hu-HU')}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {groupedAccounts.length === 0 && (
-            <div className="empty-accounts">
-              <p>Még nincsenek kasszáid. Hozz létre egyet!</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Legutóbbi tranzakciók */}
-      <div className="recent-transactions">
-        <div className="transactions-header-simple">
+      {/* Szűrők és beállítások */}
+      <div className="accounts-controls">
+        <div className="controls-header">
           <h3 className="section-title">
-            <span className="title-icon">📝</span>
-            Legutóbbi tranzakciók
+            <PiggyBank size={24} />
+            Kasszáim ({accounts.length})
           </h3>
           
-          <button 
-            className="filter-toggle"
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter size={16} />
-            {showFilters ? 'Bezár' : 'Szűrő'}
-          </button>
+          <div className="controls-actions">
+            <button 
+              className="control-btn"
+              onClick={() => setHideZeroBalances(!hideZeroBalances)}
+              title={hideZeroBalances ? "Nulla egyenlegűek mutatása" : "Nulla egyenlegűek elrejtése"}
+            >
+              {hideZeroBalances ? <Eye size={16} /> : <EyeOff size={16} />}
+            </button>
+            
+            <button 
+              className="control-btn"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter size={16} />
+              {showFilters ? 'Bezár' : 'Szűrő'}
+            </button>
+          </div>
         </div>
-        
+
         {showFilters && (
-          <div className="simple-filters">
-            <div className="search-box">
+          <div className="simple-filters-enhanced">
+            <div className="search-box-enhanced">
               <Search size={16} />
               <input
                 type="text"
                 placeholder="Keresés..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input-simple"
+                className="search-input-enhanced"
               />
             </div>
-            
-            <select 
-              className="account-filter"
-              value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-            >
-              <option value="all">Minden kassza</option>
-              {accounts.map(acc => (
-                <option key={acc.id} value={acc.id}>{acc.name}</option>
-              ))}
-            </select>
           </div>
         )}
+      </div>
+
+      {/* Kasszák csoportok szerint fejlesztett nézet */}
+      <div className="account-groups-enhanced">
+        {groupedAccounts.map(group => (
+          <div key={group.id} className="account-group-enhanced">
+            <div 
+              className="group-header-enhanced"
+              onClick={() => toggleGroup(group.id)}
+            >
+              <div className="group-header-left-enhanced">
+                <span className="group-icon-enhanced">{group.icon}</span>
+                <span className="group-title-enhanced">{group.title}</span>
+                <span className="group-count-enhanced">({group.accounts.length})</span>
+                <span className="group-total-enhanced">
+                  {group.accounts.reduce((sum, acc) => sum + parseFloat(acc.balance), 0).toLocaleString('hu-HU')} Ft
+                </span>
+              </div>
+              <div className={`group-toggle-enhanced ${collapsedGroups.has(group.id) ? 'collapsed' : ''}`}>
+                <ChevronDown size={16} />
+              </div>
+            </div>
+            
+            <div className={`group-content-enhanced ${collapsedGroups.has(group.id) ? 'collapsed' : ''}`}>
+              <div className="accounts-grid-enhanced">
+                {group.accounts.map(account => {
+                  const accountType = ACCOUNT_TYPES[account.type] || ACCOUNT_TYPES['személyes'];
+                  const isGoal = account.type === 'cél';
+                  const progress = isGoal && account.goal_amount > 0 
+                    ? (parseFloat(account.balance) / parseFloat(account.goal_amount)) * 100 
+                    : 0;
+                  const canTransferTo = isGoal; // Cél kasszákba lehet utalni
+                  const canTransferFrom = user && (user.role === 'Családfő' || user.role === 'Szülő' || user.id === account.owner_user_id);
+                  
+                  return (
+                    <div 
+                      key={account.id} 
+                      className="account-card-enhanced"
+                      onClick={() => navigate(`/finances/account/${account.id}`)}
+                      style={{
+                        borderLeft: `4px solid ${accountType.borderColor}`
+                      }}
+                    >
+                      <div className="account-header-enhanced">
+                        <div className="account-title-section">
+                          <h4 className="account-name-enhanced">{account.name}</h4>
+                          <div 
+                            className="account-type-badge-enhanced"
+                            style={{
+                              backgroundColor: accountType.bgColor,
+                              color: accountType.color,
+                              border: `1px solid ${accountType.borderColor}`
+                            }}
+                          >
+                            {accountType.icon}
+                            <span>{account.type}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="account-balance-enhanced">
+                          {parseFloat(account.balance).toLocaleString('hu-HU')} Ft
+                        </div>
+                      </div>
+                      
+                      {isGoal && account.goal_amount && (
+                        <div className="goal-progress-enhanced">
+                          <div className="progress-info-enhanced">
+                            <span className="goal-target">Cél: {parseFloat(account.goal_amount).toLocaleString('hu-HU')} Ft</span>
+                            <span className="progress-percentage-enhanced" style={{ color: accountType.color }}>
+                              {progress.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="progress-bar-enhanced">
+                            <div 
+                              className="progress-fill-enhanced" 
+                              style={{ 
+                                width: `${Math.min(progress, 100)}%`,
+                                backgroundColor: accountType.color
+                              }}
+                            />
+                          </div>
+                          {account.goal_date && (
+                            <div className="goal-deadline-enhanced">
+                              Határidő: {new Date(account.goal_date).toLocaleDateString('hu-HU')}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {account.owner_user && account.owner_user_id !== user?.id && (
+                        <div className="account-owner-enhanced">
+                          <User size={14} />
+                          <span>{account.owner_user.display_name}</span>
+                        </div>
+                      )}
+
+                      <div className="account-actions-enhanced" onClick={e => e.stopPropagation()}>
+                        {account.type !== 'közös' && !isGoal && (
+                          <>
+                            <button 
+                              className="action-btn-enhanced income" 
+                              onClick={(e) => { e.stopPropagation(); openModalForNew('bevétel', account.id, account.name); }}
+                              title="Bevétel hozzáadása"
+                            >
+                              <TrendingUp size={16} />
+                            </button>
+                            <button 
+                              className="action-btn-enhanced expense" 
+                              onClick={(e) => { e.stopPropagation(); openModalForNew('kiadás', account.id, account.name); }}
+                              title="Kiadás hozzáadása"
+                            >
+                              <TrendingDown size={16} />
+                            </button>
+                          </>
+                        )}
+                        
+                        {/* Átutalás CÉL kasszákBA */}
+                        {canTransferTo && (
+                          <button 
+                            className="action-btn-enhanced transfer-to" 
+                            onClick={(e) => { e.stopPropagation(); openTransferModal(myPersonalAccount); }}
+                            title="Átutalás ebbe a célkasszába"
+                            disabled={!myPersonalAccount}
+                          >
+                            <ArrowUpRight size={16} />
+                          </button>
+                        )}
+                        
+                        {/* Átutalás kasszából (nem cél kasszák esetén) */}
+                        {!isGoal && canTransferFrom && (
+                          <button 
+                            className="action-btn-enhanced transfer-from" 
+                            onClick={(e) => { e.stopPropagation(); openTransferModal(account); }}
+                            title="Átutalás ebből a kasszából"
+                          >
+                            <Send size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ))}
         
-        <div className="transactions-list-simple">
+        {groupedAccounts.length === 0 && (
+          <div className="empty-accounts-enhanced">
+            <PiggyBank size={48} />
+            <h3>Még nincsenek kasszáid</h3>
+            <p>Hozz létre az első kasszádat a gombbal fent!</p>
+          </div>
+        )}
+      </div>
+
+      {/* Legutóbbi tranzakciók egyszerűsített verzió */}
+      <div className="recent-transactions-enhanced">
+        <div className="transactions-header-enhanced">
+          <h3 className="section-title">
+            <TrendingUp size={24} />
+            Legutóbbi tranzakciók
+          </h3>
+        </div>
+        
+        <div className="transactions-list-enhanced">
           {filteredTransactions.length === 0 ? (
-            <div className="empty-transactions-simple">
+            <div className="empty-transactions-enhanced">
               <span>Nincsenek tranzakciók</span>
             </div>
           ) : (
-            filteredTransactions.slice(0, 10).map(tx => (
-              <div key={tx.id} className="transaction-item-simple">
-                <div className={`transaction-icon-simple ${tx.type}`}>
-                  {tx.type === 'bevétel' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+            filteredTransactions.slice(0, 5).map(tx => (
+              <div key={tx.id} className="transaction-item-enhanced">
+                <div className={`transaction-icon-enhanced ${tx.type}`}>
+                  {tx.type === 'bevétel' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                 </div>
                 
-                <div className="transaction-details-simple">
-                  <div className="transaction-description">
+                <div className="transaction-details-enhanced">
+                  <div className="transaction-description-enhanced">
                     {tx.description || 'Nincs leírás'}
                   </div>
-                  <div className="transaction-meta-simple">
+                  <div className="transaction-meta-enhanced">
                     {tx.creator?.display_name} • {new Date(tx.date).toLocaleDateString('hu-HU')}
                     {tx.category && ` • ${tx.category.name}`}
                   </div>
                 </div>
                 
-                <div className={`transaction-amount-simple ${tx.type}`}>
+                <div className={`transaction-amount-enhanced ${tx.type}`}>
                   {tx.type === 'bevétel' ? '+' : '-'}
                   {parseFloat(tx.amount).toLocaleString('hu-HU')} Ft
                 </div>
@@ -537,9 +651,9 @@ function SimplifiedFinancesOverview() {
           )}
         </div>
         
-        {filteredTransactions.length > 10 && (
-          <div className="show-more-simple">
-            <span>...és még {filteredTransactions.length - 10} tranzakció</span>
+        {filteredTransactions.length > 5 && (
+          <div className="show-more-enhanced">
+            <span>...és még {filteredTransactions.length - 5} tranzakció</span>
           </div>
         )}
       </div>
@@ -573,4 +687,4 @@ function SimplifiedFinancesOverview() {
   );
 }
 
-export default SimplifiedFinancesOverview;
+export default ImprovedFinancesOverview;

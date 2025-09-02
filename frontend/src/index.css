@@ -3567,429 +3567,185 @@ body {
   }
 }
 
-/* Simplified Finances Overview Styles */
+/* Enhanced Finances Overview Styles - PWA Optimized */
 
-.simplified-finances {
+.improved-finances {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  max-width: 1000px;
+  gap: 1.5rem;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 1rem;
 }
 
-/* Balance Overview Card */
-.balance-overview-card {
-  background: var(--bg-secondary);
-  border-radius: 20px;
+/* ===== ENHANCED BALANCE OVERVIEW ===== */
+.balance-overview-enhanced {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  border-radius: 24px;
   padding: 2rem;
-  border: 1px solid var(--border);
-  text-align: center;
-  box-shadow: var(--shadow-md);
+  color: white;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-xl);
 }
 
-.balance-overview-card::before {
+.balance-overview-enhanced::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--accent-gradient);
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  animation: float 8s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+}
+
+.balance-main {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin-bottom: 1.5rem;
 }
 
 .balance-title {
   font-size: 1.1rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  opacity: 0.9;
   margin: 0 0 0.5rem 0;
 }
 
 .balance-amount-large {
   font-size: 2.5rem;
   font-weight: 800;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
   margin-bottom: 1rem;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .personal-balance {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: var(--bg-primary);
-  border-radius: 12px;
-  font-size: 0.9rem;
+  background: rgba(255,255,255,0.15);
+  border-radius: 16px;
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(10px);
 }
 
 .personal-label {
-  color: var(--text-secondary);
+  opacity: 0.9;
 }
 
 .personal-amount {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Section Titles */
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 1.25rem;
   font-weight: 700;
-  margin: 0 0 1rem 0;
-  color: var(--text-primary);
 }
 
-.title-icon {
-  font-size: 1.5rem;
-}
-
-/* Quick Actions */
-.quick-actions-simple {
-  background: var(--bg-secondary);
-  border-radius: 20px;
-  padding: 1.5rem;
-  border: 1px solid var(--border);
-}
-
-.actions-grid {
+/* ===== ENHANCED QUICK ACTIONS ===== */
+.quick-actions-enhanced {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  position: relative;
+  z-index: 1;
 }
 
-.action-card {
+.quick-action-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem 1rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(255,255,255,0.15);
+  border: none;
   border-radius: 16px;
+  color: white;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-weight: 500;
-  text-decoration: none;
-  color: var(--text-primary);
-  min-height: 100px;
-  justify-content: center;
+  backdrop-filter: blur(10px);
+  font-weight: 600;
 }
 
-.action-card:disabled {
+.quick-action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.25);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.quick-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.action-card:not(:disabled):hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-.action-card.income:hover {
-  border-color: var(--success);
-  color: var(--success);
-}
-
-.action-card.expense:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.action-card.transfer:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-}
-
-.action-card.new-account:hover {
-  border-color: var(--accent-secondary);
-  color: var(--accent-secondary);
-}
-
-/* Accounts List */
-.accounts-simple {
+/* ===== ACCOUNTS CONTROLS ===== */
+.accounts-controls {
   background: var(--bg-secondary);
   border-radius: 20px;
   padding: 1.5rem;
   border: 1px solid var(--border);
 }
 
-.account-name {
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-
-.account-type-tag {
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.account-type-tag.személyes {
-  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-  color: var(--accent-primary);
-}
-
-.account-type-tag.közös {
-  background: color-mix(in srgb, var(--success) 15%, transparent);
-  color: var(--success);
-}
-
-.account-type-tag.cél {
-  background: color-mix(in srgb, var(--accent-secondary) 15%, transparent);
-  color: var(--accent-secondary);
-}
-
-.account-type-tag.vész {
-  background: color-mix(in srgb, var(--danger) 15%, transparent);
-  color: var(--danger);
-}
-
-.account-balance {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-}
-
-.goal-progress-simple {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
-}
-
-.progress-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.progress-bar-simple {
-  height: 8px;
-  background: var(--bg-primary);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.progress-fill-simple {
-  height: 100%;
-  background: var(--accent-gradient);
-  border-radius: 10px;
-  transition: width 0.5s ease;
-}
-
-/* Accounts Groups */
-.account-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.account-group-section {
-  background: var(--bg-primary);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.group-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  background: var(--bg-primary);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.group-header:hover {
-  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
-}
-
-.group-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.group-icon {
-  font-size: 1.25rem;
-}
-
-.group-title {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 1.1rem;
-}
-
-.group-count {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-}
-
-.group-toggle {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  transition: transform 0.3s ease;
-  user-select: none;
-}
-
-.group-toggle.collapsed {
-  transform: rotate(-90deg);
-}
-
-.group-content {
-  max-height: 1000px;
-  overflow: hidden;
-  transition: max-height 0.4s ease-in-out;
-}
-
-.group-content.collapsed {
-  max-height: 0;
-  border-top: none;
-}
-
-.accounts-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-}
-
-.account-item-simple {
-  background: var(--bg-secondary);
-  padding: 1.25rem 1.5rem;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.account-item-simple:last-child {
-  border-bottom: none;
-}
-
-.account-item-simple:hover {
-  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary));
-  transform: translateX(4px);
-}
-
-.account-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0.75rem;
-  gap: 1rem;
-}
-
-.account-badges {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.owner-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: color-mix(in srgb, var(--accent-secondary) 15%, transparent);
-  color: var(--accent-secondary);
-  border: 1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent);
-}
-
-.goal-deadline {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: 0.25rem;
-}
-
-.empty-accounts {
-  text-align: center;
-  padding: 3rem 1.5rem;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-/* Recent Transactions */
-.recent-transactions {
-  background: var(--bg-secondary);
-  border-radius: 20px;
-  padding: 1.5rem;
-  border: 1px solid var(--border);
-}
-
-.transactions-header-simple {
+.controls-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
 }
 
-.filter-toggle {
+.controls-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.control-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 0.875rem;
   color: var(--text-secondary);
   transition: all 0.3s ease;
 }
 
-.filter-toggle:hover {
+.control-btn:hover {
   color: var(--text-primary);
   border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
 }
 
-.simple-filters {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
+.simple-filters-enhanced {
   padding: 1rem;
   background: var(--bg-primary);
   border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
-.search-box {
+.search-box-enhanced {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  padding: 0.5rem;
+  gap: 0.75rem;
+  padding: 0.75rem;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
-.search-box svg {
+.search-box-enhanced svg {
   color: var(--text-secondary);
   flex-shrink: 0;
 }
 
-.search-input-simple {
+.search-input-enhanced {
   border: none;
   background: none;
   outline: none;
@@ -3998,40 +3754,321 @@ body {
   font-size: 0.875rem;
 }
 
-.search-input-simple::placeholder {
+.search-input-enhanced::placeholder {
   color: var(--text-secondary);
 }
 
-.account-filter {
-  padding: 0.5rem;
+/* ===== ENHANCED ACCOUNT GROUPS ===== */
+.account-groups-enhanced {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.account-group-enhanced {
   background: var(--bg-secondary);
+  border-radius: 20px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 0.875rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.group-header-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-primary);
   cursor: pointer;
+  transition: all 0.3s ease;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
-.account-filter:focus {
-  outline: none;
-  border-color: var(--accent-primary);
+.group-header-enhanced:hover {
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
 }
 
-/* Transactions List */
-.transactions-list-simple {
+.group-header-left-enhanced {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.group-icon-enhanced {
+  color: var(--accent-primary);
+}
+
+.group-title-enhanced {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+}
+
+.group-count-enhanced {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.group-total-enhanced {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+}
+
+.group-toggle-enhanced {
+  color: var(--text-secondary);
+  transition: transform 0.3s ease;
+  padding: 0.25rem;
+  border-radius: 6px;
+}
+
+.group-toggle-enhanced:hover {
+  background: var(--bg-secondary);
+}
+
+.group-toggle-enhanced.collapsed {
+  transform: rotate(-90deg);
+}
+
+.group-content-enhanced {
+  max-height: 2000px;
+  overflow: hidden;
+  transition: max-height 0.4s ease-in-out, padding 0.4s ease-in-out;
+  padding: 1.5rem;
+}
+
+.group-content-enhanced.collapsed {
+  max-height: 0;
+  padding: 0 1.5rem;
+}
+
+.accounts-grid-enhanced {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+/* ===== ENHANCED ACCOUNT CARDS ===== */
+.account-card-enhanced {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.account-card-enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.account-header-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.account-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.account-name-enhanced {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.account-type-badge-enhanced {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.account-balance-enhanced {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+/* ===== GOAL PROGRESS ENHANCED ===== */
+.goal-progress-enhanced {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.progress-info-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.goal-target {
+  color: var(--text-secondary);
+}
+
+.progress-percentage-enhanced {
+  font-weight: 700;
+}
+
+.progress-bar-enhanced {
+  height: 12px;
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill-enhanced {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.5s ease;
+}
+
+.goal-deadline-enhanced {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ===== ACCOUNT OWNER ===== */
+.account-owner-enhanced {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* ===== ENHANCED ACCOUNT ACTIONS ===== */
+.account-actions-enhanced {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.action-btn-enhanced {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  font-size: 0.875rem;
+}
+
+.action-btn-enhanced.income {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+}
+
+.action-btn-enhanced.income:hover {
+  background: var(--success);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.action-btn-enhanced.expense {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.action-btn-enhanced.expense:hover {
+  background: var(--danger);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.action-btn-enhanced.transfer-to,
+.action-btn-enhanced.transfer-from {
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.action-btn-enhanced.transfer-to:hover,
+.action-btn-enhanced.transfer-from:hover {
+  background: var(--accent-primary);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.action-btn-enhanced:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn-enhanced:disabled:hover {
+  transform: none;
+}
+
+/* ===== ENHANCED RECENT TRANSACTIONS ===== */
+.recent-transactions-enhanced {
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.transactions-header-enhanced {
+  margin-bottom: 1rem;
+}
+
+.transactions-list-enhanced {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.empty-transactions-simple {
+.empty-transactions-enhanced {
   text-align: center;
   padding: 2rem;
   color: var(--text-secondary);
   font-style: italic;
 }
 
-.transaction-item-simple {
+.transaction-item-enhanced {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -4042,12 +4079,12 @@ body {
   transition: all 0.3s ease;
 }
 
-.transaction-item-simple:hover {
+.transaction-item-enhanced:hover {
   background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
   border-color: var(--accent-primary);
 }
 
-.transaction-icon-simple {
+.transaction-icon-enhanced {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -4057,23 +4094,23 @@ body {
   flex-shrink: 0;
 }
 
-.transaction-icon-simple.bevétel {
+.transaction-icon-enhanced.bevétel {
   background: color-mix(in srgb, var(--success) 15%, transparent);
   color: var(--success);
 }
 
-.transaction-icon-simple.kiadás {
+.transaction-icon-enhanced.kiadás {
   background: color-mix(in srgb, var(--danger) 15%, transparent);
   color: var(--danger);
 }
 
-.transaction-details-simple {
+.transaction-details-enhanced {
   flex: 1;
   min-width: 0;
 }
 
-.transaction-description {
-  font-weight: 500;
+.transaction-description-enhanced {
+  font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 0.25rem;
   white-space: nowrap;
@@ -4081,26 +4118,26 @@ body {
   text-overflow: ellipsis;
 }
 
-.transaction-meta-simple {
+.transaction-meta-enhanced {
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
-.transaction-amount-simple {
+.transaction-amount-enhanced {
   font-size: 1rem;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.transaction-amount-simple.bevétel {
+.transaction-amount-enhanced.bevétel {
   color: var(--success);
 }
 
-.transaction-amount-simple.kiadás {
+.transaction-amount-enhanced.kiadás {
   color: var(--text-primary);
 }
 
-.show-more-simple {
+.show-more-enhanced {
   text-align: center;
   padding: 1rem;
   color: var(--text-secondary);
@@ -4108,14 +4145,36 @@ body {
   font-style: italic;
 }
 
-/* Mobile Responsive */
+/* ===== EMPTY STATE ===== */
+.empty-accounts-enhanced {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-secondary);
+}
+
+.empty-accounts-enhanced svg {
+  margin-bottom: 1rem;
+  color: var(--accent-primary);
+}
+
+.empty-accounts-enhanced h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.empty-accounts-enhanced p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* ===== RESPONSIVE DESIGN - PWA OPTIMIZED ===== */
 @media (max-width: 768px) {
-  .simplified-finances {
-    gap: 1.5rem;
+  .improved-finances {
+    gap: 1rem;
     padding: 0 0.5rem;
   }
   
-  .balance-overview-card {
+  .balance-overview-enhanced {
     padding: 1.5rem;
   }
   
@@ -4123,97 +4182,142 @@ body {
     font-size: 2rem;
   }
   
-  .actions-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
+  .quick-actions-enhanced {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
   }
   
-  .action-card {
-    padding: 1rem 0.75rem;
-    min-height: 80px;
+  .quick-action-btn {
+    flex-direction: row;
+    justify-content: center;
+    padding: 0.875rem;
   }
   
-  .simple-filters {
-    flex-direction: column;
-    gap: 0.75rem;
+  .accounts-controls {
+    padding: 1rem;
   }
   
-  .transaction-item-simple {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  
-  .transaction-icon-simple {
-    align-self: center;
-  }
-  
-  .transaction-details-simple {
-    width: 100%;
-    text-align: center;
-  }
-  
-  .transaction-amount-simple {
-    align-self: center;
-    font-size: 1.1rem;
-  }
-  
-  .transactions-header-simple {
+  .controls-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
   
-  .section-title {
-    font-size: 1.1rem;
+  .accounts-grid-enhanced {
+    grid-template-columns: 1fr;
   }
   
-  /* Mobile Group Adjustments */
-  .group-header {
-    padding: 0.875rem 1rem;
-  }
-  
-  .group-header-left {
-    gap: 0.5rem;
-  }
-  
-  .group-title {
-    font-size: 1rem;
-  }
-  
-  .account-item-simple {
-    padding: 1rem;
-  }
-  
-  .account-header {
+  .account-header-enhanced {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
   }
   
-  .account-badges {
-    justify-content: flex-start;
-    width: 100%;
+  .account-balance-enhanced {
+    text-align: left;
+    font-size: 1.25rem;
   }
   
-  .account-balance {
-    font-size: 1.25rem;
+  .account-actions-enhanced {
+    flex-wrap: wrap;
+  }
+  
+  .action-btn-enhanced {
+    min-width: calc(50% - 0.25rem);
+    flex: none;
+  }
+  
+  .group-header-enhanced {
+    padding: 1rem;
+  }
+  
+  .group-header-left-enhanced {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .group-content-enhanced {
+    padding: 1rem;
+  }
+  
+  .group-content-enhanced.collapsed {
+    padding: 0 1rem;
+  }
+  
+  .transaction-item-enhanced {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .transaction-icon-enhanced {
+    align-self: center;
+  }
+  
+  .transaction-details-enhanced {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .transaction-amount-enhanced {
+    align-self: center;
+    font-size: 1.1rem;
   }
 }
 
 @media (max-width: 480px) {
-  .actions-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .account-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+  .balance-overview-enhanced {
+    padding: 1rem;
   }
   
   .personal-balance {
     flex-direction: column;
     text-align: center;
   }
+  
+  .group-total-enhanced {
+    display: none;
+  }
+  
+  .account-actions-enhanced {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-btn-enhanced {
+    min-width: auto;
+  }
+}
+
+/* ===== TOUCH OPTIMIZATION ===== */
+@media (pointer: coarse) {
+  .quick-action-btn,
+  .control-btn,
+  .action-btn-enhanced,
+  .group-header-enhanced {
+    min-height: 44px;
+  }
+  
+  .account-card-enhanced {
+    padding: 1.5rem;
+  }
+  
+  .transaction-item-enhanced {
+    padding: 1.25rem;
+  }
+}
+
+/* ===== HIGH DPI OPTIMIZATION ===== */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .balance-overview-enhanced::before {
+    background-size: 50% 50%;
+  }
+}
+
+/* ===== DARK MODE OPTIMIZATIONS ===== */
+[data-theme="dark"] .account-card-enhanced:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .balance-overview-enhanced {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
