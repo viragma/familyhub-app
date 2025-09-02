@@ -1476,6 +1476,10 @@ def get_categories_tree(db: Session):
     ).filter(models.Category.parent_id.is_(None)).all()
 
 def create_category(db: Session, category: schemas.CategoryCreate):
+    """
+    Létrehoz egy új kategóriát. Ha alkategóriáról van szó, és nincs saját színe,
+    akkor örökli a szülő kategória színét.
+    """
     # Ellenőrzés duplikáció ellen
     exists_query = db.query(models.Category).filter(
         models.Category.name == category.name, 
@@ -1483,6 +1487,15 @@ def create_category(db: Session, category: schemas.CategoryCreate):
     )
     if db.query(exists_query.exists()).scalar():
         raise HTTPException(status_code=400, detail="Ilyen nevű kategória már létezik ezen a szinten.")
+
+    # === SZÍNÖRÖKLÉS LOGIKA KEZDETE ===
+    # Ha alkategóriát hozunk létre (van parent_id) ÉS nem adtunk meg neki színt
+    if category.parent_id and not category.color:
+        parent_category = get_category(db, category.parent_id)
+        if parent_category:
+            # Az új kategória megkapja a szülő színét
+            category.color = parent_category.color
+    # === SZÍNÖRÖKLÉS LOGIKA VÉGE ===
 
     db_category = models.Category(**category.model_dump())
     db.add(db_category)
@@ -1887,5 +1900,4 @@ def create_and_submit_wish(db: Session, wish: schemas.WishCreate, user: models.U
     db_wish = create_wish(db=db, wish=wish, user=user)
     
     # Azonnal be is küldjük
-    return submit_wish_for_approval(db=db, wish_id=db_wish.id, user=user)    
-    
+    return submit_wish_for_approval(db=db, wish_id=db_wish.id, user=user)

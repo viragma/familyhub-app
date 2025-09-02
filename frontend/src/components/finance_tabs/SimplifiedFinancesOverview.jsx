@@ -651,7 +651,7 @@ function ImprovedFinancesOverview() {
           )}
         </div>
         
-        {filteredTransactions.length > 5 && (
+        {filteredTransactions.length > 20 && (
           <div className="show-more-enhanced">
             <span>...és még {filteredTransactions.length - 5} tranzakció</span>
           </div>

@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from .crud import (
     get_tasks, create_task, toggle_task_status, delete_task,
-    create_family, create_user, get_user, update_user, 
+    create_family, create_user, get_user, update_user,
     delete_user as crud_delete_user, get_users_by_family,
     create_family_account, get_accounts_by_family, create_account_transaction,
     create_category, get_categories,get_transactions,update_transaction, delete_transaction,
@@ -33,7 +33,7 @@ from .schemas import (
     Family, FamilyCreate,
     User, UserCreate, UserProfile,
     Account, Transaction, TransactionCreate, AccountCreate,
-    Category as CategorySchema, CategoryCreate,TransferCreate,
+    Category as CategorySchema, CategoryCreate,TransferCreate, # CategoryCreate importálva
     RecurringRule, RecurringRuleCreate,
     # Új importok
     ExpectedExpense as ExpectedExpenseSchema, ExpectedExpenseCreate,
@@ -192,17 +192,16 @@ def read_categories(db: Session = Depends(get_db)):
 def read_categories_as_tree(db: Session = Depends(get_db)):
     return get_categories_tree(db)
 
+# === JAVÍTÁS ITT: CategoryCreate sémát használunk a body validálására ===
 @app.post("/api/categories", response_model=CategorySchema)
-def add_category(category: CategorySchema, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
+def add_category(category: CategoryCreate, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
     return create_category(db, category)
 
+# === JAVÍTÁS ITT: CategoryCreate sémát használunk a body validálására ===
 @app.put("/api/categories/{category_id}", response_model=CategorySchema)
-def update_category_details(category_id: int, category_data: CategorySchema, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
+def update_category_details(category_id: int, category_data: CategoryCreate, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
     return update_category(db, category_id, category_data)
 
-@app.delete("/api/categories/{category_id}", response_model=CategorySchema)
-def remove_category(category_id: int, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin_user)):
-    return delete_category(db, category_id)
 
 @app.delete("/api/categories/{category_id}", response_model=CategorySchema)
 def remove_category(
@@ -352,12 +351,14 @@ def create_new_account(
     current_user: UserModel = Depends(get_current_user)
 ):
     """ Létrehoz egy új kasszát, és beállítja a láthatóságát. """
-    # Biztonsági ellenőrzés: csak szülők állíthatják be a dashboard megjelenést
+    # JAVÍTÁS: Szerver-oldali dátum validáció
+    if account.type == 'cél' and account.goal_date and account.goal_date < date.today():
+        raise HTTPException(status_code=400, detail="A cél dátuma nem lehet a múltban.")
+
     if account.show_on_dashboard and current_user.role not in ['Családfő', 'Szülő']:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod a kasszát a dashboardon megjeleníteni.")
         
     return create_family_account(db=db, account=account, family_id=current_user.family_id, owner_user=current_user)
-
 
 @app.get("/api/accounts/{account_id}", response_model=Account)
 def read_account_details(
@@ -370,22 +371,6 @@ def read_account_details(
     if db_account is None:
         raise HTTPException(status_code=404, detail="Kassza nem található.")
     return db_account
-
-@app.post("/api/accounts", response_model=Account)
-def create_new_account(
-    account: AccountCreate,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    """ Létrehoz egy új kasszát, és beállítja a láthatóságát. """
-    # JAVÍTÁS: Szerver-oldali dátum validáció
-    if account.type == 'cél' and account.goal_date and account.goal_date < date.today():
-        raise HTTPException(status_code=400, detail="A cél dátuma nem lehet a múltban.")
-
-    if account.show_on_dashboard and current_user.role not in ['Családfő', 'Szülő']:
-        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kasszát a dashboardon megjeleníteni.")
-        
-    return create_family_account(db=db, account=account, family_id=current_user.family_id, owner_user=current_user)
 
 @app.delete("/api/accounts/{account_id}")
 def remove_account(

@@ -29,24 +29,39 @@ function CategoryManager() {
         setIsModalOpen(true);
     };
 
-    const handleSaveCategory = async (categoryData) => {
-        const method = editingCategory ? 'PUT' : 'POST';
-        const endpoint = editingCategory
-            ? `${apiUrl}/api/categories/${editingCategory.id}`
-            : `${apiUrl}/api/categories`;
+   const handleSaveCategory = async (categoryData) => {
+    const method = editingCategory ? 'PUT' : 'POST';
+    const endpoint = editingCategory
+        ? `${apiUrl}/api/categories/${editingCategory.id}`
+        : `${apiUrl}/api/categories`;
 
-        try {
-            const response = await fetch(endpoint, {
-                method,
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(categoryData),
-            });
-            if (response.ok) {
-                setIsModalOpen(false);
-                fetchCategories();
-            } else { alert('Hiba a mentés során!'); }
-        } catch (error) { console.error("Hiba a kategória mentésekor:", error); }
+    // A backend által várt adatok előkészítése
+    const dataToSend = {
+        name: categoryData.name,
+        parent_id: categoryData.parent_id,
+        color: categoryData.color,
+        icon: categoryData.icon
     };
+
+    try {
+        const response = await fetch(endpoint, {
+            method,
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify(dataToSend), // A javított adatküldés
+        });
+        if (response.ok) {
+            setIsModalOpen(false);
+            fetchCategories();
+        } else { 
+            alert('Hiba a mentés során!'); 
+        }
+    } catch (error) { 
+        console.error("Hiba a kategória mentésekor:", error); 
+    }
+};
 
     const handleDeleteCategory = async (categoryId) => {
         if (!window.confirm("Biztosan törölni szeretnéd ezt a kategóriát? A hozzá tartozó tranzakciók kategória nélkül maradnak.")) return;
