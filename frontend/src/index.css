@@ -3566,3 +3566,654 @@ body {
     width: 100%; /* Mindegyik gomb kitölti a teljes szélességet */
   }
 }
+
+/* Simplified Finances Overview Styles */
+
+.simplified-finances {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Balance Overview Card */
+.balance-overview-card {
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 2rem;
+  border: 1px solid var(--border);
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.balance-overview-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--accent-gradient);
+}
+
+.balance-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem 0;
+}
+
+.balance-amount-large {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+}
+
+.personal-balance {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.personal-label {
+  color: var(--text-secondary);
+}
+
+.personal-amount {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Section Titles */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+}
+
+.title-icon {
+  font-size: 1.5rem;
+}
+
+/* Quick Actions */
+.quick-actions-simple {
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--text-primary);
+  min-height: 100px;
+  justify-content: center;
+}
+
+.action-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-card:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.action-card.income:hover {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.action-card.expense:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.action-card.transfer:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.action-card.new-account:hover {
+  border-color: var(--accent-secondary);
+  color: var(--accent-secondary);
+}
+
+/* Accounts List */
+.accounts-simple {
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.account-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.account-type-tag {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.account-type-tag.személyes {
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+}
+
+.account-type-tag.közös {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.account-type-tag.cél {
+  background: color-mix(in srgb, var(--accent-secondary) 15%, transparent);
+  color: var(--accent-secondary);
+}
+
+.account-type-tag.vész {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.account-balance {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.goal-progress-simple {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar-simple {
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-fill-simple {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: 10px;
+  transition: width 0.5s ease;
+}
+
+/* Accounts Groups */
+.account-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.account-group-section {
+  background: var(--bg-primary);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--bg-primary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.group-header:hover {
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
+}
+
+.group-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.group-icon {
+  font-size: 1.25rem;
+}
+
+.group-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+}
+
+.group-count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+}
+
+.group-toggle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: transform 0.3s ease;
+  user-select: none;
+}
+
+.group-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+
+.group-content {
+  max-height: 1000px;
+  overflow: hidden;
+  transition: max-height 0.4s ease-in-out;
+}
+
+.group-content.collapsed {
+  max-height: 0;
+  border-top: none;
+}
+
+.accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.account-item-simple {
+  background: var(--bg-secondary);
+  padding: 1.25rem 1.5rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.account-item-simple:last-child {
+  border-bottom: none;
+}
+
+.account-item-simple:hover {
+  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary));
+  transform: translateX(4px);
+}
+
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+
+.account-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.owner-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--accent-secondary) 15%, transparent);
+  color: var(--accent-secondary);
+  border: 1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent);
+}
+
+.goal-deadline {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.empty-accounts {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Recent Transactions */
+.recent-transactions {
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.transactions-header-simple {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
+}
+
+.filter-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
+.simple-filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.search-box svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.search-input-simple {
+  border: none;
+  background: none;
+  outline: none;
+  width: 100%;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.search-input-simple::placeholder {
+  color: var(--text-secondary);
+}
+
+.account-filter {
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.account-filter:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Transactions List */
+.transactions-list-simple {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.empty-transactions-simple {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.transaction-item-simple {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.transaction-item-simple:hover {
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
+  border-color: var(--accent-primary);
+}
+
+.transaction-icon-simple {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.transaction-icon-simple.bevétel {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.transaction-icon-simple.kiadás {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.transaction-details-simple {
+  flex: 1;
+  min-width: 0;
+}
+
+.transaction-description {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transaction-meta-simple {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.transaction-amount-simple {
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.transaction-amount-simple.bevétel {
+  color: var(--success);
+}
+
+.transaction-amount-simple.kiadás {
+  color: var(--text-primary);
+}
+
+.show-more-simple {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .simplified-finances {
+    gap: 1.5rem;
+    padding: 0 0.5rem;
+  }
+  
+  .balance-overview-card {
+    padding: 1.5rem;
+  }
+  
+  .balance-amount-large {
+    font-size: 2rem;
+  }
+  
+  .actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .action-card {
+    padding: 1rem 0.75rem;
+    min-height: 80px;
+  }
+  
+  .simple-filters {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .transaction-item-simple {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .transaction-icon-simple {
+    align-self: center;
+  }
+  
+  .transaction-details-simple {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .transaction-amount-simple {
+    align-self: center;
+    font-size: 1.1rem;
+  }
+  
+  .transactions-header-simple {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .section-title {
+    font-size: 1.1rem;
+  }
+  
+  /* Mobile Group Adjustments */
+  .group-header {
+    padding: 0.875rem 1rem;
+  }
+  
+  .group-header-left {
+    gap: 0.5rem;
+  }
+  
+  .group-title {
+    font-size: 1rem;
+  }
+  
+  .account-item-simple {
+    padding: 1rem;
+  }
+  
+  .account-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .account-badges {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  
+  .account-balance {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .account-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .personal-balance {
+    flex-direction: column;
+    text-align: center;
+  }
+}

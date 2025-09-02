@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import ModernAccountsOverview from '../components/finance_tabs/ModernAccountsOverview';
+import SimplifiedFinancesOverview from '../components/finance_tabs/SimplifiedFinancesOverview'; // ÚJ IMPORT
 import RecurringRulesManager from '../components/finance_tabs/RecurringRulesManager';
 import CategoryManager from '../components/finance_tabs/CategoryManager';
-import ExpectedExpensesManager from '../components/finance_tabs/ExpectedExpensesManager'; // ÚJ IMPORT
+import ExpectedExpensesManager from '../components/finance_tabs/ExpectedExpensesManager';
 import FinancialSummaryCard from '../components/finance_tabs/FinancialSummaryCard';
 
 function FinancesPage() {
@@ -12,8 +12,6 @@ function FinancesPage() {
 
   return (
     <div className="finances-page">
-
-
       {/* Modern Tab Navigation */}
       <div className="finances-tabs-container">
         <div className="finances-tabs">
@@ -53,14 +51,18 @@ function FinancesPage() {
       {/* Tab Content */}
       <div className="finances-content">
         <div className={`finances-tab-content ${activeTab === 'overview' ? 'active' : ''}`}>
-          <ModernAccountsOverview />
+          {/* LECSERÉLT KOMPONENS: ModernAccountsOverview -> SimplifiedFinancesOverview */}
+          <SimplifiedFinancesOverview />
         </div>
-           <div className={`finances-tab-content ${activeTab === 'expected' ? 'active' : ''}`}>
+        
+        <div className={`finances-tab-content ${activeTab === 'expected' ? 'active' : ''}`}>
           <ExpectedExpensesManager />
         </div>
+        
         <div className={`finances-tab-content ${activeTab === 'recurring' ? 'active' : ''}`}>
           <RecurringRulesManager />
         </div>
+        
         {user && ['Szülő', 'Családfő'].includes(user.role) && (
           <div className={`finances-tab-content ${activeTab === 'categories' ? 'active' : ''}`}>
             <CategoryManager />
