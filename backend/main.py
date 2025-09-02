@@ -24,7 +24,8 @@ from .crud import (
     create_wish, get_wishes_by_family, get_wish, update_wish, delete_wish,
     submit_wish_for_approval,process_wish_approval,
     get_dashboard_notifications,
-    get_wish_history, create_and_submit_wish,close_goal_account
+    get_wish_history, create_and_submit_wish,close_goal_account,
+   
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -44,6 +45,7 @@ from .schemas import (
     Notification,
     WishHistory as WishHistorySchema,
     WishActivationRequest,
+    GoalCloseRequest
 
 
 )
@@ -743,3 +745,23 @@ def close_account_goal(account_id: int, db: Session = Depends(get_db), current_u
     """
     result = close_goal_account(db=db, account_id=account_id, user=current_user)
     return result
+
+# === EZ AZ ÚJ VÉGPONT A KASSZA LEZÁRÁSÁHOZ ===
+@app.post("/api/accounts/{account_id}/close", tags=["Accounts"])
+def close_account_goal_endpoint(
+    account_id: int,
+    request_data: GoalCloseRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Lezár egy célkasszát a "persely" logika alapján:
+    létrehoz egy statisztikai kiadást, lenullázza a kasszát,
+    és teljesített státuszba helyezi a kapcsolódó kívánságokat.
+    """
+    return close_goal_account(
+        db=db,
+        account_id=account_id,
+        user=current_user,
+        request_data=request_data
+    )
