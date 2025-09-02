@@ -1,53 +1,40 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Confetti from 'react-confetti';
 import { useAuth } from '../context/AuthContext';
 import AccountModal from '../components/AccountModal';
-import CloseGoalModal from '../components/CloseGoalModal'; // <- ÚJ IMPORT
+import CloseGoalModal from '../components/CloseGoalModal';
 
 function AccountDetailPage() {
     const [account, setAccount] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [familyMembers, setFamilyMembers] = useState([]);
+    const [categories, setCategories] = useState([]); // A kategóriákra szükség van a modalban
     const [isModalOpen, setIsModalOpen] = useState(false);
-    
-    // === ÚJ STATE-EK A LEZÁRÓ MODALHOZ ===
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-    const [categories, setCategories] = useState([]);
-    const [apiError, setApiError] = useState(''); // Hibakezelés a modal számára
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [apiError, setApiError] = useState('');
 
     const { accountId } = useParams();
     const navigate = useNavigate();
     const { token, user, apiUrl } = useAuth();
 
-    // === ÚJ FÜGGVÉNY: KATEGÓRIÁK LEKÉRDEZÉSE ===
-    const fetchCategories = useCallback(async () => {
-        if (!token) return;
-        try {
-            const response = await fetch(`${apiUrl}/api/categories`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setCategories(data);
-            }
-        } catch (err) {
-            console.error("Hiba a kategóriák lekérésekor:", err);
-        }
-    }, [apiUrl, token]);
-
     const fetchData = useCallback(async () => {
         if (!token || !user) return;
         try {
-            const [accRes, transRes, membersRes] = await Promise.all([
+            const [accRes, transRes, membersRes, categoriesRes] = await Promise.all([
                 fetch(`${apiUrl}/api/accounts/${accountId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
                 fetch(`${apiUrl}/api/transactions?account_id=${accountId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${apiUrl}/api/families/${user.family_id}/users`, { headers: { 'Authorization': `Bearer ${token}` } })
+                fetch(`${apiUrl}/api/families/${user.family_id}/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(`${apiUrl}/api/categories`, { headers: { 'Authorization': `Bearer ${token}` } })
             ]);
             if (!accRes.ok) throw new Error("Kassza nem található vagy nincs jogosultságod.");
             
             setAccount(await accRes.json());
             setTransactions(await transRes.json());
             setFamilyMembers(await membersRes.json());
+            if (categoriesRes.ok) setCategories(await categoriesRes.json());
+
         } catch (error) {
             console.error(error);
             navigate('/finances');
@@ -56,11 +43,10 @@ function AccountDetailPage() {
 
     useEffect(() => {
         fetchData();
-        fetchCategories(); // Adatbetöltéskor a kategóriákat is lekérjük
-    }, [fetchData, fetchCategories]);
+    }, [fetchData]);
 
     const handleSaveAccount = async (accountData) => {
-        // ... (Ez a függvény változatlan maradt)
+        // Ez a függvény változatlan maradt
         try {
             const response = await fetch(`${apiUrl}/api/accounts/${accountId}`, {
                 method: 'PUT',
@@ -79,7 +65,7 @@ function AccountDetailPage() {
     };
 
     const handleDeleteAccount = async () => {
-        // ... (Ez a függvény változatlan maradt)
+        // Ez a függvény változatlan maradt
         if (window.confirm("Biztosan törölni szeretnéd ezt a kasszát? Ez a művelet nem vonható vissza.")) {
             try {
                 const response = await fetch(`${apiUrl}/api/accounts/${accountId}`, {
@@ -97,7 +83,7 @@ function AccountDetailPage() {
     };
 
     const handleSharingToggle = async (viewerId, isShared) => {
-        // ... (Ez a függvény változatlan maradt)
+        // Ez a függvény változatlan maradt
         try {
             const response = await fetch(`${apiUrl}/api/accounts/${accountId}/share?viewer_id=${viewerId}&share=${isShared}`, {
                 method: 'POST',
@@ -113,9 +99,8 @@ function AccountDetailPage() {
         }
     };
     
-    // === ÚJ FÜGGVÉNY A MODAL ADATAINAK KÜLDÉSÉHEZ ===
     const handleCloseSubmit = async (formData) => {
-        setApiError(''); // Hibaüzenet törlése minden próbálkozásnál
+        setApiError('');
         try {
             const response = await fetch(`${apiUrl}/api/accounts/${accountId}/close`, {
                 method: 'POST',
@@ -129,13 +114,18 @@ function AccountDetailPage() {
                 const errorData = await response.json();
                 throw new Error(errorData.detail || 'A kassza lezárása sikertelen.');
             }
-            const result = await response.json();
+            
             setIsCloseModalOpen(false);
-            // Átirányítás a főoldalra egy sikerüzenettel
-            navigate('/finances', { state: { successMessage: result.message || 'Célkassza sikeresen lezárva!' } });
+            setShowConfetti(true);
+
+            setTimeout(() => {
+                setShowConfetti(false);
+                navigate('/finances', { state: { successMessage: 'Célkassza sikeresen lezárva!' } });
+            }, 5000);
+
         } catch (err) {
             console.error("Hiba a gyűjtés lezárásakor:", err);
-            setApiError(err.message); // Hiba beállítása, amit a modal meg tud jeleníteni
+            setApiError(err.message);
         }
     };
 
@@ -147,6 +137,7 @@ function AccountDetailPage() {
     const isParent = user.role === 'Szülő' || user.role === 'Családfő';
     const canManageAccount = isOwner || isParent;
     const isSystemAccount = account.type === 'személyes' || account.type === 'közös';
+    // A gomb akkor is aktív, ha túlteljesült a cél
     const goalReached = account.goal_amount && parseFloat(account.balance) >= parseFloat(account.goal_amount);
 
     const progress = account.goal_amount > 0 ? (parseFloat(account.balance) / parseFloat(account.goal_amount)) * 100 : 0;
@@ -157,6 +148,7 @@ function AccountDetailPage() {
 
     return (
         <div>
+            {showConfetti && <Confetti />}
             <div className="page-header">
                 <h1>{account.name.replace(/\[Teljesítve\]\s*/, '')}</h1>
             </div>
@@ -168,12 +160,14 @@ function AccountDetailPage() {
                     
                     {account.type === 'cél' && account.goal_amount && (
                         <div>
-                            {/* === A GOMB MOST MÁR A MODALT NYITJA MEG === */}
-                            {isParent && !account.name.startsWith('[Teljesítve]') && (
+                            {/* A gomb most már csak akkor jelenik meg, ha a kassza aktív */}
+                            {isParent && account.status === 'active' && (
                                 <button 
                                     className="btn btn-primary" 
                                     onClick={() => setIsCloseModalOpen(true)} 
+                                    // A gomb akkor aktív, ha a cél elért
                                     disabled={!goalReached}
+                                    title={!goalReached ? "A cél még nem teljesült." : "Cél lezárása"}
                                     style={{width: '100%', marginBottom: '1rem'}}
                                 >
                                     Gyűjtés Lezárása
@@ -187,7 +181,6 @@ function AccountDetailPage() {
                             <div className="progress-bar-large">
                                 <div className="progress-fill" style={{ width: `${Math.min(progress, 100)}%` }}></div>
                             </div>
-                            {/* ... (a többi rész változatlan) */}
                             <div className="summary-goal-details">
                                <span>Teljesítve</span>
                                <span>{progress.toFixed(1)}%</span>
@@ -201,7 +194,6 @@ function AccountDetailPage() {
 
                     {account.type === 'személyes' && isOwner && (
                        <div className="sharing-section">
-                           {/* ... (a megosztás rész változatlan maradt) */}
                            <h3 className="form-label" style={{marginBottom: '1rem'}}>Megosztás Más Szülőkkel</h3>
                            {otherParents.length > 0 ? otherParents.map(parent => (
                              <div className="sharing-item" key={parent.id}>
@@ -218,7 +210,7 @@ function AccountDetailPage() {
                            )) : <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>Nincs más szülő a családban.</p>}
                          </div>
                     )}
-                    {canManageAccount && !isSystemAccount && !account.name.startsWith('[Teljesítve]') && (
+                    {canManageAccount && !isSystemAccount && account.status !== 'archived' && (
                         <div className="summary-actions">
                             <button className="btn btn-secondary" onClick={() => setIsModalOpen(true)}>Kassza Szerkesztése</button>
                             <button className="btn btn-secondary" style={{borderColor: 'var(--danger)', color: 'var(--danger)'}} onClick={handleDeleteAccount}>Kassza Törlése</button>
@@ -229,7 +221,6 @@ function AccountDetailPage() {
                 <main>
                     {account.type === 'cél' && account.wishes && account.wishes.length > 0 && (
                         <div className="transactions-section" style={{marginTop: 0, marginBottom: '2rem'}}>
-                            {/* ... (a kívánságok listája változatlan maradt) */}
                             <h2>Kapcsolt Kívánságok</h2>
                             <div className="wishes-grid" style={{gridTemplateColumns: '1fr'}}>
                                 {account.wishes.map(wish => (
@@ -261,7 +252,6 @@ function AccountDetailPage() {
                     <div className="transactions-section" style={{marginTop: 0}}>
                         <h2>Tranzakciók</h2>
                         <div>
-                            {/* ... (a tranzakciók listája változatlan maradt) */}
                             {transactions.length > 0 ? transactions.map(tx => (
                                 <div className="transaction-card" key={tx.id}>
                                     <div className="transaction-card-icon" style={{ background: tx.type === 'bevétel' ? 'var(--success)' : 'var(--danger)', color: 'white' }}>
@@ -296,14 +286,14 @@ function AccountDetailPage() {
                 />
             )}
 
-            {/* === A LEZÁRÓ MODAL RENDERELÉSE === */}
+            {/* A LEZÁRÓ MODAL RENDERELÉSE a javított, helyes props-okkal */}
             <CloseGoalModal
                 isOpen={isCloseModalOpen}
-                onClose={() => setIsCloseModalOpen(false)}
+                onClose={() => { setIsCloseModalOpen(false); setApiError(''); }} // Hiba törlése bezáráskor
                 onSubmit={handleCloseSubmit}
                 account={account}
                 categories={categories}
-                error={apiError} // Átadjuk az API hibát a modalnak
+                error={apiError}
             />
         </div>
     );

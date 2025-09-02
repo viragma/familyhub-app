@@ -1,7 +1,7 @@
 from pydantic import BaseModel,Field
 from datetime import date
 from datetime import datetime
-from decimal import Decimal 
+from decimal import Decimal
 from typing import List, Optional, ForwardRef,Literal
 import uuid
 from typing import Literal
@@ -36,7 +36,7 @@ class CategorySimple(BaseModel):
     name: str
     color: Optional[str] = None
     icon: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -89,7 +89,7 @@ class AccountSimple(BaseModel):
     name: str
     balance: Decimal
     goal_amount: Optional[Decimal] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -100,7 +100,7 @@ class Wish(WishBase):
     owner_user_id: int
     family_id: int
     goal_account_id: Optional[int] = None
-    
+
     owner: UserProfile
     category: Optional[CategorySimple] = None
     images: List[WishImage] = []
@@ -111,6 +111,21 @@ class Wish(WishBase):
 
     class Config:
         from_attributes = True
+
+class AccountHistoryBase(BaseModel):
+    action: str
+    details: Optional[dict] = None
+
+class AccountHistory(AccountHistoryBase):
+    id: int
+    account_id: int
+    user_id: Optional[int] = None
+    timestamp: datetime
+    user: Optional[UserProfile] = None
+
+    class Config:
+        from_attributes = True
+
 
 # --- Account Schema ---
 class AccountBase(BaseModel):
@@ -130,9 +145,10 @@ class Account(AccountBase):
     owner_user_id: int | None = None
     viewers: list[UserProfile] = []
     owner_user: Optional[UserProfile] = None
+    status: Literal['active', 'archived']
     # === EZ AZ ÚJ SOR ===
     wishes: List[Wish] = []
-    
+
     class Config:
         from_attributes = True
 
@@ -145,7 +161,7 @@ Wish.model_rebuild()
 from pydantic import BaseModel,Field
 from datetime import date
 from datetime import datetime
-from decimal import Decimal 
+from decimal import Decimal
 from typing import List, Optional, ForwardRef,Literal
 import uuid
 from typing import Literal
@@ -173,7 +189,7 @@ class ExpectedExpense(ExpectedExpenseBase):
     owner_id: int
     family_id: int
     transaction_id: Optional[int] = None
-    
+
     owner: 'UserProfile'
     category: Optional['CategorySimple'] = None
 
@@ -207,7 +223,7 @@ class CategoryCreate(CategoryBase):
 # Simple Category without children for avoiding recursion
 class CategorySimple(CategoryBase):
     id: int
-    
+
     class Config:
         from_attributes = True
 
@@ -225,7 +241,7 @@ class Category(CategoryBase):
 class CategoryResponse(CategoryBase):
     id: int
     has_children: bool = False  # Jelzi, hogy vannak-e gyerekei
-    
+
     class Config:
         from_attributes = True
 
@@ -242,7 +258,7 @@ class TaskCreate(TaskBase):
 
 class Task(TaskBase):
     id: int
-    
+
     class Config:
         from_attributes = True
 
@@ -272,7 +288,7 @@ class User(UserBase):
     id: int
     family_id: int
     expected_expenses: List[ExpectedExpense] = []
-    
+
     class Config:
         from_attributes = True
 
@@ -286,7 +302,7 @@ class FamilyCreate(FamilyBase):
 # Family without members to avoid recursion
 class FamilySimple(FamilyBase):
     id: int
-    
+
     class Config:
         from_attributes = True
 
@@ -296,7 +312,7 @@ class Family(FamilyBase):
     members: list[UserProfile] = []
     # FRISSÍTÉS: Hozzáadjuk a várható költségeket
     expected_expenses: List[ExpectedExpense] = []
-    
+
     class Config:
         from_attributes = True
 
@@ -317,7 +333,7 @@ class TransactionSimple(TransactionBase):
     date: datetime
     account_id: int
     transfer_id: Optional[uuid.UUID] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -329,7 +345,7 @@ class Transaction(TransactionBase):
     category: Optional[CategoryResponse] = None  # CategoryResponse használata
     creator: Optional[UserProfile] = None
     transfer_id: Optional[uuid.UUID] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -357,7 +373,7 @@ class AccountSimple(AccountBase):
     balance: Decimal
     family_id: int
     owner_user_id: int | None = None
-    
+
     class Config:
         from_attributes = True
 
@@ -371,7 +387,9 @@ class Account(AccountBase):
     viewers: list[UserProfile] = []
     owner_user: Optional[UserProfile] = None
     wishes: List[Wish] = []
-    
+    status: Literal['active', 'archived']
+
+
     class Config:
         from_attributes = True
 
@@ -384,7 +402,7 @@ class AccountResponse(AccountBase):
     viewers: list[UserProfile] = []
     owner_user: Optional[UserProfile] = None
     show_on_dashboard: bool = False
-    
+
     class Config:
         from_attributes = True
 
@@ -440,7 +458,7 @@ class WishLink(WishLinkBase):
 
     class Config:
         from_attributes = True
-        
+
 class WishApprovalBase(BaseModel):
     status: Literal['approved', 'rejected', 'modifications_requested', 'conditional']
     feedback: Optional[str] = None
@@ -502,7 +520,7 @@ class Wish(WishBase):
     owner_user_id: int
     family_id: int
     goal_account_id: Optional[int] = None
-    
+
     # Kapcsolódó adatok
     owner: UserProfile
     category: Optional[CategorySimple] = None
@@ -526,9 +544,9 @@ class WishActivationRequest(BaseModel):
 # --- Célkassza Lezárás Séma ---
 class GoalCloseRequest(BaseModel):
     final_amount: Decimal = Field(..., description="A vásárlás végleges összege.")
+    description: str = Field(..., description="A vásárlás leírása.")
     category_id: Optional[int] = Field(None, description="A létrehozandó statisztikai tranzakció kategóriája.")
-    description: Optional[str] = Field(None, description="A vásárlás leírása.")
-
+    remainder_destination_account_id: Optional[int] = Field(None, description="A maradványösszeg célkasszájának ID-ja.")
 
 # Forward reference frissítések
 Wish.model_rebuild()

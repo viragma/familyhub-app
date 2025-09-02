@@ -182,8 +182,8 @@ def get_accounts_by_family(db: Session, user: models.User, account_type: Optiona
 
     # A megosztott kasszák hozzáadása (szülők esetén)
     if user.role == "Szülő":
-        shared_query = db.query(models.Account).join(account_visibility_association).filter(
-            account_visibility_association.c.user_id == user.id
+        shared_query = db.query(models.Account).join(models.account_visibility_association).filter(
+            models.account_visibility_association.c.user_id == user.id
         ).options(query_options)
 
         if account_type:
@@ -398,6 +398,8 @@ def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: mo
 
     if not from_account or not to_account:
         raise HTTPException(status_code=404, detail="Egyik vagy mindkét kassza nem található.")
+    if to_account.status == 'archived':
+        raise HTTPException(status_code=400, detail="Lezárt kasszába nem lehet utalni.")
 
     can_transfer = False
     if user.role in ["Családfő", "Szülő"] or from_account.owner_user_id == user.id:
@@ -1717,7 +1719,9 @@ def submit_wish_for_approval(db: Session, wish_id: int, user: models.User):
 # backend/crud.py
 
 def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.WishApprovalCreate, approver: models.User):
-    """Feldolgozza a szülői döntést egy kívánságról, de MÁR NEM hoz létre automatikusan kasszát."""
+    """
+    Feldolgozza a szülői döntést egy kívánságról, de már NEM hoz létre automatikusan kasszát.
+    """
     if approver.role not in ["Családfő", "Szülő"]:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod döntést hozni.")
 
@@ -1729,12 +1733,14 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
     if db_wish.owner_user_id == approver.id:
         raise HTTPException(status_code=400, detail="Saját kívánságot nem hagyhatsz jóvá.")
 
+    # Korábbi döntés ellenőrzése
     existing_approval = db.query(models.WishApproval).filter(
         models.WishApproval.wish_id == wish_id,
         models.WishApproval.approver_user_id == approver.id
     ).first()
 
     if existing_approval:
+        # Ha korábban módosítást kért, de most dönt, a régi törölhető
         if existing_approval.status == 'modifications_requested':
             db.delete(existing_approval)
             db.flush()
@@ -1752,52 +1758,40 @@ def process_wish_approval(db: Session, wish_id: int, approval_data: schemas.Wish
     db.add(new_approval)
 
     # Döntés alapján a kívánság státuszának frissítése
-    if approval_data.status == 'rejected':
-        db_wish.status = 'rejected'
-    elif approval_data.status == 'modifications_requested':
-        db_wish.status = 'modifications_requested'
+    if approval_data.status in ['rejected', 'modifications_requested']:
+        db_wish.status = approval_data.status
     elif approval_data.status in ['approved', 'conditional']:
         # Számoljuk ki, hány jóváhagyás kell
-        wish_owner = db_wish.owner
         parents = db.query(models.User).filter(
             models.User.family_id == db_wish.family_id,
             models.User.role.in_(['Családfő', 'Szülő'])
         ).all()
+        
+        # A tulajdonos nem szavazhat, így őt nem számoljuk a szülők közé, ha szülő
+        approving_parents = [p for p in parents if p.id != db_wish.owner_user_id]
+        required_approvals = len(approving_parents)
+        if required_approvals == 0 and db_wish.owner.role in ['Szülő', 'Családfő']:
+             required_approvals = 1 # Ha egy szülő a tulaj, akkor csak 1 szavazat kell (a másiké)
 
-        required_approvals = 0
-        if wish_owner.role in ['Gyerek', 'Tizenéves']:
-            required_approvals = len(parents)
-        elif wish_owner.role in ['Szülő', 'Családfő']:
-            required_approvals = 1
-
-        # Számoljuk össze a jelenlegi támogató szavazatokat
-        committed_approvals = db.query(models.WishApproval).filter(
+        # Számoljuk össze a jelenlegi támogató szavazatokat (az újjal együtt)
+        current_approvals_count = db.query(models.WishApproval).filter(
             models.WishApproval.wish_id == wish_id,
             models.WishApproval.status.in_(['approved', 'conditional'])
-        ).count()
-        current_approvals_count = committed_approvals + 1
+        ).count() + 1
 
-        is_fully_supported = False
-        if approver.role == 'Családfő':
-             is_fully_supported = True
-        elif current_approvals_count >= required_approvals and required_approvals > 0:
-             is_fully_supported = True
+        is_fully_supported = current_approvals_count >= required_approvals
 
         # Ha megvan a kellő számú jóváhagyás
         if is_fully_supported:
-            # Ha van 'conditional' szavazat, a végső státusz is az lesz.
             has_conditional = db.query(models.WishApproval).filter(
                 models.WishApproval.wish_id == wish_id,
                 models.WishApproval.status == 'conditional'
             ).count() > 0 or approval_data.status == 'conditional'
 
-            if has_conditional:
-                db_wish.status = 'conditional'
-            else:
-                db_wish.status = 'approved'
-                db_wish.approved_at = datetime.utcnow()
-
-            # FONTOS: A KASSZA LÉTREHOZÁSÁT TÖRÖLTÜK INNEN!
+            db_wish.status = 'conditional' if has_conditional else 'approved'
+            db_wish.approved_at = datetime.utcnow()
+            
+            # === A LÉNYEG: NINCS TÖBBÉ AUTOMATIKUS KASSZA LÉTREHOZÁS ===
 
     # Előzmény bejegyzés létrehozása
     notes = f"Döntés: {approval_data.status}."
@@ -1954,88 +1948,103 @@ def activate_wish(db: Session, wish_id: int, user: models.User, goal_account_id:
 
 def close_goal_account(db: Session, account_id: int, user: models.User, request_data: schemas.GoalCloseRequest):
     """
-    Lezár egy célkasszát a "persely" logika alapján.
+    Lezár egy célkasszát: rögzíti a vásárlást, kezeli a maradványt vagy
+    a túlköltekezést, és archiválja a kasszát. (VÉGLEGES, LOGIKAI HIBÁKTÓL MENTES VERZIÓ)
     """
-    # 1. Jogosultság és validáció
     if user.role not in ["Családfő", "Szülő"]:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod a kassza lezárásához.")
 
     db_account = get_account(db, account_id, user)
-    if not db_account:
-        raise HTTPException(status_code=404, detail="Célkassza nem található.")
-    if db_account.type != 'cél':
-        raise HTTPException(status_code=400, detail="Csak célkassza zárható le.")
-    if db_account.balance < request_data.final_amount:
-        raise HTTPException(status_code=400, detail="A vásárlás végösszege nem lehet több, mint a kassza egyenlege.")
+    if not db_account or db_account.type != 'cél' or db_account.status == 'archived':
+        raise HTTPException(status_code=404, detail="Aktív célkassza nem található.")
 
-    # 2. Statisztikai célú kiadási tranzakció létrehozása
-    # A hibát itt javítottam: 'creator_id' helyett 'user_id'-t használunk
-    statistical_expense = models.Transaction(
-        description=request_data.description or f"Vásárlás: {db_account.name}",
-        amount=request_data.final_amount,
-        type='kiadás',
-        category_id=request_data.category_id,
-        account_id=account_id,
-        user_id=user.id, # <-- EZ VOLT A HIBA
-        is_family_expense=True # Jelöljük, hogy ez egy családi kiadás
-    )
-    db.add(statistical_expense)
-    
-    # 3. A kassza egyenlegének lenullázása
-    remaining_balance = db_account.balance - request_data.final_amount
-    
-    # Kiadási tranzakció a vásárlás összegével (ez csökkenti az egyenleget)
+    final_amount = request_data.final_amount
+    initial_balance = db_account.balance
+
+    # Különbözet számítása a VÁSÁRLÁS ELŐTT
+    difference = initial_balance - final_amount
+
+    # 1. A vásárlás rögzítése kiadási tranzakcióként
+    # Ez a lépés csökkenteni fogja a db_account.balance értékét
     create_account_transaction(
-        db,
-        schemas.TransactionCreate(
-            description=f"Vásárlás (cél teljesítve): {db_account.name}",
-            amount=request_data.final_amount,
+        db=db,
+        transaction=schemas.TransactionCreate(
+            description=request_data.description or f"Vásárlás: {db_account.name}",
+            amount=final_amount,
             type='kiadás',
-            category_id=None, # A statisztikai tranzakció már kapott kategóriát
+            category_id=request_data.category_id,
         ),
         account_id=account_id,
         user=user,
-        is_internal=True # Belső tranzakció, nem jelenik meg mindenhol
+        is_internal=True
     )
 
-    # Ha maradt pénz a kasszában, azt egy "egyéb bevétel" tranzakcióval nullázzuk ki
-    if remaining_balance > 0:
-        create_account_transaction(
-            db,
-            schemas.TransactionCreate(
-                description="Maradványösszeg átvezetése (cél lezárva)",
-                amount=remaining_balance,
-                type='kiadás', # Kiadásként vezetjük ki
+    # 2. Maradvány vagy hiány kezelése a KORÁBBAN KISZÁMOLT KÜLÖNBSÉG ALAPJÁN
+    if difference > 0:  # ESET 1: Olcsóbb volt a vásárlás -> MARADVÁNY
+        if not request_data.remainder_destination_account_id:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="A maradványösszeg átutalásához meg kell adni egy célkasszát.")
+        
+        # A maradványt (difference) utaljuk, ami a helyes, vásárlás utáni egyenleg
+        create_transfer(
+            db=db,
+            transfer_data=schemas.TransferCreate(
+                from_account_id=account_id,
+                to_account_id=request_data.remainder_destination_account_id,
+                amount=difference,
+                description=f"Maradvány átvezetése: {db_account.name}"
             ),
-            account_id=account_id,
-            user=user,
-            is_internal=True
+            user=user
+        )
+    elif difference < 0:  # ESET 2: Drágább volt a vásárlás -> HIÁNY
+        deficit = abs(difference)
+        owner = db_account.owner_user
+        if not owner:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="A túlköltekezés nem fedezhető, mert a célkasszának nincs tulajdonosa.")
+
+        owner_personal_account = db.query(models.Account).filter(
+            models.Account.owner_user_id == owner.id,
+            models.Account.type == 'személyes'
+        ).first()
+
+        if not owner_personal_account or owner_personal_account.balance < deficit:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Sikertelen lezárás. A {deficit:,.0f} Ft túlköltekezést nem lehet fedezni a tulajdonos ({owner.display_name}) személyes kasszájából.".replace(",", " "))
+
+        # A hiányt (deficit) pótoljuk a személyes kasszából
+        create_transfer(
+            db=db,
+            transfer_data=schemas.TransferCreate(
+                from_account_id=owner_personal_account.id,
+                to_account_id=account_id,
+                amount=deficit,
+                description=f"Túlköltekezés fedezése: {db_account.name}"
+            ),
+            user=user
         )
 
-    # 4. Kapcsolódó kívánságok státuszának frissítése
-    updated_wishes_count = 0
+    # 3. Kassza archiválása és naplózás
+    db_account.status = 'archived'
+    if not db_account.name.startswith("[Teljesítve]"):
+        db_account.name = f"[Teljesítve] {db_account.name}"
+
+    account_history_entry = models.AccountHistory(
+        account_id=account_id, user_id=user.id, family_id=user.family_id, action="archived",
+        details={"closed_by": user.display_name, "final_amount": float(final_amount)}
+    )
+    db.add(account_history_entry)
+
     for wish in db_account.wishes:
         if wish.status != 'completed':
             wish.status = 'completed'
             wish.completed_at = datetime.utcnow()
             create_history_entry(
-                db, 
-                wish_id=wish.id, 
-                user_id=user.id, 
-                action='completed', 
-                notes=f"Automatikus teljesítés a(z) '{db_account.name}' kassza lezárásával."
+                db, wish_id=wish.id, user_id=user.id, action='completed',
+                notes=f"Teljesítve a(z) '{db_account.name}' kassza lezárásával."
             )
-            updated_wishes_count += 1
-    
-    # 5. Kassza "lezárása"
-    if not db_account.name.startswith("[Teljesítve]"):
-        db_account.name = f"[Teljesítve] {db_account.name}"
-    db_account.show_on_dashboard = False
-    
+
     db.commit()
     db.refresh(db_account)
     
-    return {
-        "account": db_account,
-        "message": f"Kassza sikeresen lezárva. {updated_wishes_count} kívánság státusza 'teljesítve'-re állítva."
-    }
+    return {"message": "Célkassza sikeresen lezárva és archiválva.", "account": db_account}

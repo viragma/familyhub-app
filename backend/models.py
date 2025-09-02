@@ -37,6 +37,8 @@ class Family(Base):
     accounts = relationship("Account", back_populates="family")
     expected_expenses = relationship("ExpectedExpense", back_populates="family")
     wishes = relationship("Wish", back_populates="family")
+    account_history = relationship("AccountHistory", back_populates="family")
+
 
 class User(Base):
     __tablename__ = "users"
@@ -60,6 +62,7 @@ class User(Base):
     visible_accounts = relationship("Account", secondary=account_visibility_association, back_populates="viewers")
     owned_accounts = relationship("Account", back_populates="owner_user", foreign_keys="[Account.owner_user_id]")
     wishes = relationship("Wish", back_populates="owner", foreign_keys="[Wish.owner_user_id]")
+    account_history_entries = relationship("AccountHistory", back_populates="user")
 
 
 
@@ -82,6 +85,7 @@ class Account(Base):
     goal_amount = Column(Numeric(10, 2), nullable=True)
     goal_date = Column(Date, nullable=True)
     show_on_dashboard = Column(Boolean, default=False)
+    status = Column(Enum('active', 'archived', name='account_status_enum'), default='active', nullable=False)
     
     family_id = Column(Integer, ForeignKey("families.id"))
     owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -92,8 +96,10 @@ class Account(Base):
     
  # JAVÍTOTT KAPCSOLAT: Account -> User (many-to-many)
     viewers = relationship("User", secondary=account_visibility_association, back_populates="visible_accounts")
-    # === EZ AZ ÚJ SOR ===
     wishes = relationship("Wish", back_populates="goal_account", foreign_keys="[Wish.goal_account_id]")
+    
+    # === EZ VOLT A HIBA, EZT JAVÍTOTTAM ===
+    history_entries = relationship("AccountHistory", back_populates="account")
 
 
 class Transaction(Base):
@@ -246,3 +252,17 @@ class WishHistory(Base):
 
     wish = relationship("Wish", back_populates="history")
     user = relationship("User")
+
+class AccountHistory(Base):
+    __tablename__ = "account_history"
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    family_id = Column(Integer, ForeignKey("families.id"), nullable=False)
+    action = Column(String, nullable=False) # pl. 'created', 'archived', 'renamed'
+    details = Column(JSONB, nullable=True) # pl. {"old_name": "...", "new_name": "..."}
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    
+    account = relationship("Account", back_populates="history_entries")
+    user = relationship("User", back_populates="account_history_entries")
+    family = relationship("Family", back_populates="account_history")
