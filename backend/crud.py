@@ -125,12 +125,20 @@ def delete_user(db: Session, user_id: int):
         db.commit()
     return db_user
 
+# === EZ A FÜGGVÉNY MÓDOSUL ===
 def get_account(db: Session, account_id: int, user: models.User):
-    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    account = db.query(models.Account).options(
+        selectinload(models.Account.wishes).selectinload(models.Wish.owner),
+        selectinload(models.Account.wishes).selectinload(models.Wish.category)
+    ).filter(models.Account.id == account_id).first()
+    
     if account:
         visible_accounts = get_accounts_by_family(db, user=user)
-        if account not in visible_accounts:
+        is_visible = any(acc.id == account.id for acc in visible_accounts)
+        
+        if not is_visible:
             raise HTTPException(status_code=403, detail="Nincs jogosultságod megtekinteni ezt a kasszát.")
+            
     return account
 
 def get_accounts_by_family(db: Session, user: models.User, account_type: Optional[str] = None):
@@ -1943,3 +1951,51 @@ def activate_wish(db: Session, wish_id: int, user: models.User, goal_account_id:
     db.refresh(db_wish)
     
     return db_wish
+
+def close_goal_account(db: Session, account_id: int, user: models.User):
+    """
+    Lezár egy célkasszát, ha az elérte a célösszeget.
+    Minden kapcsolódó, még aktív kívánság státuszát 'completed'-re állítja.
+    """
+    # 1. Jogosultság és validáció
+    if user.role not in ["Családfő", "Szülő"]:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod a kassza lezárásához.")
+
+    db_account = get_account(db, account_id, user) # A get_account már tartalmazza a jogosultság-ellenőrzést
+    if not db_account:
+        raise HTTPException(status_code=404, detail="Célkassza nem található.")
+    if db_account.type != 'cél':
+        raise HTTPException(status_code=400, detail="Csak célkassza zárható le.")
+    if db_account.balance < db_account.goal_amount:
+        raise HTTPException(status_code=400, detail="A kassza még nem érte el a célösszeget a lezáráshoz.")
+
+    # 2. Kapcsolódó kívánságok státuszának frissítése
+    # A db_account.wishes már be van töltve a get_account hívásnak köszönhetően
+    updated_wishes_count = 0
+    for wish in db_account.wishes:
+        if wish.status != 'completed':
+            wish.status = 'completed'
+            wish.completed_at = datetime.utcnow()
+            create_history_entry(
+                db, 
+                wish_id=wish.id, 
+                user_id=user.id, 
+                action='completed', 
+                notes=f"Automatikus teljesítés a(z) '{db_account.name}' kassza lezárásával."
+            )
+            updated_wishes_count += 1
+    
+    # 3. Kassza "lezárása"
+    # A kasszát nem töröljük, csak átnevezzük és levesszük a dashboardról,
+    # hogy a múltbeli adatok megmaradjanak.
+    if not db_account.name.startswith("[Teljesítve]"):
+        db_account.name = f"[Teljesítve] {db_account.name}"
+    db_account.show_on_dashboard = False
+    
+    db.commit()
+    db.refresh(db_account)
+    
+    return {
+        "account": db_account,
+        "message": f"Kassza sikeresen lezárva. {updated_wishes_count} kívánság státusza 'teljesítve'-re állítva."
+    }    

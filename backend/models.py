@@ -92,8 +92,9 @@ class Account(Base):
     
  # JAVÍTOTT KAPCSOLAT: Account -> User (many-to-many)
     viewers = relationship("User", secondary=account_visibility_association, back_populates="visible_accounts")
-    # ÚJ SOR: Add hozzá ezt a sort a többi relationship mellé
-    wishes = relationship("Wish", back_populates="goal_account")
+    # === EZ AZ ÚJ SOR ===
+    wishes = relationship("Wish", back_populates="goal_account", foreign_keys="[Wish.goal_account_id]")
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -190,7 +191,8 @@ class Wish(Base):
     owner = relationship("User", back_populates="wishes", foreign_keys=[owner_user_id])
     family = relationship("Family", back_populates="wishes")
     category = relationship("Category", back_populates="wishes")
-    goal_account = relationship("Account", foreign_keys=[goal_account_id])
+    # === EZ A MÓDOSÍTÁS ===
+    goal_account = relationship("Account", back_populates="wishes", foreign_keys=[goal_account_id])
     
     images = relationship("WishImage", back_populates="wish", cascade="all, delete-orphan")
     links = relationship("WishLink", back_populates="wish", cascade="all, delete-orphan")

@@ -24,7 +24,7 @@ from .crud import (
     create_wish, get_wishes_by_family, get_wish, update_wish, delete_wish,
     submit_wish_for_approval,process_wish_approval,
     get_dashboard_notifications,
-    get_wish_history, create_and_submit_wish
+    get_wish_history, create_and_submit_wish,close_goal_account
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
 from . import models
@@ -732,3 +732,14 @@ def activate_wish_funding(
     """
     from .crud import activate_wish
     return activate_wish(db=db, wish_id=wish_id, user=current_user, goal_account_id=request_data.goal_account_id)
+
+
+# A backend/main.py fájlban, a többi @router.post végpont közé
+
+@app.post("/accounts/{account_id}/close", status_code=status.HTTP_200_OK)
+def close_account_goal(account_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    Lezár egy célkasszát és teljesítettnek jelöli a kapcsolódó kívánságokat.
+    """
+    result = close_goal_account(db=db, account_id=account_id, user=current_user)
+    return result

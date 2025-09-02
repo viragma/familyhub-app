@@ -6,6 +6,150 @@ from typing import List, Optional, ForwardRef,Literal
 import uuid
 from typing import Literal
 
+# --- Base Schemas ---
+class WishImageBase(BaseModel):
+    image_url: str
+    image_order: int = 0
+
+class WishLinkBase(BaseModel):
+    url: str
+    title: Optional[str] = None
+
+class WishBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    estimated_price: Decimal
+    priority: Literal['low', 'medium', 'high'] = 'medium'
+    category_id: Optional[int] = None
+    deadline: Optional[date] = None
+
+class UserProfile(BaseModel):
+    id: int
+    display_name: str
+    avatar_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+class CategorySimple(BaseModel):
+    id: int
+    name: str
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class WishImage(WishImageBase):
+    id: int
+    wish_id: int
+
+    class Config:
+        from_attributes = True
+
+class WishLinkCreate(WishLinkBase):
+    pass
+
+class WishLink(WishLinkBase):
+    id: int
+    wish_id: int
+
+    class Config:
+        from_attributes = True
+
+class WishApprovalBase(BaseModel):
+    status: Literal['approved', 'rejected', 'modifications_requested', 'conditional']
+    feedback: Optional[str] = None
+    conditional_note: Optional[str] = None
+
+class WishApprovalCreate(WishApprovalBase):
+    pass
+
+class WishApproval(WishApprovalBase):
+    id: int
+    wish_id: int
+    approver_user_id: int
+    approver: UserProfile
+
+    class Config:
+        from_attributes = True
+
+class WishHistory(BaseModel):
+    id: int
+    user: UserProfile
+    action: str
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AccountSimple(BaseModel):
+    id: int
+    name: str
+    balance: Decimal
+    goal_amount: Optional[Decimal] = None
+    
+    class Config:
+        from_attributes = True
+
+# --- Main Wish Schema ---
+class Wish(WishBase):
+    id: int
+    status: Literal['draft', 'pending', 'approved', 'conditional', 'modifications_requested', 'rejected', 'completed']
+    owner_user_id: int
+    family_id: int
+    goal_account_id: Optional[int] = None
+    
+    owner: UserProfile
+    category: Optional[CategorySimple] = None
+    images: List[WishImage] = []
+    links: List[WishLink] = []
+    approvals: List[WishApproval] = []
+    goal_account: Optional[AccountSimple] = None
+    history: List[WishHistory] = []
+
+    class Config:
+        from_attributes = True
+
+# --- Account Schema ---
+class AccountBase(BaseModel):
+    name: str
+    type: str
+    goal_amount: Optional[Decimal] = None
+    goal_date: Optional[date] = None
+
+class AccountCreate(AccountBase):
+    viewer_ids: list[int] = []
+    show_on_dashboard: bool = False
+
+class Account(AccountBase):
+    id: int
+    balance: Decimal
+    family_id: int
+    owner_user_id: int | None = None
+    viewers: list[UserProfile] = []
+    owner_user: Optional[UserProfile] = None
+    # === EZ AZ ÚJ SOR ===
+    wishes: List[Wish] = []
+    
+    class Config:
+        from_attributes = True
+
+# Rebuild models to resolve forward references
+Account.model_rebuild()
+Wish.model_rebuild()
+
+# ... (a többi séma változatlan)
+# (A teljesség kedvéért a többi sémát is beilleszthetnénk, de a lényeg a fenti változtatás)
+from pydantic import BaseModel,Field
+from datetime import date
+from datetime import datetime
+from decimal import Decimal 
+from typing import List, Optional, ForwardRef,Literal
+import uuid
+from typing import Literal
+
 # --- Várható Költség Sémák ---
 class ExpectedExpenseBase(BaseModel):
     description: str
@@ -226,6 +370,7 @@ class Account(AccountBase):
     # transactions: list[TransactionSimple] = []  # TransactionSimple használata
     viewers: list[UserProfile] = []
     owner_user: Optional[UserProfile] = None
+    wishes: List[Wish] = []
     
     class Config:
         from_attributes = True
@@ -378,6 +523,11 @@ class Notification(BaseModel):
 class WishActivationRequest(BaseModel):
     goal_account_id: Optional[int] = Field(None, description="ID of an existing goal account to link to.")
 
+# --- Célkassza Lezárás Séma ---
+class GoalCloseRequest(BaseModel):
+    final_amount: Decimal = Field(..., description="A vásárlás végleges összege.")
+    category_id: Optional[int] = Field(None, description="A létrehozandó statisztikai tranzakció kategóriája.")
+    description: Optional[str] = Field(None, description="A vásárlás leírása.")
 
 
 # Forward reference frissítések
