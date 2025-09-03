@@ -167,6 +167,55 @@ from typing import List, Optional, ForwardRef,Literal
 import uuid
 from typing import Literal
 
+
+# Simple user profile - cirkuláris referenciák elkerüléséhez
+class UserProfile(BaseModel):
+    id: int
+    display_name: str
+    avatar_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+# --- Base modellek ---
+class CategoryBase(BaseModel):
+    name: str
+    parent_id: Optional[int] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
+
+class CategoryCreate(CategoryBase):
+    pass
+
+# Simple Category without children for avoiding recursion
+class CategorySimple(CategoryBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class CategoryWithParent(CategorySimple):
+    parent: Optional['CategorySimple'] = None # A hiányzó láncszem
+
+# Full Category with children - használd csak akkor, amikor tényleg kell
+class Category(CategoryBase):
+    id: int
+    children: List['Category'] = []
+
+    class Config:
+        from_attributes = True
+        # Recursion limit beállítás
+        validate_assignment = True
+
+# Response model kategóriákhoz - ez használható a legtöbb API válaszban
+class CategoryResponse(CategoryBase):
+    id: int
+    has_children: bool = False  # Jelzi, hogy vannak-e gyerekei
+
+    class Config:
+        from_attributes = True
+
+
 # --- Várható Költség Sémák ---
 class ExpectedExpenseBase(BaseModel):
     description: str
@@ -192,7 +241,8 @@ class ExpectedExpense(ExpectedExpenseBase):
     transaction_id: Optional[int] = None
 
     owner: 'UserProfile'
-    category: Optional['CategorySimple'] = None
+    category: Optional[CategoryWithParent] = None
+
 
     class Config:
         from_attributes = True
@@ -227,6 +277,9 @@ class CategorySimple(CategoryBase):
 
     class Config:
         from_attributes = True
+
+class CategoryWithParent(CategorySimple):
+    parent: Optional['CategorySimple'] = None # A hiányzó láncszem
 
 # Full Category with children - használd csak akkor, amikor tényleg kell
 class Category(CategoryBase):
@@ -275,14 +328,7 @@ class UserCreate(UserBase):
     pin: str
     family_id: int
 
-# Simple user profile - cirkuláris referenciák elkerüléséhez
-class UserProfile(BaseModel):
-    id: int
-    display_name: str
-    avatar_url: str | None = None
 
-    class Config:
-        from_attributes = True
 
 # User without family reference
 class User(UserBase):
@@ -554,4 +600,5 @@ Wish.model_rebuild()
 User.model_rebuild() # Ha a User sémába is bekerül a Wish
 Family.model_rebuild() # Ha a Family sémába is bekerül a Wish
 Category.model_rebuild()
+CategoryWithParent.model_rebuild()
 ExpectedExpense.model_rebuild()

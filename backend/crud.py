@@ -15,7 +15,7 @@ from .schemas import (
 import base64
 import os
 from dateutil.relativedelta import relativedelta
-
+from sqlalchemy.orm import joinedload
 from typing import Optional, List
 from sqlalchemy.dialects.postgresql import insert
 
@@ -371,23 +371,39 @@ def update_transaction(db: Session, transaction_id: int, transaction_data: schem
     return db_transaction
 
 def delete_transaction(db: Session, transaction_id: int, user: models.User):
-    db_transaction = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    """
+    Töröl egy tranzakciót és visszaállítja a kassza egyenlegét.
+    JAVÍTVA: A 'category' adatot előre betöltjük, hogy elkerüljük a DetachedInstanceError hibát.
+    """
+    # 1. Töltsük be a tranzakciót ÉS a hozzá tartozó kategóriát is egyszerre
+    db_transaction = (
+        db.query(models.Transaction)
+        .options(joinedload(models.Transaction.category)) # <<< EZ A LÉNYEG!
+        .filter(models.Transaction.id == transaction_id)
+        .first()
+    )
+
     if not db_transaction:
-        return None
+        raise HTTPException(status_code=404, detail="Tranzakció nem található.")
 
-    # === JOGOSULTSÁG ELLENŐRZÉS ===
-    if user.role not in ["Családfő", "Szülő"]:
-        raise HTTPException(status_code=403, detail="Nincs jogosultságod a tranzakció törléséhez.")
+    # Ellenőrizzük a jogosultságot a tranzakcióhoz tartozó kasszán keresztül
+    account = db.query(models.Account).filter(models.Account.id == db_transaction.account_id).first()
+    if not account or account.family_id != user.family_id:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod ehhez a művelethez.")
 
-    # Visszaállítjuk a kassza egyenlegét a törlés előtt
-    db_account = db_transaction.account
+    # 2. Állítsuk vissza a kassza egyenlegét
     if db_transaction.type == 'bevétel':
-        db_account.balance -= db_transaction.amount
-    else: # kiadás
-        db_account.balance += db_transaction.amount
-
+        account.balance -= db_transaction.amount
+    elif db_transaction.type == 'kiadás':
+        account.balance += db_transaction.amount
+    
+    # 3. Töröljük a tranzakciót
     db.delete(db_transaction)
+    
+    # 4. Mentsük a változásokat
     db.commit()
+
+    # Mivel a kategória már be van töltve, a válasz visszaadása sikeres lesz
     return db_transaction
 # === ÚJ FUNKCIÓ AZ ÁTUTALÁSHOZ ===
 def create_transfer(db: Session, transfer_data: schemas.TransferCreate, user: models.User):
@@ -1301,13 +1317,18 @@ def get_expected_expenses(db: Session, user: models.User):
     """
     query = db.query(models.ExpectedExpense).options(
         joinedload(models.ExpectedExpense.owner),
-        joinedload(models.ExpectedExpense.category)
+        # --- EZ A JAVÍTÁS ---
+        # A te modeledben a kapcsolat neve 'parent', nem 'parent_category'.
+        # Most már a helyes nevet használjuk.
+        joinedload(models.ExpectedExpense.category).joinedload(models.Category.parent)
     ).filter(models.ExpectedExpense.status == 'tervezett')
 
+    # A te eredeti, jól működő jogosultságkezelő logikád
     if user.role in ["Családfő", "Szülő"]:
         return query.filter(models.ExpectedExpense.family_id == user.family_id).order_by(models.ExpectedExpense.due_date.asc()).all()
     else:
         return query.filter(models.ExpectedExpense.owner_id == user.id).order_by(models.ExpectedExpense.due_date.asc()).all()
+
 
 def create_expected_expense(db: Session, expense_data: schemas.ExpectedExpenseCreate, user: models.User):
     """
@@ -1382,8 +1403,10 @@ def delete_expected_expense(db: Session, expense_id: int, user: models.User):
     return db_expense
 
 def complete_expected_expense(db: Session, expense_id: int, completion_data: schemas.ExpectedExpenseComplete, user: models.User):
+    from .scheduler import get_next_run_date 
+    from .schemas import RecurringRuleCreate
     """
-    Egy várható költség "teljesítése": létrehoz egy valódi tranzakciót.
+    Egy várható költség "teljesítése". Ha ismétlődő, létrehoz egy valódi tranzakciót ÉS egy rendszeres szabályt.
     """
     db_expense = db.query(models.ExpectedExpense).filter(models.ExpectedExpense.id == expense_id).first()
     if not db_expense or db_expense.status != 'tervezett':
@@ -1393,6 +1416,7 @@ def complete_expected_expense(db: Session, expense_id: int, completion_data: sch
     if not target_account:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod a választott kasszához.")
 
+    # 1. Létrehozzuk az ELSŐ tranzakciót minden esetben
     transaction_schema = schemas.TransactionCreate(
         description=db_expense.description,
         amount=completion_data.actual_amount,
@@ -1400,10 +1424,37 @@ def complete_expected_expense(db: Session, expense_id: int, completion_data: sch
         category_id=db_expense.category_id,
         creator_id=user.id
     )
-
     new_transaction = create_account_transaction(db, transaction=transaction_schema, account_id=target_account.id, user=user)
 
-    db_expense.status = 'teljesült'
+    # 2. Ha ismétlődőnek van jelölve, létrehozzuk a szabályt is
+    if db_expense.is_recurring:
+        # A mostani teljesítés dátumát használjuk a következő esedékesség kiszámításához
+        temp_rule_for_calc = models.RecurringRule(
+            start_date=date.today(),
+            next_run_date=date.today(),
+            frequency=db_expense.recurring_frequency or 'havi'
+        )
+        next_run = get_next_run_date(temp_rule_for_calc)
+
+        rule_schema = RecurringRuleCreate(
+            description=db_expense.description,
+            amount=completion_data.actual_amount, # A valós összeggel hozzuk létre a szabályt
+            type='kiadás',
+            to_account_id=completion_data.account_id, # A kiválasztott kassza
+            category_id=db_expense.category_id,
+            frequency=db_expense.recurring_frequency or 'havi',
+            start_date=date.today(),
+            next_run_date=next_run
+            # A day_of_month/week most egyszerűsítve van, a scheduler a next_run_date-ből tudni fogja a következőt
+        )
+        create_recurring_rule(db=db, rule=rule_schema, user=user)
+        # Az eredeti tervezett költséget "töröljük", hogy ne lehessen újra teljesíteni
+        db_expense.status = 'törölve'
+        db_expense.notes = f"Rendszeres szabállyá alakítva: {date.today()}"
+    else:
+        # Ha nem ismétlődő, simán csak teljesítjük
+        db_expense.status = 'teljesült'
+
     db_expense.actual_amount = completion_data.actual_amount
     db_expense.transaction_id = new_transaction.id
 
