@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Calendar, User, Users, CheckCircle, Clock, RefreshCw, AlertCircle, PieChart as PieChartIcon, BarChart3, Eye, ArrowRight } from 'lucide-react';
+import { Target, TrendingUp, Calendar, User, Users, CheckCircle, Clock, RefreshCw, AlertCircle, PieChart as PieChartIcon, BarChart3, Eye, ArrowRight, Plus, Minus } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -7,8 +7,9 @@ import '../components/Dashboard.css';
 import ForecastCard from '../components/ForecastCard';
 import UpcomingEventsCard from '../components/UpcomingEventsCard';
 import NotificationBar from '../components/NotificationBar';
+import TransactionModal from '../components/TransactionModal';
 
-// Kompakt Cél Kártya komponens
+// Kompakt Cél Kártya komponens (Változatlan)
 const CompactGoalCard = ({ goal, type = "personal" }) => {
   const navigate = useNavigate();
   const isFamily = type === "family";
@@ -83,7 +84,7 @@ const CompactGoalCard = ({ goal, type = "personal" }) => {
   );
 };
 
-// Célok Csoportosító Kártya
+// Célok Csoportosító Kártya (Változatlan)
 const GoalsGroupCard = ({ title, goals, type, showAll, onToggleShowAll, maxDisplay = 2 }) => {
   const navigate = useNavigate();
   
@@ -134,7 +135,7 @@ const GoalsGroupCard = ({ title, goals, type, showAll, onToggleShowAll, maxDispl
 };
 
 // Javított Pénzügyi Összefoglaló Kártya
-const EnhancedFinancialCard = ({ financialSummary }) => {
+const EnhancedFinancialCard = ({ financialSummary, onNewTransaction, personalAccount }) => {
   if (!financialSummary) return null;
 
   const totalBalance = financialSummary.total_balance || 0;
@@ -159,7 +160,6 @@ const EnhancedFinancialCard = ({ financialSummary }) => {
         <TrendingUp className="enhanced-financial-icon" />
       </div>
 
-      {/* Egyenlegek szekció */}
       <div className="enhanced-balance-section">
         <div className="primary-balance">
           <span className="balance-label">
@@ -180,47 +180,34 @@ const EnhancedFinancialCard = ({ financialSummary }) => {
         )}
       </div>
 
-      {/* Statisztikák rács */}
+      {personalAccount && (
+        <div className="financial-quick-actions">
+          <button 
+            className="quick-action-btn positive"
+            onClick={() => onNewTransaction('bevétel', personalAccount.id, personalAccount.name)}
+          >
+            <Plus size={16}/> Bevétel
+          </button>
+          <button 
+            className="quick-action-btn negative"
+            onClick={() => onNewTransaction('kiadás', personalAccount.id, personalAccount.name)}
+          >
+            <Minus size={16}/> Kiadás
+          </button>
+        </div>
+      )}
+
       <div className="enhanced-stats-grid">
-        <div className="enhanced-stat-card positive">
-          <div className="stat-icon">📈</div>
-          <div className="stat-info">
-            <span className="stat-label">Bevétel</span>
-            <span className="stat-value">+{monthlyIncome.toLocaleString('hu-HU')} Ft</span>
-          </div>
-        </div>
-
-        <div className="enhanced-stat-card negative">
-          <div className="stat-icon">📉</div>
-          <div className="stat-info">
-            <span className="stat-label">Kiadás</span>
-            <span className="stat-value">-{monthlyExpense.toLocaleString('hu-HU')} Ft</span>
-          </div>
-        </div>
-
-        <div className={`enhanced-stat-card savings ${monthlySavings >= 0 ? 'positive' : 'negative'}`}>
-          <div className="stat-icon">{monthlySavings >= 0 ? '💰' : '⚠️'}</div>
-          <div className="stat-info">
-            <span className="stat-label">Megtakarítás</span>
-            <span className="stat-value">
-              {monthlySavings >= 0 ? '+' : ''}{monthlySavings.toLocaleString('hu-HU')} Ft
-            </span>
-          </div>
-        </div>
-
-        <div className="enhanced-stat-card rate">
-          <div className="stat-icon">📊</div>
-          <div className="stat-info">
-            <span className="stat-label">Megtakarítási ráta</span>
-            <span className="stat-value">{savingsRate.toFixed(1)}%</span>
-          </div>
-        </div>
+        <div className="enhanced-stat-card positive"><div className="stat-icon">📈</div><div className="stat-info"><span className="stat-label">Bevétel</span><span className="stat-value">+{monthlyIncome.toLocaleString('hu-HU')} Ft</span></div></div>
+        <div className="enhanced-stat-card negative"><div className="stat-icon">📉</div><div className="stat-info"><span className="stat-label">Kiadás</span><span className="stat-value">-{monthlyExpense.toLocaleString('hu-HU')} Ft</span></div></div>
+        <div className={`enhanced-stat-card savings ${monthlySavings >= 0 ? 'positive' : 'negative'}`}><div className="stat-icon">{monthlySavings >= 0 ? '💰' : '⚠️'}</div><div className="stat-info"><span className="stat-label">Megtakarítás</span><span className="stat-value">{monthlySavings >= 0 ? '+' : ''}{monthlySavings.toLocaleString('hu-HU')} Ft</span></div></div>
+        <div className="enhanced-stat-card rate"><div className="stat-icon">📊</div><div className="stat-info"><span className="stat-label">Megtakarítási ráta</span><span className="stat-value">{savingsRate.toFixed(1)}%</span></div></div>
       </div>
     </div>
   );
 };
 
-// Kategória költés kártya (rövidített)
+// Kategória költés kártya (Változatlan)
 const CategorySpendingCard = ({ data, onClick }) => {
   if (!data || !data.length) {
     return (
@@ -290,7 +277,7 @@ const CategorySpendingCard = ({ data, onClick }) => {
   );
 };
 
-// Havi megtakarítás trend kártya (rövidített)
+// Havi megtakarítás trend kártya (Változatlan)
 const SavingsTrendCard = ({ data, onClick }) => {
   if (!data || !data.length) {
     return (
@@ -358,10 +345,12 @@ const SavingsTrendCard = ({ data, onClick }) => {
   );
 };
 
+// Fő Dashboard komponens
 const DashboardPage = () => {
-  const { token, apiUrl, logout } = useAuth();
+  const { user, token, apiUrl, logout } = useAuth();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
+  const [accounts, setAccounts] = useState([]);
   const [analyticsData, setAnalyticsData] = useState({
     categorySpending: null,
     savingsTrend: null
@@ -372,6 +361,10 @@ const DashboardPage = () => {
   const [error, setError] = useState(null);
   const [showAllFamilyGoals, setShowAllFamilyGoals] = useState(false);
   const [showAllPersonalGoals, setShowAllPersonalGoals] = useState(false);
+  
+  const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ type: '', accountId: null, accountName: '' });
+  const [categories, setCategories] = useState([]);
 
   const fetchData = async () => {
     try {
@@ -382,12 +375,24 @@ const DashboardPage = () => {
         throw new Error('Nincs bejelentkezett felhasználó');
       }
 
-      const [dashboardResponse, categoryResponse, savingsResponse, upcomingEventsResponse, notificationsResponse] = await Promise.all([
-        fetch(`${apiUrl}/api/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${apiUrl}/api/analytics/category-spending`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${apiUrl}/api/analytics/savings-trend`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${apiUrl}/api/upcoming-events`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${apiUrl}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } })
+      const headers = { 'Authorization': `Bearer ${token}` };
+      
+      const [
+        dashboardResponse, 
+        accountsResponse,
+        categorySpendingResponse, 
+        savingsResponse, 
+        upcomingEventsResponse, 
+        notificationsResponse,
+        categoriesResponse
+      ] = await Promise.all([
+        fetch(`${apiUrl}/api/dashboard`, { headers }),
+        fetch(`${apiUrl}/api/accounts`, { headers }),
+        fetch(`${apiUrl}/api/analytics/category-spending`, { headers }),
+        fetch(`${apiUrl}/api/analytics/savings-trend`, { headers }),
+        fetch(`${apiUrl}/api/upcoming-events`, { headers }),
+        fetch(`${apiUrl}/api/notifications`, { headers }),
+        fetch(`${apiUrl}/api/categories/tree`, { headers })
       ]);
 
       if (!dashboardResponse.ok) {
@@ -398,17 +403,14 @@ const DashboardPage = () => {
         throw new Error(`API hiba: ${dashboardResponse.status} ${dashboardResponse.statusText}`);
       }
 
-      const dashboardData = await dashboardResponse.json();
-      const categoryData = categoryResponse.ok ? await categoryResponse.json() : [];
-      const savingsData = savingsResponse.ok ? await savingsResponse.json() : [];
-      const upcomingEventsData = upcomingEventsResponse.ok ? await upcomingEventsResponse.json() : [];
-
-      setDashboardData(dashboardData);
+      setDashboardData(await dashboardResponse.json());
+      setAccounts(accountsResponse.ok ? await accountsResponse.json() : []);
+      setCategories(categoriesResponse.ok ? await categoriesResponse.json() : []);
       setAnalyticsData({
-        categorySpending: categoryData,
-        savingsTrend: savingsData
+        categorySpending: categorySpendingResponse.ok ? await categorySpendingResponse.json() : [],
+        savingsTrend: savingsResponse.ok ? await savingsResponse.json() : []
       });
-      setUpcomingEvents(upcomingEventsData);
+      setUpcomingEvents(upcomingEventsResponse.ok ? await upcomingEventsResponse.json() : []);
       setNotifications(notificationsResponse.ok ? await notificationsResponse.json() : []);
 
     } catch (err) {
@@ -425,66 +427,41 @@ const DashboardPage = () => {
     }
   }, [apiUrl, token]);
 
-  const handleCategoryAnalyticsClick = () => {
-    navigate('/analytics?tab=categories');
+  const handleOpenTransactionModal = (type, accountId, accountName) => {
+    setModalConfig({ type, accountId, accountName });
+    setTransactionModalOpen(true);
+  };
+  
+  const handleSaveTransaction = async (transactionData) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/accounts/${modalConfig.accountId}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(transactionData),
+      });
+      if (response.ok) {
+        setTransactionModalOpen(false);
+        fetchData(); 
+      } else {
+        alert('Hiba a mentés során!');
+      }
+    } catch (error) {
+      console.error("Hiba a tranzakció mentésekor:", error);
+    }
   };
 
-  const handleSavingsAnalyticsClick = () => {
-    navigate('/analytics?tab=savings');
-  };
-
-  if (!token) {
-    return (
-      <div className="loading-container">
-        <div className="error-content">
-          <AlertCircle className="error-icon" />
-          <h2 className="error-title">Bejelentkezés szükséges</h2>
-          <p className="error-message">A dashboard eléréséhez be kell jelentkezned.</p>
-          <button 
-            onClick={() => window.location.href = '/login'}
-            className="error-login-btn"
-          >
-            Bejelentkezés
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-content">
-          <div className="loading-spinner"></div>
-          <p className="loading-message">Dashboard betöltése...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="error-container">
-        <div className="error-content">
-          <AlertCircle className="error-icon" />
-          <h2 className="error-title">Hiba történt</h2>
-          <p className="error-message">{error}</p>
-          <button 
-            onClick={fetchData}
-            className="error-retry-btn"
-            disabled={loading}
-          >
-            <RefreshCw className={loading ? 'loading-spinner' : ''} />
-            Újrapróbálás
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!token) return <div className="loading-container"><div className="error-content"><AlertCircle className="error-icon" /><h2 className="error-title">Bejelentkezés szükséges</h2><p className="error-message">A dashboard eléréséhez be kell jelentkezned.</p><button onClick={() => window.location.href = '/login'} className="error-login-btn">Bejelentkezés</button></div></div>;
+  if (loading) return <div className="loading-container"><div className="loading-content"><div className="loading-spinner"></div><p className="loading-message">Dashboard betöltése...</p></div></div>;
+  if (error) return <div className="error-container"><div className="error-content"><AlertCircle className="error-icon" /><h2 className="error-title">Hiba történt</h2><p className="error-message">{error}</p><button onClick={fetchData} className="error-retry-btn" disabled={loading}><RefreshCw className={loading ? 'loading-spinner' : ''} />Újrapróbálás</button></div></div>;
   
   const forecast = dashboardData?.next_month_forecast;
   const familyGoals = dashboardData?.goals?.family_goals || [];
   const personalGoals = dashboardData?.goals?.personal_goals || [];
+
+  // === JAVÍTÁS ITT ===
+  const personalAccount = accounts.find(acc => 
+    acc.type === 'személyes' && acc.owner_user_id === user?.id
+  );
 
   return (
     <div className="enhanced-dashboard">
@@ -492,7 +469,11 @@ const DashboardPage = () => {
       
       <div className="dashboard-section-title">Pénzügyi Áttekintés</div>
       <div className="dashboard-grid">
-        <EnhancedFinancialCard financialSummary={dashboardData?.financial_summary} />
+        <EnhancedFinancialCard 
+          financialSummary={dashboardData?.financial_summary}
+          onNewTransaction={handleOpenTransactionModal}
+          personalAccount={personalAccount}
+        />
         
         {forecast?.personal && (
           <ForecastCard 
@@ -538,16 +519,26 @@ const DashboardPage = () => {
       <div className="dashboard-grid">
         <CategorySpendingCard 
           data={analyticsData.categorySpending}
-          onClick={handleCategoryAnalyticsClick}
+          onClick={() => navigate('/analytics?tab=categories')}
         />
 
         <SavingsTrendCard 
           data={analyticsData.savingsTrend}
-          onClick={handleSavingsAnalyticsClick}
+          onClick={() => navigate('/analytics?tab=savings')}
         />
         
         <UpcomingEventsCard events={upcomingEvents} />
       </div>
+
+      <TransactionModal
+        isOpen={isTransactionModalOpen}
+        onClose={() => setTransactionModalOpen(false)}
+        onSave={handleSaveTransaction}
+        transactionType={modalConfig.type}
+        accountName={modalConfig.accountName}
+        categories={categories}
+        onSaveRecurring={() => {}} 
+      />
     </div>
   );
 };

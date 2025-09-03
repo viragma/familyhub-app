@@ -1073,3 +1073,50 @@
     justify-content: center;
   }
 }
+/* === EZT A RÉSZT ADD HOZZÁ A FÁJL VÉGÉHEZ === */
+
+/* Gyorsgombok a pénzügyi kártyán */
+.financial-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem; /* Térköz a statisztikák előtt */
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.quick-action-btn.positive {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+}
+.quick-action-btn.positive:hover {
+  background: var(--success);
+  color: white;
+}
+
+.quick-action-btn.negative {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.quick-action-btn.negative:hover {
+  background: var(--danger);
+  color: white;
+}

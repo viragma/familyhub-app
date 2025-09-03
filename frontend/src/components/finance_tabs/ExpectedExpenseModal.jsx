@@ -15,9 +15,10 @@ const initialState = {
 function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
   const [formData, setFormData] = useState(initialState);
   const [categories, setCategories] = useState([]);
+  // VÁLTOZÁS: Új state annak követésére, hogy mely mezőket érintette már a felhasználó
+  const [touched, setTouched] = useState({});
   const { token, apiUrl } = useAuth();
 
-  // Kategóriák lekérése a modál számára
   useEffect(() => {
     const fetchCategories = async () => {
       if (isOpen && token) {
@@ -34,7 +35,6 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
     fetchCategories();
   }, [isOpen, token, apiUrl]);
 
-  // Form adatok feltöltése, ha szerkesztésre nyílik meg
   useEffect(() => {
     if (isOpen) {
       if (expenseData) {
@@ -43,7 +43,7 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
           estimated_amount: expenseData.estimated_amount || '',
           priority: expenseData.priority || 'közepes',
           category_id: expenseData.category_id || '',
-          due_date_option: 'specific_date', // Szerkesztésnél mindig konkrét dátumot mutatunk
+          due_date_option: 'specific_date',
           due_date: new Date(expenseData.due_date).toISOString().split('T')[0],
           is_recurring: expenseData.is_recurring || false,
           recurring_frequency: expenseData.recurring_frequency || 'havi',
@@ -51,6 +51,8 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
       } else {
         setFormData(initialState);
       }
+      // VÁLTOZÁS: Modál megnyitásakor töröljük az "érintett" állapotokat
+      setTouched({});
     }
   }, [isOpen, expenseData]);
 
@@ -62,12 +64,28 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
     }));
   };
 
+  // VÁLTOZÁS: Új függvény, ami akkor fut le, ha a felhasználó elhagy egy mezőt
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+  };
+
   const handleSave = () => {
-    if (!formData.description || !formData.estimated_amount) {
-      alert('A leírás és a becsült összeg megadása kötelező!');
+    if (isFormInvalid) {
+      // VÁLTOZÁS: Mielőtt mentünk, az összes mezőt "érintetté" tesszük, hogy a hiányzók pirosak legyenek
+      setTouched({ description: true, estimated_amount: true, category_id: true });
       return;
     }
     onSave(formData);
+  };
+
+  const isFormInvalid = !formData.description || !formData.estimated_amount || !formData.category_id;
+  
+  // VÁLTOZÁS: Hiba objektum létrehozása a könnyebb olvashatóságért
+  const errors = {
+    description: touched.description && !formData.description,
+    estimated_amount: touched.estimated_amount && !formData.estimated_amount,
+    category_id: touched.category_id && !formData.category_id,
   };
 
   if (!isOpen) return null;
@@ -79,16 +97,35 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
           <h2 className="modal-title">{expenseData ? 'Tervezett Kiadás Szerkesztése' : 'Új Tervezett Kiadás'}</h2>
           <button className="modal-close-btn" onClick={onClose}>&times;</button>
         </div>
-        
+
         <div className="form-group">
-          <label className="form-label">Leírás</label>
-          <input className="form-input" name="description" value={formData.description} onChange={handleChange} placeholder="Pl. Autó műszaki vizsga" autoFocus/>
+          {/* VÁLTOZÁS: Dinamikus class a label-nek */}
+          <label className={`form-label ${errors.description ? 'form-label-error' : ''}`}>Leírás</label>
+          {/* VÁLTOZÁS: Dinamikus class az inputnak és onBlur esemény */}
+          <input 
+            className={`form-input ${errors.description ? 'form-input-error' : ''}`}
+            name="description" 
+            value={formData.description} 
+            onChange={handleChange} 
+            onBlur={handleBlur}
+            placeholder="Pl. Autó műszaki vizsga" 
+            autoFocus 
+            required 
+          />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
           <div className="form-group">
-            <label className="form-label">Becsült összeg (Ft)</label>
-            <input className="form-input" type="number" name="estimated_amount" value={formData.estimated_amount} onChange={handleChange} />
+            <label className={`form-label ${errors.estimated_amount ? 'form-label-error' : ''}`}>Becsült összeg (Ft)</label>
+            <input 
+              className={`form-input ${errors.estimated_amount ? 'form-input-error' : ''}`}
+              type="number" 
+              name="estimated_amount" 
+              value={formData.estimated_amount} 
+              onChange={handleChange} 
+              onBlur={handleBlur}
+              required 
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Prioritás</label>
@@ -101,9 +138,16 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
         </div>
         
         <div className="form-group">
-          <label className="form-label">Kategória</label>
-          <select className="form-input" name="category_id" value={formData.category_id} onChange={handleChange}>
-            <option value="">Nincs kategória</option>
+          <label className={`form-label ${errors.category_id ? 'form-label-error' : ''}`}>Kategória</label>
+          <select 
+            className={`form-input ${errors.category_id ? 'form-input-error' : ''}`}
+            name="category_id" 
+            value={formData.category_id} 
+            onChange={handleChange} 
+            onBlur={handleBlur}
+            required
+          >
+            <option value="">Válassz kategóriát...</option>
             {categories.map(cat => (
               <optgroup label={cat.name} key={cat.id}>
                 <option value={cat.id}>{cat.name} (Főkategória)</option>
@@ -115,6 +159,7 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
           </select>
         </div>
 
+        {/* ...a többi form-group változatlan... */}
         <div className="form-group">
           <label className="form-label">Esedékesség</label>
           <div style={{ display: 'flex', gap: '1rem' }}>
@@ -128,14 +173,12 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
             )}
           </div>
         </div>
-
         <div className="form-group">
           <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
             <input type="checkbox" name="is_recurring" checked={formData.is_recurring} onChange={handleChange} />
             Legyen ismétlődő? (pl. éves biztosítás)
           </label>
         </div>
-
         {formData.is_recurring && (
           <div className="form-group">
             <label className="form-label">Ismétlődés Gyakorisága</label>
@@ -150,7 +193,9 @@ function ExpectedExpenseModal({ isOpen, onClose, onSave, expenseData }) {
         
         <div className="modal-actions">
           <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={isFormInvalid}>
+            Mentés
+          </button>
         </div>
       </div>
     </div>

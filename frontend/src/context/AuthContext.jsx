@@ -6,7 +6,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('authToken'));
   const [user, setUser] = useState(null);
   
-  const apiUrl = `http://${window.location.hostname}:8000`;
+  const apiUrl =`http://${window.location.hostname}:8000`;
 
   useEffect(() => {
     const fetchUser = async () => {

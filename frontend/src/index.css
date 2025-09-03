@@ -4922,3 +4922,19 @@ body {
     padding: 0.75rem;
   }
 }
+/* A hibás mező címkéjének stílusa */
+.form-label-error {
+  color: #e53e3e; /* Vörös szín a hibás mező címkéjének */
+}
+
+/* A hibás mező inputjának stílusa */
+.form-input-error {
+  border-color: #e53e3e; /* Vörös keret */
+  box-shadow: 0 0 0 1px #e53e3e; /* Finom vörös "ragyogás" fókusz nélkül is */
+}
+
+/* Opcionális: A disabled gomb legyen kicsit áttetszőbb, hogy egyértelműbb legyen */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

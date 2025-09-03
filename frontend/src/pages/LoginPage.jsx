@@ -8,12 +8,12 @@ function LoginPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [pin, setPin] = useState('');
   const navigate = useNavigate();
-  const { token, user, apiUrl,login } = useAuth();
-  // Profilok lekérése a backendtől, amint az oldal betöltődik
+  const { apiUrl, login } = useAuth();
+
+  // Profilok lekérése a backendtől
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
-        // Egyelőre a család ID-ja fixen 1
         const response = await fetch(`${apiUrl}/api/families/1/users`);
         const data = await response.json();
         setProfiles(data);
@@ -36,7 +36,16 @@ function LoginPage() {
     }
   };
 
-  // Ha még nincs profil kiválasztva, a profilválasztót mutatjuk
+  // --- VÁLTOZÁS: Új függvény a PIN kód változásának kezelésére ---
+  // Ez biztosítja, hogy csak számokat lehessen beírni.
+  const handlePinChange = (e) => {
+    const value = e.target.value;
+    if (/^[0-9]*$/.test(value)) {
+        setPin(value);
+    }
+  };
+
+  // Profilválasztó nézet
   if (!selectedUser) {
     return (
       <AuthLayout>
@@ -55,7 +64,7 @@ function LoginPage() {
     );
   }
 
-  // Ha már van kiválasztott profil, a PIN bekérőt mutatjuk
+  // PIN bekérő nézet
   return (
     <AuthLayout>
       <h1 className="auth-title">Üdv, {selectedUser.display_name}!</h1>
@@ -64,7 +73,19 @@ function LoginPage() {
       <form onSubmit={handleLogin}>
         <div className="form-group">
           <label className="form-label" htmlFor="pin">PIN Kód</label>
-          <input id="pin" className="form-input" type="password" value={pin} onChange={e => setPin(e.target.value)} maxLength="4" autoFocus />
+          <input 
+            id="pin" 
+            className="form-input" 
+            type="password" 
+            value={pin} 
+            // --- VÁLTOZÁS: A módosítások itt történtek ---
+            onChange={handlePinChange}      // A dedikált, szűrt függvény használata
+            inputMode="numeric"             // Numerikus billentyűzet mobilokon
+            pattern="[0-9]*"                // Csak számok engedélyezése
+            // --- VÁLTOZÁS VÉGE ---
+            maxLength="4" 
+            autoFocus 
+          />
         </div>
         <button type="submit" className="btn btn-primary btn-full">Belépés</button>
         <button type="button" className="btn btn-secondary btn-full" style={{marginTop: '1rem'}} onClick={() => setSelectedUser(null)}>
