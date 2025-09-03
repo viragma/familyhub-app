@@ -1,29 +1,126 @@
-/* === ENHANCED DASHBOARD ADDITIONS === */
-/* Add these styles to the existing Dashboard.css file */
+/* ===================================== */
+/* DASHBOARD KOMPONENS - SZÉP VERZIÓ    */
+/* ===================================== */
 
-/* Enhanced Dashboard Layout */
-.enhanced-dashboard {
+/* === FŐKONTÉNER === */
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
   display: flex;
   flex-direction: column;
   gap: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 1rem;
 }
 
-/* Enhanced Financial Card */
-.enhanced-financial-card {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary)) 100%);
+/* === SZEKCIÓK === */
+.dashboard-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--accent-primary);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+/* === ALAP DASHBOARD KÁRTYA === */
+.dashboard-card {
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 2rem;
-  position: relative;
-  overflow: hidden;
-  grid-column: 1 / -1;
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
 
-.enhanced-financial-card::before {
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.period-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
+  padding: 0.375rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.header-icon {
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  padding: 0.5rem;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.card-footer:hover {
+  color: var(--accent-primary);
+}
+
+/* ========================================= */
+/* PÉNZÜGYI ÁTTEKINTÉS KÁRTYA              */
+/* ========================================= */
+
+.financial-overview {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary)) 100%);
+  border: 1px solid var(--accent-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.financial-overview::before {
   content: '';
   position: absolute;
   top: 0;
@@ -33,58 +130,12 @@
   background: var(--accent-gradient);
 }
 
-.enhanced-financial-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
+/* Egyenleg szekció */
+.balance-section {
+  margin-bottom: 1.5rem;
 }
 
-.financial-title-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.enhanced-financial-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.financial-period-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
-  color: var(--accent-primary);
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  width: fit-content;
-}
-
-.enhanced-financial-icon {
-  width: 40px;
-  height: 40px;
-  color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-  border-radius: 50%;
-  padding: 8px;
-}
-
-/* Enhanced Balance Section */
-.enhanced-balance-section {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: var(--bg-primary);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-}
-
-.primary-balance {
+.main-balance {
   text-align: center;
   margin-bottom: 1rem;
 }
@@ -97,7 +148,7 @@
   font-weight: 500;
 }
 
-.balance-amount-large {
+.balance-amount {
   display: block;
   font-size: 2.5rem;
   font-weight: 800;
@@ -105,123 +156,282 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 0.5rem;
   line-height: 1.1;
+  margin-bottom: 0.5rem;
 }
 
-.secondary-balance {
+.personal-balance {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border-radius: 12px;
   border: 1px solid var(--border);
 }
 
-.personal-balance-label {
+.personal-label {
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-.personal-balance-amount {
+.personal-amount {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-/* Enhanced Stats Grid */
-.enhanced-stats-grid {
+/* GYORS MŰVELETEK - KRITIKUS RÉSZ! */
+.quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
-.enhanced-stat-card {
+.quick-btn {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  background: var(--bg-secondary);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 44px; /* Touch optimalizálás */
 }
 
-.enhanced-stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--border);
-  transition: all 0.3s ease;
-}
-
-.enhanced-stat-card.positive::before {
-  background: var(--success);
-}
-
-.enhanced-stat-card.negative::before {
-  background: var(--danger);
-}
-
-.enhanced-stat-card.savings.positive::before {
-  background: linear-gradient(45deg, var(--success), #48bb78);
-}
-
-.enhanced-stat-card.savings.negative::before {
-  background: linear-gradient(45deg, var(--danger), #fc8181);
-}
-
-.enhanced-stat-card.rate::before {
-  background: var(--accent-primary);
-}
-
-.enhanced-stat-card:hover {
+.quick-btn:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
-/* Goals Group Cards */
-.goals-group-card {
-  background: var(--bg-secondary);
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-  transition: all 0.3s ease;
+.quick-btn.income {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
 }
 
-.goals-group-card:hover {
-  box-shadow: var(--shadow-lg);
+.quick-btn.income:hover {
+  background: var(--success);
+  color: white;
 }
 
-.goals-group-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--accent-primary) 3%, var(--bg-secondary));
+.quick-btn.expense {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
 }
 
-.goals-group-title-section {
-  display: flex;
-  align-items: center;
+.quick-btn.expense:hover {
+  background: var(--danger);
+  color: white;
+}
+
+/* Statisztikák rács */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
 }
 
-.goals-group-title {
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin: 0;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  word-break: break-all;
+}
+
+/* Színek a statisztikákhoz */
+.stat-item.income {
+  border-left: 4px solid var(--success);
+}
+
+.stat-item.expense {
+  border-left: 4px solid var(--danger);
+}
+
+.stat-item.savings.positive {
+  border-left: 4px solid var(--success);
+}
+
+.stat-item.savings.negative {
+  border-left: 4px solid var(--danger);
+}
+
+.stat-item.rate {
+  border-left: 4px solid var(--accent-primary);
+}
+
+/* ========================================= */
+/* ELŐREJELZÉS KÁRTYA                      */
+/* ========================================= */
+
+.forecast-card {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--success) 3%, var(--bg-secondary)) 100%);
+  border: 1px solid color-mix(in srgb, var(--success) 20%, var(--border));
+}
+
+.forecast-summary {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.forecast-label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.forecast-amount {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.forecast-amount.positive {
+  color: var(--success);
+}
+
+.forecast-amount.negative {
+  color: var(--danger);
+}
+
+.forecast-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.forecast-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.forecast-item.income {
+  border-left: 4px solid var(--success);
+}
+
+.forecast-item.expense {
+  border-left: 4px solid var(--danger);
+}
+
+.forecast-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.forecast-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.forecast-item-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.forecast-item-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.forecast-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--warning);
+  font-style: italic;
+}
+
+/* ========================================= */
+/* CÉLOK SZEKCIÓ                           */
+/* ========================================= */
+
+.goals-section {
+  padding: 0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
   color: var(--text-primary);
 }
 
-.goals-count-badge {
+.count-badge {
   background: var(--accent-gradient);
   color: white;
   padding: 0.25rem 0.75rem;
@@ -230,14 +440,14 @@
   font-weight: 600;
 }
 
-.goals-group-actions {
+.section-actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
 }
 
-.toggle-goals-btn,
-.view-all-goals-btn {
+.toggle-btn,
+.view-all-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -252,63 +462,57 @@
   transition: all 0.3s ease;
 }
 
-.toggle-goals-btn:hover,
-.view-all-goals-btn:hover {
+.toggle-btn:hover,
+.view-all-btn:hover {
   color: var(--text-primary);
   border-color: var(--accent-primary);
   background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
 }
 
-.view-all-goals-btn {
+.view-all-btn {
   background: var(--accent-gradient);
   color: white;
   border-color: transparent;
 }
 
-.view-all-goals-btn:hover {
+.view-all-btn:hover {
   background: color-mix(in srgb, var(--accent-primary) 90%, black);
 }
 
-/* Compact Goals Grid */
-.compact-goals-grid {
+.goals-grid {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1.5rem 2rem 2rem;
+  padding: 1.5rem;
 }
 
-/* Compact Goal Cards */
-.compact-goal-card {
+/* ========================================= */
+/* CÉL KÁRTYA                              */
+/* ========================================= */
+
+.goal-card {
   background: var(--bg-primary);
-  border-radius: 16px;
-  padding: 1.5rem;
+  border-radius: 12px;
+  padding: 1.25rem;
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
 }
 
-.compact-goal-card:hover {
+.goal-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--accent-primary);
 }
 
-.compact-goal-header {
+.goal-header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
+  gap: 1rem;
   margin-bottom: 1rem;
-  gap: 1rem;
 }
 
-.compact-goal-info {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  flex: 1;
-}
-
-.compact-goal-icon {
+.goal-icon {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -316,33 +520,23 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
 }
 
-.compact-goal-icon.family {
-  background: color-mix(in srgb, #4299e1 15%, transparent);
-  color: #4299e1;
-}
-
-.compact-goal-icon.personal {
-  background: color-mix(in srgb, #48bb78 15%, transparent);
-  color: #48bb78;
-}
-
-.compact-goal-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.goal-info {
   flex: 1;
+  min-width: 0;
 }
 
-.compact-goal-name {
+.goal-name {
   font-size: 1.1rem;
   font-weight: 600;
-  margin: 0;
+  margin: 0 0 0.5rem 0;
   color: var(--text-primary);
 }
 
-.compact-goal-owner {
+.goal-owner {
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -351,29 +545,29 @@
   font-weight: 500;
 }
 
-.compact-goal-amount-section {
+.goal-amount {
   text-align: right;
   flex-shrink: 0;
 }
 
-.compact-goal-current {
+.current-amount {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
 }
 
-.compact-goal-target {
+.target-amount {
   font-size: 0.875rem;
   color: var(--text-secondary);
 }
 
-/* Compact Goal Progress */
-.compact-goal-progress {
+/* Cél progress */
+.goal-progress {
   margin-bottom: 1rem;
 }
 
-.compact-progress-bar {
+.progress-bar {
   height: 8px;
   background: var(--bg-secondary);
   border-radius: 10px;
@@ -382,50 +576,50 @@
   margin-bottom: 0.75rem;
 }
 
-.compact-progress-fill {
+.progress-fill {
   height: 100%;
   border-radius: 10px;
   transition: width 0.5s ease;
 }
 
-.compact-progress-fill.family {
+.progress-fill.family {
   background: linear-gradient(to right, #4299e1, #3182ce);
 }
 
-.compact-progress-fill.personal {
+.progress-fill.personal {
   background: linear-gradient(to right, #48bb78, #38a169);
 }
 
-.compact-progress-info {
+.progress-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.875rem;
 }
 
-.compact-progress-percentage {
+.progress-percentage {
   font-weight: 700;
   color: var(--accent-primary);
 }
 
-.compact-goal-date {
+.goal-date {
   display: flex;
   align-items: center;
   gap: 0.25rem;
   color: var(--text-secondary);
 }
 
-.compact-goal-remaining {
+.goal-remaining {
   font-size: 0.875rem;
   color: var(--text-secondary);
   text-align: center;
   background: color-mix(in srgb, var(--warning) 10%, transparent);
-  padding: 0.5rem;
+  padding: 0.75rem;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent);
 }
 
-.compact-goal-completed {
+.goal-completed {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -439,30 +633,54 @@
   font-weight: 600;
 }
 
-/* Compact Analytics Cards */
-.compact-analytics {
-  min-height: auto !important;
+/* ========================================= */
+/* ANALITIKAI KÁRTYÁK                     */
+/* ========================================= */
+
+.analytics-card {
+  cursor: pointer;
 }
 
-.compact-chart-section {
+.analytics-card:hover {
+  border-color: var(--accent-primary);
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+/* Chart szekció */
+.chart-section {
   display: flex;
   gap: 1rem;
   align-items: center;
   margin-bottom: 1rem;
 }
 
-.compact-chart-container {
+.chart-container {
   flex-shrink: 0;
 }
 
-.compact-legend {
+.legend {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.compact-legend-item {
+.legend-item {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -482,7 +700,7 @@
   font-weight: 500;
 }
 
-.legend-amount {
+.legend-percentage {
   color: var(--accent-primary);
   font-weight: 600;
 }
@@ -495,8 +713,8 @@
   margin-top: 0.5rem;
 }
 
-/* Compact Trend Summary */
-.compact-trend-summary {
+/* Trend összefoglaló */
+.trend-summary {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -510,12 +728,12 @@
 .trend-current {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
 }
 
 .trend-label {
   font-size: 0.875rem;
   color: var(--text-secondary);
-  margin-bottom: 0.25rem;
   font-weight: 500;
 }
 
@@ -537,8 +755,6 @@
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
-  font-size: 1.5rem;
-  font-weight: bold;
 }
 
 .trend-indicator.up {
@@ -549,149 +765,8 @@
   color: var(--danger);
 }
 
-.trend-change {
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-/* === MODERN ANALYTICS CARDS === */
-.modern-analytics-card {
-  background: var(--bg-secondary);
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  padding: 0;
-  overflow: hidden;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  position: relative;
-}
-
-.modern-analytics-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-xl);
-  border-color: var(--accent-primary);
-}
-
-.modern-analytics-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--accent-gradient);
-  transform: scaleX(0);
-  transition: transform 0.2s ease;
-}
-
-.modern-analytics-card:hover::before {
-  transform: scaleX(1);
-}
-
-/* Modern Analytics Header */
-.modern-analytics-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1.5rem 1.5rem 1rem;
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--accent-primary) 3%, var(--bg-secondary)) 100%);
-}
-
-.analytics-title-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.modern-analytics-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.analytics-period-badge {
-  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
-  color: var(--accent-primary);
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  width: fit-content;
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent);
-}
-
-.analytics-icon-wrapper {
-  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
-  border-radius: 50%;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modern-analytics-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--accent-primary);
-}
-
-/* Modern Analytics Summary */
-.modern-analytics-summary {
-  padding: 0 1.5rem 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-.summary-amount {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.summary-label {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.summary-value {
+.trend-arrow {
   font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-.summary-value.positive {
-  color: var(--success);
-}
-
-.summary-value.negative {
-  color: var(--danger);
-}
-
-.trend-indicators {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: flex-end;
-}
-
-.trend-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.trend-indicator.up {
-  color: var(--success);
-}
-
-.trend-indicator.down {
-  color: var(--danger);
 }
 
 .trend-change {
@@ -699,341 +774,146 @@
   font-weight: 500;
 }
 
-.avg-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
-}
+/* ========================================= */
+/* LOADING ÉS ERROR STATES                 */
+/* ========================================= */
 
-.avg-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.avg-value {
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-/* Modern Chart Section */
-.modern-chart-section {
-  padding: 0 1.5rem 1rem;
-}
-
-.chart-and-legend {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.modern-chart-container {
-  flex-shrink: 0;
-}
-
-.modern-chart-container.full-width {
-  width: 100%;
-}
-
-/* Modern Legend */
-.modern-legend {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-width: 0;
-}
-
-.modern-legend-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  transition: all 0.2s ease;
-}
-
-.modern-legend-item:hover {
-  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
-  border-color: var(--accent-primary);
-  transform: translateX(2px);
-}
-
-.legend-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.legend-color {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.legend-name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.legend-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.125rem;
-  flex-shrink: 0;
-}
-
-.legend-percentage {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--accent-primary);
-}
-
-.legend-amount {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.legend-more-info {
-  text-align: center;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-style: italic;
-  padding: 0.5rem;
-  background: var(--bg-primary);
-  border-radius: 6px;
-}
-
-/* Modern Analytics Empty State */
-.modern-analytics-empty {
-  padding: 2rem 1.5rem;
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.empty-chart-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding: 1.5rem;
-  background: var(--bg-primary);
-  border-radius: 12px;
-  border: 2px dashed var(--border);
-}
-
-.empty-chart-placeholder svg {
-  color: color-mix(in srgb, var(--text-secondary) 60%, transparent);
-}
-
-.empty-chart-placeholder span {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.modern-analytics-empty p {
-  font-size: 0.875rem;
-  margin: 0;
-}
-
-/* Modern Analytics Footer */
-.modern-analytics-footer {
+.loading-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
-  background: var(--bg-primary);
-  border-top: 1px solid var(--border);
-  font-size: 0.875rem;
-  font-weight: 600;
+  min-height: 400px;
+  padding: 2rem;
+}
+
+.loading-content,
+.error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  max-width: 400px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-icon {
+  color: var(--danger);
+  font-size: 3rem;
+}
+
+.error-content h2 {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.error-content p {
   color: var(--text-secondary);
-  transition: all 0.3s ease;
+  margin: 0;
 }
 
-.modern-analytics-card:hover .modern-analytics-footer {
-  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary));
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-}
+/* ========================================= */
+/* RESZPONZÍV DESIGN                       */
+/* ========================================= */
 
-/* Mobile Responsiveness for Modern Analytics */
 @media (max-width: 768px) {
-  .modern-analytics-header {
-    padding: 1rem 1rem 0.75rem;
-  }
-
-  .modern-analytics-title {
-    font-size: 1rem;
-  }
-
-  .modern-analytics-summary {
-    padding: 0 1rem 0.75rem;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-
-  .trend-indicators {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .chart-and-legend {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .modern-chart-section {
-    padding: 0 1rem 0.75rem;
-  }
-
-  .modern-analytics-footer {
-    padding: 0.75rem 1rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .modern-analytics-header {
-    padding: 0.75rem 0.75rem 0.5rem;
-  }
-
-  .modern-analytics-summary {
-    padding: 0 0.75rem 0.5rem;
-  }
-
-  .modern-chart-section {
-    padding: 0 0.75rem 0.5rem;
-  }
-
-  .modern-legend-item {
-    padding: 0.375rem 0.5rem;
-  }
-
-  .legend-name {
-    font-size: 0.8rem;
-  }
-
-  .legend-percentage {
-    font-size: 0.8rem;
-  }
-
-  .legend-amount {
-    font-size: 0.7rem;
-  }
-
-  .modern-analytics-footer {
-    padding: 0.75rem;
-  }
-}
-
-/* === ENHANCED DASHBOARD MOBILE IMPROVEMENTS === */
-@media (max-width: 768px) {
-  .dashboard-section-title {
-    font-size: 1rem;
-    padding: 0.75rem 0 0.5rem;
-    margin-top: 1.5rem;
-  }
-
-  .enhanced-dashboard {
-    gap: 1.25rem;
-  }
-}
-
-/* === COMPACT ANALYTICS OVERRIDE === */
-@media (max-width: 768px) {
-  .enhanced-dashboard {
+  .dashboard-container {
     padding: 0 0.5rem;
+    gap: 1.5rem;
+  }
+  
+  .dashboard-grid {
+    grid-template-columns: 1fr;
     gap: 1rem;
   }
-
-  .enhanced-financial-card {
+  
+  .dashboard-card {
     padding: 1rem;
   }
-
-  .enhanced-financial-header {
-    flex-direction: column;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+  
+  .section-title {
+    font-size: 1.25rem;
   }
-
-  .balance-amount-large {
+  
+  /* Pénzügyi kártya mobil */
+  .balance-amount {
     font-size: 2rem;
   }
-
-  .enhanced-balance-section {
-    padding: 1rem;
-  }
-
-  .secondary-balance {
-    flex-direction: column;
-    gap: 0.5rem;
-    text-align: center;
-  }
-
-  .enhanced-stats-grid {
+  
+  .quick-actions {
     grid-template-columns: 1fr;
     gap: 0.75rem;
   }
-
-  .goals-group-header {
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  /* Előrejelzés kártya mobil */
+  .forecast-amount {
+    font-size: 1.5rem;
+  }
+  
+  .forecast-details {
+    gap: 0.75rem;
+  }
+  
+  .forecast-item {
+    padding: 0.5rem;
+  }
+  
+  /* Célok szekció mobil */
+  .section-header {
     padding: 1rem;
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-
-  .goals-group-actions {
+  
+  .section-actions {
     width: 100%;
     justify-content: space-between;
   }
-
-  .compact-goals-grid {
+  
+  .goals-grid {
     padding: 1rem;
   }
-
-  .compact-goal-card {
+  
+  .goal-card {
     padding: 1rem;
   }
-
-  .compact-goal-header {
+  
+  .goal-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+    gap: 0.75rem;
   }
-
-  .compact-goal-info {
-    width: 100%;
-  }
-
-  .compact-goal-amount-section {
+  
+  .goal-amount {
     text-align: left;
     width: 100%;
   }
-
-  .compact-chart-section {
+  
+  /* Chart szekció mobil */
+  .chart-section {
     flex-direction: column;
     gap: 0.75rem;
   }
-
-  .compact-trend-summary {
+  
+  .trend-summary {
     flex-direction: column;
     gap: 0.75rem;
     text-align: center;
@@ -1041,82 +921,47 @@
 }
 
 @media (max-width: 480px) {
-  .enhanced-financial-card {
+  .dashboard-container {
+    padding: 0 0.25rem;
+  }
+  
+  .dashboard-card {
     padding: 0.75rem;
   }
-
-  .balance-amount-large {
+  
+  .balance-amount {
     font-size: 1.75rem;
   }
-
-  .enhanced-stats-grid {
-    gap: 0.5rem;
-  }
-
-  .enhanced-stat-card {
+  
+  .quick-btn {
     padding: 0.75rem;
-    gap: 0.75rem;
+    font-size: 0.8rem;
   }
-
-  .compact-goal-card {
+  
+  .goal-card {
     padding: 0.75rem;
   }
-
-  .goals-group-actions {
+  
+  .section-actions {
     flex-direction: column;
     gap: 0.5rem;
   }
-
-  .toggle-goals-btn,
-  .view-all-goals-btn {
+  
+  .toggle-btn,
+  .view-all-btn {
     width: 100%;
     justify-content: center;
   }
 }
-/* === EZT A RÉSZT ADD HOZZÁ A FÁJL VÉGÉHEZ === */
 
-/* Gyorsgombok a pénzügyi kártyán */
-.financial-quick-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 2rem; /* Térköz a statisztikák előtt */
-}
-
-.quick-action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.quick-action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.quick-action-btn.positive {
-  background: color-mix(in srgb, var(--success) 15%, transparent);
-  color: var(--success);
-  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
-}
-.quick-action-btn.positive:hover {
-  background: var(--success);
-  color: white;
-}
-
-.quick-action-btn.negative {
-  background: color-mix(in srgb, var(--danger) 15%, transparent);
-  color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
-}
-.quick-action-btn.negative:hover {
-  background: var(--danger);
-  color: white;
+/* ========================================= */
+/* TOUCH OPTIMALIZATION                     */
+/* ========================================= */
+@media (pointer: coarse) {
+  .quick-btn,
+  .toggle-btn,
+  .view-all-btn,
+  .goal-card {
+    min-height: 44px;
+  }
 }
