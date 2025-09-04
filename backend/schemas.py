@@ -595,6 +595,39 @@ class GoalCloseRequest(BaseModel):
     category_id: Optional[int] = Field(None, description="A létrehozandó statisztikai tranzakció kategóriája.")
     remainder_destination_account_id: Optional[int] = Field(None, description="A maradványösszeg célkasszájának ID-ja.")
 
+class FinancialSummary(BaseModel):
+    total_balance: float
+    personal_balance: float
+    monthly_income: float
+    monthly_expense: float
+    monthly_savings: float
+    view_type: str
+    personal_income: float
+    personal_expense: float
+
+class ForecastData(BaseModel):
+    projected_income: float
+    projected_expenses: float
+
+class Forecast(BaseModel):
+    personal: Optional[ForecastData] = None
+    family: Optional[ForecastData] = None
+    view_type: str
+
+class Goals(BaseModel):
+    personal_goals: List[Account]
+    family_goals: List[Account]
+
+class DashboardResponse(BaseModel):
+    financial_summary: FinancialSummary
+    next_month_forecast: Forecast
+    current_month_forecast: Forecast
+    goals: Goals
+
+    class Config:
+        from_attributes = True
+
+
 # Forward reference frissítések
 Wish.model_rebuild()
 User.model_rebuild() # Ha a User sémába is bekerül a Wish

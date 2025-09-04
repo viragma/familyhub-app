@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Target, TrendingUp, Calendar, User, Users, CheckCircle, 
-  Plus, Minus, RefreshCw, AlertCircle, PieChart as PieChartIcon, 
+import {
+  Target, TrendingUp, Calendar, User, Users, CheckCircle,
+  Plus, Minus, RefreshCw, AlertCircle, PieChart as PieChartIcon,
   BarChart3, Eye, ArrowRight, DollarSign
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
@@ -11,64 +11,7 @@ import '../components/Dashboard.css';
 import UpcomingEventsCard from '../components/UpcomingEventsCard';
 import NotificationBar from '../components/NotificationBar';
 import TransactionModal from '../components/TransactionModal';
-
-// === EGYSZERŰ ELŐREJELZÉS KÁRTYA ===
-const SimpleForecastCard = ({ forecastData, title }) => {
-  if (!forecastData) return null;
-
-  const expectedIncome = forecastData.expected_income || 0;
-  const expectedExpense = forecastData.expected_expense || 0;
-  const expectedBalance = expectedIncome - expectedExpense;
-
-  return (
-    <div className="dashboard-card forecast-card">
-      <div className="card-header">
-        <div className="header-content">
-          <h3>{title}</h3>
-          <div className="period-badge">
-            <Calendar size={14} />
-            Következő hónap
-          </div>
-        </div>
-        <TrendingUp className="header-icon" />
-      </div>
-
-      <div className="forecast-summary">
-        <div className="forecast-balance">
-          <span className="forecast-label">Várható egyenleg változás</span>
-          <span className={`forecast-amount ${expectedBalance >= 0 ? 'positive' : 'negative'}`}>
-            {expectedBalance >= 0 ? '+' : ''}{expectedBalance.toLocaleString('hu-HU')} Ft
-          </span>
-        </div>
-      </div>
-
-      <div className="forecast-details">
-        <div className="forecast-item income">
-          <div className="forecast-icon">💰</div>
-          <div className="forecast-content">
-            <span className="forecast-item-label">Várható bevétel</span>
-            <span className="forecast-item-value">+{expectedIncome.toLocaleString('hu-HU')} Ft</span>
-          </div>
-        </div>
-        
-        <div className="forecast-item expense">
-          <div className="forecast-icon">💸</div>
-          <div className="forecast-content">
-            <span className="forecast-item-label">Várható kiadás</span>
-            <span className="forecast-item-value">-{expectedExpense.toLocaleString('hu-HU')} Ft</span>
-          </div>
-        </div>
-      </div>
-
-      {forecastData.note && (
-        <div className="forecast-note">
-          <AlertCircle size={14} />
-          {forecastData.note}
-        </div>
-      )}
-    </div>
-  );
-};
+import ForecastCard from '../components/ForecastCard';
 
 // === KOMPAKT CÉL KÁRTYA KOMPONENS ===
 const CompactGoalCard = ({ goal, type = "personal" }) => {
@@ -78,7 +21,7 @@ const CompactGoalCard = ({ goal, type = "personal" }) => {
   const goalAmount = goal.goal_amount || 0;
   const progress = goalAmount > 0 ? Math.min((balance / goalAmount) * 100, 100) : 0;
   const remainingAmount = Math.max(goalAmount - balance, 0);
-  
+
   const handleCardClick = () => {
     navigate(`/finances/account/${goal.id}`);
   };
@@ -107,10 +50,10 @@ const CompactGoalCard = ({ goal, type = "personal" }) => {
           </div>
         </div>
       </div>
-      
+
       <div className="goal-progress">
         <div className="progress-bar">
-          <div 
+          <div
             className={`progress-fill ${isFamily ? 'family' : 'personal'}`}
             style={{ width: `${progress}%` }}
           />
@@ -120,9 +63,9 @@ const CompactGoalCard = ({ goal, type = "personal" }) => {
           {goal.goal_date && (
             <span className="goal-date">
               <Calendar size={12} />
-              {new Date(goal.goal_date).toLocaleDateString('hu-HU', { 
-                month: 'short', 
-                day: 'numeric' 
+              {new Date(goal.goal_date).toLocaleDateString('hu-HU', {
+                month: 'short',
+                day: 'numeric'
               })}
             </span>
           )}
@@ -147,7 +90,7 @@ const CompactGoalCard = ({ goal, type = "personal" }) => {
 const GoalsSection = ({ title, goals, type, icon }) => {
   const navigate = useNavigate();
   const [showAll, setShowAll] = useState(false);
-  
+
   if (!goals || goals.length === 0) return null;
 
   const maxDisplay = 3;
@@ -162,10 +105,10 @@ const GoalsSection = ({ title, goals, type, icon }) => {
           <h3>{title}</h3>
           <span className="count-badge">{goals.length}</span>
         </div>
-        
+
         <div className="section-actions">
           {hasMore && (
-            <button 
+            <button
               className="toggle-btn"
               onClick={() => setShowAll(!showAll)}
             >
@@ -173,7 +116,7 @@ const GoalsSection = ({ title, goals, type, icon }) => {
               {showAll ? 'Kevesebb' : `+${goals.length - maxDisplay}`}
             </button>
           )}
-          <button 
+          <button
             className="view-all-btn"
             onClick={() => navigate('/finances')}
           >
@@ -182,12 +125,12 @@ const GoalsSection = ({ title, goals, type, icon }) => {
           </button>
         </div>
       </div>
-      
+
       <div className="goals-grid">
         {displayedGoals.map(goal => (
-          <CompactGoalCard 
-            key={goal.id} 
-            goal={goal} 
+          <CompactGoalCard
+            key={goal.id}
+            goal={goal}
             type={type}
           />
         ))}
@@ -205,7 +148,7 @@ const FinancialOverviewCard = ({ financialSummary, onNewTransaction, personalAcc
   const monthlyIncome = financialSummary.monthly_income || 0;
   const monthlyExpense = financialSummary.monthly_expense || 0;
   const monthlySavings = financialSummary.monthly_savings || 0;
-  
+
   const savingsRate = monthlyIncome > 0 ? ((monthlySavings / monthlyIncome) * 100) : 0;
   const isParentView = financialSummary.view_type === 'parent';
 
@@ -231,7 +174,7 @@ const FinancialOverviewCard = ({ financialSummary, onNewTransaction, personalAcc
             {totalBalance.toLocaleString('hu-HU')} Ft
           </span>
         </div>
-        
+
         {isParentView && personalBalance !== null && (
           <div className="personal-balance">
             <span className="personal-label">Saját egyenleg</span>
@@ -242,17 +185,16 @@ const FinancialOverviewCard = ({ financialSummary, onNewTransaction, personalAcc
         )}
       </div>
 
-      {/* GYORS MŰVELETEK - FONTOS! */}
       {personalAccount && (
         <div className="quick-actions">
-          <button 
+          <button
             className="quick-btn income"
             onClick={() => onNewTransaction('bevétel', personalAccount.id, personalAccount.name)}
           >
             <Plus size={18} />
             Bevétel
           </button>
-          <button 
+          <button
             className="quick-btn expense"
             onClick={() => onNewTransaction('kiadás', personalAccount.id, personalAccount.name)}
           >
@@ -270,7 +212,7 @@ const FinancialOverviewCard = ({ financialSummary, onNewTransaction, personalAcc
             <span className="stat-value">+{monthlyIncome.toLocaleString('hu-HU')} Ft</span>
           </div>
         </div>
-        
+
         <div className="stat-item expense">
           <div className="stat-icon">📉</div>
           <div className="stat-content">
@@ -278,7 +220,7 @@ const FinancialOverviewCard = ({ financialSummary, onNewTransaction, personalAcc
             <span className="stat-value">-{monthlyExpense.toLocaleString('hu-HU')} Ft</span>
           </div>
         </div>
-        
+
         <div className={`stat-item savings ${monthlySavings >= 0 ? 'positive' : 'negative'}`}>
           <div className="stat-icon">{monthlySavings >= 0 ? '💰' : '⚠️'}</div>
           <div className="stat-content">
@@ -289,7 +231,7 @@ const FinancialOverviewCard = ({ financialSummary, onNewTransaction, personalAcc
             </span>
           </div>
         </div>
-        
+
         <div className="stat-item rate">
           <div className="stat-icon">📊</div>
           <div className="stat-content">
@@ -302,9 +244,11 @@ const FinancialOverviewCard = ({ financialSummary, onNewTransaction, personalAcc
   );
 };
 
-// === KATEGÓRIA KÖLTÉS KÁRTYA ===
+// === KATEGÓRIA KÖLTÉS KÁRTYA (Javítva) ===
 const CategorySpendingCard = ({ data, onClick }) => {
-  if (!data || !data.length) {
+  const validData = (data || []).filter(item => item.name && Math.abs(item.amount) > 0);
+
+  if (!validData || validData.length === 0) {
     return (
       <div className="dashboard-card analytics-card" onClick={onClick}>
         <div className="card-header">
@@ -315,20 +259,22 @@ const CategorySpendingCard = ({ data, onClick }) => {
           <div className="empty-icon">📊</div>
           <p>Nincs adat az aktuális hónapra</p>
         </div>
+        <div className="card-footer">
+          <ArrowRight size={14} />
+          Részletek
+        </div>
       </div>
     );
   }
 
-  // Alapértelmezett színek ha nincsenek
-  const colors = ['#4299e1', '#48bb78', '#f59e0b', '#ef4444', '#8b5cf6'];
-  
-  // Adatok előkészítése színekkel
-  const processedData = data.slice(0, 5).map((item, index) => ({
+  const colors = ['#4299e1', '#48bb78', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6d28d9'];
+  const processedData = validData.slice(0, 5).map((item, index) => ({
     ...item,
+    amount: Math.abs(item.amount), 
     color: item.color || colors[index % colors.length]
   }));
-
-  const totalAmount = data.reduce((sum, item) => sum + Math.abs(item.amount || 0), 0);
+  
+  const totalAmount = processedData.reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <div className="dashboard-card analytics-card" onClick={onClick}>
@@ -336,26 +282,38 @@ const CategorySpendingCard = ({ data, onClick }) => {
         <h3>Kategóriás költések</h3>
         <PieChartIcon size={24} />
       </div>
-      
+
       <div className="chart-section">
         <div className="chart-container">
-          <ResponsiveContainer width="100%" height={160}>
+          {/* JAVÍTVA: ResponsiveContainer magasságot kapott */}
+          <ResponsiveContainer width="100%" height={160}> 
             <PieChart>
               <Pie
                 data={processedData}
-                cx="50%"
-                cy="50%"
-                innerRadius={30}
-                outerRadius={60}
+                cx="50%" // JAVÍTVA: Középre igazítás
+                cy="50%" // JAVÍTVA: Középre igazítás
+                innerRadius={40} // Kicsit megnöveltem a belső sugarat
+                outerRadius={70} // Kicsit megnöveltem a külső sugarat
+                fill="#8884d8"
+                paddingAngle={2} // Kicsit csökkentettem a hézagot
                 dataKey="amount"
-                nameKey="name"
+                nameKey="name" 
+                labelLine={false}
               >
                 {processedData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip 
-                formatter={(value) => [`${Math.abs(value).toLocaleString('hu-HU')} Ft`, 'Költés']} 
+              <Tooltip
+                formatter={(value, name) => [`${value.toLocaleString('hu-HU')} Ft`, name]}
+                contentStyle={{ 
+                    backgroundColor: 'var(--card-bg-darker)', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)' 
+                }}
+                labelStyle={{ color: 'var(--text-color-primary)' }}
+                itemStyle={{ color: 'var(--text-color-secondary)' }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -367,12 +325,12 @@ const CategorySpendingCard = ({ data, onClick }) => {
               <div className="legend-color" style={{ backgroundColor: item.color }} />
               <span className="legend-name">{item.name || 'Ismeretlen'}</span>
               <span className="legend-percentage">
-                {totalAmount > 0 ? ((Math.abs(item.amount) / totalAmount) * 100).toFixed(0) : 0}%
+                {totalAmount > 0 ? ((item.amount / totalAmount) * 100).toFixed(0) : 0}%
               </span>
             </div>
           ))}
-          {data.length > 3 && (
-            <div className="legend-more">+{data.length - 3} további</div>
+          {validData.length > 3 && (
+            <div className="legend-more">+{validData.length - 3} további</div>
           )}
         </div>
       </div>
@@ -421,7 +379,7 @@ const SavingsTrendCard = ({ data, onClick }) => {
             {latestSavings >= 0 ? '+' : ''}{latestSavings.toLocaleString('hu-HU')} Ft
           </span>
         </div>
-        
+
         <div className={`trend-indicator ${trend}`}>
           <div className="trend-arrow">
             {trend === 'up' ? '↗️' : '↘️'}
@@ -435,20 +393,20 @@ const SavingsTrendCard = ({ data, onClick }) => {
       <div className="chart-container">
         <ResponsiveContainer width="100%" height={120}>
           <LineChart data={data.slice(-6)}>
-            <XAxis 
-              dataKey="month" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fontSize: 11 }} 
+            <XAxis
+              dataKey="month"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 11 }}
             />
             <YAxis hide />
-            <Tooltip 
-              formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Megtakarítás']} 
+            <Tooltip
+              formatter={(value) => [`${value.toLocaleString('hu-HU')} Ft`, 'Megtakarítás']}
             />
-            <Line 
-              type="monotone" 
-              dataKey="savings" 
-              stroke="#4299e1" 
+            <Line
+              type="monotone"
+              dataKey="savings"
+              stroke="#4299e1"
               strokeWidth={2}
               dot={{ fill: '#4299e1', r: 3 }}
             />
@@ -464,272 +422,202 @@ const SavingsTrendCard = ({ data, onClick }) => {
   );
 };
 
-// === FŐ DASHBOARD KOMPONENS ===
+// === FŐ DASHBOARD KOMPONENS (Véglegesen Javított) ===
 const DashboardPage = () => {
-  const { user, token, apiUrl, logout } = useAuth();
-  const navigate = useNavigate();
+    const { user, token, apiUrl, logout } = useAuth();
+    const navigate = useNavigate();
   
-  // State-ek
-  const [dashboardData, setDashboardData] = useState(null);
-  const [accounts, setAccounts] = useState([]);
-  const [analyticsData, setAnalyticsData] = useState({
-    categorySpending: null,
-    savingsTrend: null
-  });
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
-  const [error, setError] = useState(null);
+    const [dashboardData, setDashboardData] = useState(null);
+    const [accounts, setAccounts] = useState([]);
+    const [analyticsData, setAnalyticsData] = useState({ categorySpending: null, savingsTrend: null });
+    const [upcomingEvents, setUpcomingEvents] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+    const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
+    const [modalConfig, setModalConfig] = useState({ type: '', accountId: null, accountName: '' });
   
-  // Tranzakció modal
-  const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ 
-    type: '', 
-    accountId: null, 
-    accountName: '' 
-  });
-  const [categories, setCategories] = useState([]);
-
-  // Adatok lekérése
-  const fetchData = async () => {
-    try {
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
-      
-      if (!token) {
-        throw new Error('Nincs bejelentkezett felhasználó');
-      }
-
-      const headers = { 'Authorization': `Bearer ${token}` };
-      
-      const [
-        dashboardResponse, 
-        accountsResponse,
-        categorySpendingResponse, 
-        savingsResponse, 
-        upcomingEventsResponse, 
-        notificationsResponse,
-        categoriesResponse
-      ] = await Promise.all([
-        fetch(`${apiUrl}/api/dashboard`, { headers }),
-        fetch(`${apiUrl}/api/accounts`, { headers }),
-        fetch(`${apiUrl}/api/analytics/category-spending`, { headers }),
-        fetch(`${apiUrl}/api/analytics/savings-trend`, { headers }),
-        fetch(`${apiUrl}/api/upcoming-events`, { headers }),
-        fetch(`${apiUrl}/api/notifications`, { headers }),
-        fetch(`${apiUrl}/api/categories/tree`, { headers })
-      ]);
-
-      if (!dashboardResponse.ok) {
-        if (dashboardResponse.status === 401) {
-          logout();
-          throw new Error('Lejárt munkamenet, kérlek jelentkezz be újra!');
+      try {
+        if (!token) throw new Error('Nincs bejelentkezett felhasználó');
+        const headers = { 'Authorization': `Bearer ${token}` };
+  
+        const [
+          dashboardResponse,
+          accountsResponse,
+          categorySpendingResponse,
+          savingsResponse,
+          upcomingEventsResponse,
+          notificationsResponse,
+          categoriesResponse
+        ] = await Promise.all([
+          fetch(`${apiUrl}/api/dashboard`, { headers }),
+          fetch(`${apiUrl}/api/accounts`, { headers }),
+          fetch(`${apiUrl}/api/analytics/category-spending`, { headers }),
+          fetch(`${apiUrl}/api/analytics/savings-trend`, { headers }),
+          fetch(`${apiUrl}/api/upcoming-events`, { headers }),
+          fetch(`${apiUrl}/api/notifications`, { headers }),
+          fetch(`${apiUrl}/api/categories/tree`, { headers })
+        ]);
+  
+        if (!dashboardResponse.ok) {
+          if (dashboardResponse.status === 401) logout();
+          throw new Error(`API hiba: ${dashboardResponse.statusText}`);
         }
-        throw new Error(`API hiba: ${dashboardResponse.status}`);
-      }
-
-      setDashboardData(await dashboardResponse.json());
-      setAccounts(accountsResponse.ok ? await accountsResponse.json() : []);
-      setCategories(categoriesResponse.ok ? await categoriesResponse.json() : []);
-      setAnalyticsData({
-        categorySpending: categorySpendingResponse.ok ? await categorySpendingResponse.json() : [],
-        savingsTrend: savingsResponse.ok ? await savingsResponse.json() : []
-      });
-      setUpcomingEvents(upcomingEventsResponse.ok ? await upcomingEventsResponse.json() : []);
-      setNotifications(notificationsResponse.ok ? await notificationsResponse.json() : []);
-
-    } catch (err) {
-      console.error('Dashboard hiba:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (apiUrl && token) {
-      fetchData();
-    }
-  }, [apiUrl, token]);
-
-  // Tranzakció modal kezelése
-  const handleOpenTransactionModal = (type, accountId, accountName) => {
-    setModalConfig({ type, accountId, accountName });
-    setTransactionModalOpen(true);
-  };
   
-  const handleSaveTransaction = async (transactionData) => {
-    try {
-      const response = await fetch(`${apiUrl}/api/accounts/${modalConfig.accountId}/transactions`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(transactionData),
-      });
-      
-      if (response.ok) {
-        setTransactionModalOpen(false);
-        fetchData(); // Frissítjük az adatokat
-      } else {
-        alert('Hiba a mentés során!');
-      }
-    } catch (error) {
-      console.error("Tranzakció mentési hiba:", error);
-      alert('Hiba történt a mentés során!');
-    }
-  };
-
-  // Loading és error kezelés
-  if (!token) {
-    return (
-      <div className="loading-container">
-        <div className="error-content">
-          <AlertCircle className="error-icon" />
-          <h2>Bejelentkezés szükséges</h2>
-          <p>A dashboard eléréséhez be kell jelentkezned.</p>
-          <button 
-            onClick={() => navigate('/login')} 
-            className="btn btn-primary"
-          >
-            Bejelentkezés
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-content">
-          <div className="loading-spinner"></div>
-          <p>Dashboard betöltése...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="loading-container">
-        <div className="error-content">
-          <AlertCircle className="error-icon" />
-          <h2>Hiba történt</h2>
-          <p>{error}</p>
-          <button 
-            onClick={fetchData} 
-            className="btn btn-primary"
-            disabled={loading}
-          >
-            <RefreshCw className={loading ? 'loading-spinner' : ''} />
-            Újrapróbálás
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Dashboard adatok
-  const forecast = dashboardData?.next_month_forecast;
-  const familyGoals = dashboardData?.goals?.family_goals || [];
-  const personalGoals = dashboardData?.goals?.personal_goals || [];
+        setDashboardData(await dashboardResponse.json());
+        setAccounts(accountsResponse.ok ? await accountsResponse.json() : []);
+        setCategories(categoriesResponse.ok ? await categoriesResponse.json() : []);
+        setAnalyticsData({
+          categorySpending: categorySpendingResponse.ok ? await categorySpendingResponse.json() : [],
+          savingsTrend: savingsResponse.ok ? await savingsResponse.json() : []
+        });
+        setUpcomingEvents(upcomingEventsResponse.ok ? await upcomingEventsResponse.json() : []);
+        setNotifications(notificationsResponse.ok ? await notificationsResponse.json() : []);
   
-  // Személyes számla megkeresése
-  const personalAccount = accounts.find(acc => 
-    acc.type === 'személyes' && acc.owner_user_id === user?.id
-  );
+      } catch (err) {
+        console.error('Dashboard hiba:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    useEffect(() => {
+      if (apiUrl && token) {
+        fetchData();
+      }
+    }, [apiUrl, token]);
+  
+    const handleOpenTransactionModal = (type, accountId, accountName) => {
+        setModalConfig({ type, accountId, accountName });
+        setTransactionModalOpen(true);
+    };
 
-  return (
-    <div className="dashboard-container">
-      <NotificationBar notifications={notifications} />
+    const handleSaveTransaction = async (transactionData) => {
+        try {
+            const response = await fetch(`${apiUrl}/api/accounts/${modalConfig.accountId}/transactions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(transactionData),
+            });
       
-      {/* PÉNZÜGYI ÁTTEKINTÉS SZEKCIÓ */}
-      <section className="dashboard-section">
-        <h2 className="section-title">Pénzügyi Áttekintés</h2>
-        
-        <div className="dashboard-grid">
-          <FinancialOverviewCard 
-            financialSummary={dashboardData?.financial_summary}
-            onNewTransaction={handleOpenTransactionModal}
-            personalAccount={personalAccount}
-          />
-          
-          {forecast?.personal && (
-            <SimpleForecastCard 
-              forecastData={forecast.personal} 
-              title="Személyes Előrejelzés" 
-            />
-          )}
-          
-          {forecast?.view_type === 'parent' && forecast.family && (
-            <SimpleForecastCard 
-              forecastData={forecast.family} 
-              title="Családi Előrejelzés" 
-            />
-          )}
-        </div>
-      </section>
-
-      {/* CÉLKASSZÁK SZEKCIÓ */}
-      {(familyGoals.length > 0 || personalGoals.length > 0) && (
-        <section className="dashboard-section">
-          <h2 className="section-title">Célkasszák</h2>
-          
-          <div className="dashboard-grid">
-            {familyGoals.length > 0 && (
-              <GoalsSection 
-                title="Családi Célok"
-                goals={familyGoals}
-                type="family"
-                icon={<Users size={20} />}
-              />
-            )}
-            
-            {personalGoals.length > 0 && (
-              <GoalsSection 
-                title="Személyes Célok"
-                goals={personalGoals}
-                type="personal"
-                icon={<Target size={20} />}
-              />
-            )}
+            if (response.ok) {
+              setTransactionModalOpen(false);
+              fetchData();
+            } else {
+              alert('Hiba a mentés során!');
+            }
+          } catch (error) {
+            console.error("Tranzakció mentési hiba:", error);
+            alert('Hiba történt a mentés során!');
+          }
+    };
+    
+    if (loading) {
+        return (
+          <div className="loading-container">
+            <div className="loading-content">
+              <div className="loading-spinner"></div>
+              <p>Dashboard betöltése...</p>
+            </div>
           </div>
-        </section>
-      )}
+        );
+    }
+    
+    if (error || !dashboardData) {
+        return (
+            <div className="loading-container">
+              <div className="error-content">
+                <AlertCircle className="error-icon" />
+                <h2>Hiba történt</h2>
+                <p>{error || "Nem sikerült betölteni a dashboard adatokat."}</p>
+                <button onClick={fetchData} className="btn btn-primary">
+                  <RefreshCw /> Újrapróbálás
+                </button>
+              </div>
+            </div>
+        );
+    }
 
-      {/* STATISZTIKÁK SZEKCIÓ */}
-      <section className="dashboard-section">
-        <h2 className="section-title">Statisztikák</h2>
-        
-        <div className="dashboard-grid">
-          <CategorySpendingCard 
-            data={analyticsData.categorySpending}
-            onClick={() => navigate('/analytics?tab=categories')}
-          />
+    const { financial_summary, current_month_forecast, next_month_forecast, goals } = dashboardData;
+    
+    const currentMonthData = financial_summary && current_month_forecast ? {
+      personal: {
+        projected_income: (financial_summary.personal_income || 0) + (current_month_forecast.personal?.projected_income || 0),
+        projected_expenses: (financial_summary.personal_expense || 0) + (current_month_forecast.personal?.projected_expenses || 0)
+      },
+      family: {
+        projected_income: (financial_summary.monthly_income || 0) + (current_month_forecast.family?.projected_income || 0),
+        projected_expenses: (financial_summary.monthly_expense || 0) + (current_month_forecast.family?.projected_expenses || 0)
+      }
+    } : null;
+  
+    const personalAccount = accounts.find(acc => 
+      acc.type === 'személyes' && acc.owner_user_id === user?.id
+    );
+  
+    return (
+        <div className="dashboard-container">
+            <NotificationBar notifications={notifications} />
 
-          <SavingsTrendCard 
-            data={analyticsData.savingsTrend}
-            onClick={() => navigate('/analytics?tab=savings')}
-          />
-          
-          <UpcomingEventsCard events={upcomingEvents} />
+            <section className="dashboard-section">
+              <h2 className="section-title">Pénzügyi Áttekintés</h2>
+              <div className="dashboard-grid">
+                <FinancialOverviewCard
+                  financialSummary={financial_summary}
+                  onNewTransaction={handleOpenTransactionModal}
+                  personalAccount={personalAccount}
+                />
+                <ForecastCard
+                  currentMonthData={currentMonthData}
+                  nextMonthData={next_month_forecast}
+                  viewType={financial_summary?.view_type}
+                />
+              </div>
+            </section>
+
+            {(goals?.personal_goals?.length > 0 || goals?.family_goals?.length > 0) && (
+              <section className="dashboard-section">
+                <h2 className="section-title">Célkasszák</h2>
+                <div className="dashboard-grid">
+                  {goals.family_goals.length > 0 && (
+                    <GoalsSection title="Családi Célok" goals={goals.family_goals} type="family" icon={<Users size={20} />} />
+                  )}
+                  {goals.personal_goals.length > 0 && (
+                    <GoalsSection title="Személyes Célok" goals={goals.personal_goals} type="personal" icon={<Target size={20} />} />
+                  )}
+                </div>
+              </section>
+            )}
+
+            <section className="dashboard-section">
+              <h2 className="section-title">Statisztikák</h2>
+              <div className="dashboard-grid">
+                <CategorySpendingCard data={analyticsData.categorySpending} onClick={() => navigate('/analytics?tab=categories')} />
+                <SavingsTrendCard data={analyticsData.savingsTrend} onClick={() => navigate('/analytics?tab=savings')} />
+                <UpcomingEventsCard events={upcomingEvents} />
+              </div>
+            </section>
+
+            <TransactionModal
+              isOpen={isTransactionModalOpen}
+              onClose={() => setTransactionModalOpen(false)}
+              onSave={handleSaveTransaction}
+              transactionType={modalConfig.type}
+              accountName={modalConfig.accountName}
+              categories={categories}
+              onSaveRecurring={() => {}}
+            />
         </div>
-      </section>
-
-      {/* TRANZAKCIÓ MODAL */}
-      <TransactionModal
-        isOpen={isTransactionModalOpen}
-        onClose={() => setTransactionModalOpen(false)}
-        onSave={handleSaveTransaction}
-        transactionType={modalConfig.type}
-        accountName={modalConfig.accountName}
-        categories={categories}
-        onSaveRecurring={() => {}}
-      />
-    </div>
-  );
+    );
 };
 
 export default DashboardPage;

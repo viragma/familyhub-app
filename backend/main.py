@@ -8,6 +8,7 @@ from typing import Optional, List
 from fastapi import Query
 from contextlib import asynccontextmanager
 
+
 from .crud import (
     get_tasks, create_task, toggle_task_status, delete_task,
     create_family, create_user, get_user, update_user,
@@ -25,6 +26,7 @@ from .crud import (
     submit_wish_for_approval,process_wish_approval,
     get_dashboard_notifications,
     get_wish_history, create_and_submit_wish,close_goal_account,
+    get_dashboard_data
    
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
@@ -45,7 +47,8 @@ from .schemas import (
     Notification,
     WishHistory as WishHistorySchema,
     WishActivationRequest,
-    GoalCloseRequest
+    GoalCloseRequest,
+    DashboardResponse
 
 
 )
@@ -282,79 +285,20 @@ def read_transfer_recipients(current_user: UserModel = Depends(get_current_user)
     return get_valid_transfer_targets(db=db, user=current_user)
 
 
-@app.get("/api/dashboard")  # ✅ NO response_model!
-def get_dashboard_data(db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
-    try:
-        # Manual, biztonságos hívások
-        tasks_raw = get_tasks(db, user=current_user)
-        financials = get_financial_summary(db, user=current_user)
-        goals_raw = get_dashboard_goals(db, user=current_user)
-         # --- ÚJ RÉSZ KEZDETE ---
-        forecast = get_next_month_forecast(db, user=current_user) # Új függvény hívása
-        # --- ÚJ RÉSZ VÉGE ---
-        
-        # Tasks manual serialization
-        tasks = [
-            {
-                "id": task.id,
-                "title": task.title,
-                "status": task.status,
-                "reward_type": task.reward_type,
-                "reward_value": task.reward_value,
-                "owner_id": task.owner_id,
-                # Owner info - safe loading
-                "owner": {
-                    "id": task.owner.id,
-                    "display_name": task.owner.display_name,
-                    "avatar_url": task.owner.avatar_url
-                } if task.owner else None
-            }
-            for task in tasks_raw
-        ]
-        
-        # Goals manual serialization
-        def serialize_account(acc):
-            return {
-                "id": acc.id,
-                "name": acc.name,
-                "type": acc.type,
-                "balance": float(acc.balance),
-                "goal_amount": float(acc.goal_amount) if acc.goal_amount else None,
-                "goal_date": acc.goal_date.isoformat() if acc.goal_date else None,
-                "show_on_dashboard": getattr(acc, 'show_on_dashboard', False),
-                "owner_user": {
-                    "id": acc.owner_user.id,
-                    "display_name": acc.owner_user.display_name,
-                    "avatar_url": acc.owner_user.avatar_url
-                } if acc.owner_user else None
-            }
-        
-        goals = {
-            "family_goals": [serialize_account(acc) for acc in goals_raw["family_goals"]],
-            "personal_goals": [serialize_account(acc) for acc in goals_raw["personal_goals"]]
-        }
-        
-        return {
-            "financial_summary": financials,
-            "tasks": tasks,
-            "goals": goals,
-            "next_month_forecast": forecast
-        }
-        
-    except Exception as e:
-        print(f"Dashboard error: {e}")  # Debug
-        # Fallback minimal response
-        return {
-            "financial_summary": {
-                "view_type": "error",
-                "total_balance": 0,
-                "monthly_income": 0,
-                "monthly_expense": 0,
-                "monthly_savings": 0
-            },
-            "tasks": [],
-            "goals": {"family_goals": [], "personal_goals": []}
-        }
+@app.get("/api/dashboard", response_model=DashboardResponse)
+def read_dashboard_data(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Ez az API végpont lekéri a teljes dashboard adatcsomagot
+    a crud modulból.
+    """
+    dashboard_data = get_dashboard_data(db=db, user=current_user)
+    if not dashboard_data:
+        raise HTTPException(status_code=404, detail="Dashboard data not found")
+    return dashboard_data
+
 @app.post("/api/accounts", response_model=Account)
 def create_new_account(
     account: AccountCreate,

@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta
 from decimal import Decimal
-from sqlalchemy import func, extract, and_, or_
+from sqlalchemy import func, extract, and_, or_,case
+import calendar
 from sqlalchemy.orm import Session, joinedload, selectinload, aliased
 from . import models, schemas
 from .security import get_pin_hash
@@ -2097,3 +2098,155 @@ def close_goal_account(db: Session, account_id: int, user: models.User, request_
     db.refresh(db_account)
     
     return {"message": "Célkassza sikeresen lezárva és archiválva.", "account": db_account}
+
+# ==============================================================================
+# ÚJ, KISZERVEZETT DASHBOARD LOGIKA
+# ==============================================================================
+
+
+def get_financial_forecast(db: Session, user: models.User, family_members_ids: list[int], start_date: date, end_date: date):
+    """
+    Univerzális előrejelző funkció, ami egy adott időintervallumra számol.
+    A VALÓS adatbázis-logika alapján ('type' oszlop).
+    """
+    # --- Személyes előrejelzés ---
+    personal_recurring_q = db.query(
+        func.sum(case((models.RecurringRule.type == 'bevétel', models.RecurringRule.amount), else_=Decimal('0.0'))).label("income"),
+        func.sum(case((models.RecurringRule.type == 'kiadás', models.RecurringRule.amount), else_=Decimal('0.0'))).label("expense")
+    ).filter(
+        models.RecurringRule.owner_id == user.id,
+        models.RecurringRule.start_date <= end_date,
+        (models.RecurringRule.end_date == None) | (models.RecurringRule.end_date >= start_date),
+        models.RecurringRule.is_active == True
+    ).first()
+
+    personal_expected_expenses_q = db.query(
+        func.sum(models.ExpectedExpense.estimated_amount)
+    ).filter(
+        models.ExpectedExpense.owner_id == user.id,
+        models.ExpectedExpense.due_date >= start_date,
+        models.ExpectedExpense.due_date <= end_date,
+        models.ExpectedExpense.status == 'tervezett'
+    ).scalar()
+
+    personal_income = personal_recurring_q.income or Decimal('0.0')
+    personal_recurring_expense = personal_recurring_q.expense or Decimal('0.0')
+    personal_expected_expenses = personal_expected_expenses_q or Decimal('0.0')
+    personal_total_expense = personal_recurring_expense + personal_expected_expenses
+
+    personal_forecast = schemas.ForecastData(
+        projected_income=float(personal_income),
+        projected_expenses=float(personal_total_expense)
+    )
+
+    # --- Családi előrejelzés ---
+    family_forecast = None
+    is_parent_role = user.role in ['Szülő', 'Családfő']
+    if is_parent_role:
+        family_recurring_q = db.query(
+            func.sum(case((models.RecurringRule.type == 'bevétel', models.RecurringRule.amount), else_=Decimal('0.0'))).label("income"),
+            func.sum(case((models.RecurringRule.type == 'kiadás', models.RecurringRule.amount), else_=Decimal('0.0'))).label("expense")
+        ).filter(
+            models.RecurringRule.owner_id.in_(family_members_ids),
+            models.RecurringRule.start_date <= end_date,
+            (models.RecurringRule.end_date == None) | (models.RecurringRule.end_date >= start_date),
+            models.RecurringRule.is_active == True
+        ).first()
+
+        family_expected_expenses_q = db.query(
+            func.sum(models.ExpectedExpense.estimated_amount)
+        ).filter(
+            models.ExpectedExpense.owner_id.in_(family_members_ids),
+            models.ExpectedExpense.due_date >= start_date,
+            models.ExpectedExpense.due_date <= end_date,
+            models.ExpectedExpense.status == 'tervezett'
+        ).scalar()
+        
+        family_income = family_recurring_q.income or Decimal('0.0')
+        family_recurring_expense = family_recurring_q.expense or Decimal('0.0')
+        family_expected_expenses = family_expected_expenses_q or Decimal('0.0')
+        family_total_expense = family_recurring_expense + family_expected_expenses
+
+        family_forecast = schemas.ForecastData(
+            projected_income=float(family_income),
+            projected_expenses=float(family_total_expense)
+        )
+    
+    view_type_for_frontend = 'parent' if is_parent_role else 'child'
+    return schemas.Forecast(
+        personal=personal_forecast,
+        family=family_forecast,
+        view_type=view_type_for_frontend
+    )
+
+def get_dashboard_data(db: Session, user: models.User):
+    today = date.today()
+    start_of_current_month = today.replace(day=1)
+    _, num_days_in_month = calendar.monthrange(today.year, today.month)
+    end_of_current_month = today.replace(day=num_days_in_month)
+    
+    start_of_next_month = today + relativedelta(months=1, day=1)
+    _, num_days_in_next_month = calendar.monthrange(start_of_next_month.year, start_of_next_month.month)
+    end_of_next_month = start_of_next_month.replace(day=num_days_in_next_month)
+
+    is_parent_role = user.role in ['Szülő', 'Családfő']
+    
+    family_members_ids = [user.id]
+    if user.family_id and is_parent_role:
+        members = db.query(models.User.id).filter(models.User.family_id == user.family_id).all()
+        family_members_ids = [m.id for m in members]
+
+    # --- 1. Pénzügyi Összefoglaló (Ami EDDIG történt ebben a hónapban) ---
+    personal_monthly_income = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.user_id == user.id, models.Transaction.type == 'bevétel', models.Transaction.date >= start_of_current_month, models.Transaction.date <= datetime.now()).scalar() or Decimal('0.0')
+    personal_monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.user_id == user.id, models.Transaction.type == 'kiadás', models.Transaction.date >= start_of_current_month, models.Transaction.date <= datetime.now()).scalar() or Decimal('0.0')
+    personal_balance = db.query(func.sum(models.Account.balance)).filter(models.Account.owner_user_id == user.id, models.Account.status == 'active').scalar() or Decimal('0.0')
+
+    total_balance = personal_balance
+    monthly_income = personal_monthly_income
+    monthly_expense = personal_monthly_expense
+
+    if is_parent_role:
+        total_balance = db.query(func.sum(models.Account.balance)).filter(models.Account.family_id == user.family_id, models.Account.status == 'active').scalar() or Decimal('0.0')
+        monthly_income = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.user_id.in_(family_members_ids), models.Transaction.type == 'bevétel', models.Transaction.date >= start_of_current_month, models.Transaction.date <= datetime.now()).scalar() or Decimal('0.0')
+        monthly_expense = db.query(func.sum(models.Transaction.amount)).filter(models.Transaction.user_id.in_(family_members_ids), models.Transaction.type == 'kiadás', models.Transaction.date >= start_of_current_month, models.Transaction.date <= datetime.now()).scalar() or Decimal('0.0')
+
+    view_type_for_frontend = 'parent' if is_parent_role else 'child'
+    financial_summary = schemas.FinancialSummary(
+        total_balance=float(total_balance),
+        personal_balance=float(personal_balance),
+        monthly_income=float(monthly_income),
+        monthly_expense=float(monthly_expense),
+        monthly_savings=float(monthly_income) - float(monthly_expense),
+        view_type=view_type_for_frontend,
+        personal_income=float(personal_monthly_income),
+        personal_expense=float(personal_monthly_expense)
+    )
+
+    # --- 2. ELŐREJELZÉSEK ---
+    # Ami a HÓNAP HÁTRALÉVŐ RÉSZÉBEN várható
+    current_month_forecast = get_financial_forecast(db, user, family_members_ids, start_date=today, end_date=end_of_current_month)
+    # Ami a KÖVETKEZŐ TELJES HÓNAPBAN várható
+    next_month_forecast = get_financial_forecast(db, user, family_members_ids, start_date=start_of_next_month, end_date=end_of_next_month)
+
+    # --- 3. Célok ---
+    personal_goals = db.query(models.Account).filter(models.Account.owner_user_id == user.id, models.Account.type == 'cél', models.Account.status == 'active').all()
+    
+    family_goals = []
+    if is_parent_role and user.family_id:
+        family_goals = db.query(models.Account).filter(
+            models.Account.family_id == user.family_id, 
+            models.Account.type == 'cél',
+            models.Account.status == 'active'
+        ).all()
+    
+    goals = schemas.Goals(
+        personal_goals=personal_goals,
+        family_goals=family_goals
+    )
+
+    return schemas.DashboardResponse(
+        financial_summary=financial_summary,
+        current_month_forecast=current_month_forecast,
+        next_month_forecast=next_month_forecast,
+        goals=goals,
+    )

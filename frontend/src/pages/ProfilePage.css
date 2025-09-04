@@ -1,0 +1,167 @@
+/* frontend/src/pages/ProfilePage.css */
+
+.profile-page {
+    background-color: #f9fafb;
+    color: #1f2937;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.profile-page.dark {
+    background-color: #111827;
+    color: #f9fafb;
+}
+
+.profile-container {
+    max-width: 56rem;
+    margin: 0 auto;
+}
+
+/* === FEJLÉC === */
+.profile-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+    text-align: center;
+}
+
+.profile-picture-container {
+    position: relative;
+    cursor: pointer;
+}
+
+.profile-picture-container .overlay {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.profile-picture-container:hover .overlay {
+    opacity: 1;
+}
+
+.profile-picture {
+    width: 8rem;
+    height: 8rem;
+    border-radius: 9999px;
+    object-fit: cover;
+    border: 4px solid white;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+
+.profile-page.dark .profile-picture {
+    border-color: #1f2937;
+}
+
+.profile-info { flex-grow: 1; }
+.profile-name { font-size: 2.25rem; font-weight: 700; color: #111827; }
+.profile-page.dark .profile-name { color: white; }
+.profile-role { font-size: 1.125rem; font-weight: 500; color: #4f46e5; }
+.profile-page.dark .profile-role { color: #818cf8; }
+.profile-actions { margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+
+/* === GOMBOK === */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary { background-color: #4f46e5; color: white; }
+.btn-primary:hover { background-color: #4338ca; }
+.btn-success { background-color: #16a34a; color: white; }
+.btn-success:hover { background-color: #15803d; }
+
+.btn-secondary { background-color: #f3f4f6; color: #374151; border-color: #e5e7eb; }
+.btn-secondary:hover { background-color: #e5e7eb; }
+.profile-page.dark .btn-secondary { background-color: #374151; color: #f9fafb; border-color: #4b5563; }
+.profile-page.dark .btn-secondary:hover { background-color: #4b5563; }
+
+.btn-danger { background-color: rgba(239, 68, 68, 0.1); color: #dc2626; }
+.btn-danger:hover { background-color: rgba(239, 68, 68, 0.2); }
+.profile-page.dark .btn-danger { color: #f87171; }
+
+.btn-icon { padding: 0.625rem; }
+
+/* === KÁRTYÁK === */
+.profile-card {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+}
+.profile-page.dark .profile-card { background-color: #1f2937; border-color: #374151; }
+
+.profile-card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #111827;
+}
+.profile-page.dark .profile-card-title { color: #f9fafb; }
+
+
+/* Adatok és Beállítások */
+.info-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+.info-field label, .setting-row-title { font-size: 0.875rem; font-weight: 500; color: #6b7280; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.profile-page.dark .info-field label, .profile-page.dark .setting-row-title { color: #9ca3af; }
+.info-field p, .info-field input, .info-field textarea { font-size: 1rem; font-weight: 500; color: #111827; }
+.profile-page.dark .info-field p, .profile-page.dark .info-field input, .profile-page.dark .info-field textarea { color: #f9fafb; }
+.info-field input, .info-field textarea { width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; border: 1px solid #d1d5db; background-color: #f9fafb; }
+.profile-page.dark .info-field input, .profile-page.dark .info-field textarea { border-color: #4b5563; background-color: #374151; }
+.info-field textarea { min-height: 80px; }
+
+.settings-list { display: flex; flex-direction: column; }
+.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #e5e7eb; }
+.setting-row:last-child { border-bottom: none; }
+.profile-page.dark .setting-row { border-color: #374151; }
+.setting-row-info { display: flex; align-items: center; gap: 1rem; }
+.setting-row-icon { background-color: #f3f4f6; padding: 0.5rem; border-radius: 0.5rem; }
+.profile-page.dark .setting-row-icon { background-color: #374151; }
+.setting-row-title { font-weight: 600; }
+.setting-row-description { font-size: 0.875rem; color: #6b7280; }
+.profile-page.dark .setting-row-description { color: #9ca3af; }
+
+/* Kapcsoló */
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+.toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .toggle-slider { background-color: #4f46e5; }
+input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+/* Alsó gombok */
+.profile-bottom-actions { display: grid; grid-template-columns: 1fr; gap: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+.profile-page.dark .profile-bottom-actions { border-color: #374151; }
+
+/* Reszponzív nézet */
+@media (min-width: 640px) {
+    .profile-header { flex-direction: row; text-align: left; }
+    .profile-actions { justify-content: flex-start; }
+    .info-grid { grid-template-columns: repeat(2, 1fr); }
+    .info-field.full-width { grid-column: span 2; }
+    .profile-bottom-actions { grid-template-columns: repeat(3, 1fr); }
+}

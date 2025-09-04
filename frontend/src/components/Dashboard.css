@@ -965,3 +965,141 @@
     min-height: 44px;
   }
 }
+
+/* =================================== */
+/* MODERN FORECAST CARD & TABS (V2)    */
+/* =================================== */
+
+.forecast-card.modern {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.forecast-card.modern .card-header {
+  padding: 0;
+  margin-bottom: 16px;
+}
+
+.tab-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* Új wrapper a csúszka pozicionálásához */
+.tab-group-wrapper {
+  position: relative;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 4px;
+  width: 100%;
+}
+
+.tab-group {
+  position: relative;
+  z-index: 2; /* A gombok a csúszka felett legyenek */
+  display: flex;
+  width: 100%;
+}
+
+/* Az aktív fület jelölő "csúszka" */
+.active-tab-indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 1;
+  height: calc(100% - 8px);
+  width: calc(50% - 4px); /* Fele szélesség, levonva a padding felét */
+  background-color: var(--bg-primary);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Finom animáció */
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background-color: transparent; /* A gombok háttere átlátszó */
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.3s ease; /* A szövegszín váltása is animált */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Az aktív gomb szövegszíne más */
+.tab-btn.active {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+/* Hover effektus csak a nem aktív gombokon */
+.tab-btn:not(.active):hover {
+  color: var(--text-primary);
+}
+
+.forecast-content-wrapper {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.forecast-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 20px;
+    gap: 8px;
+    flex-grow: 1;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+}
+
+.forecast-card .forecast-summary {
+    margin-bottom: 16px;
+}
+.forecast-card .forecast-details {
+    gap: 12px;
+}
+.chart-container {
+  flex: 1;
+  height: 160px; /* <-- EZT AZ EGY SORT ADD HOZZÁ */
+}
+
+@media (max-width: 768px) {
+    /* A kártya belső elrendezése mobilon */
+    .analytics-card .chart-section {
+        flex-direction: column;
+        align-items: center; /* Középre rendezzük a diagramot */
+    }
+
+    /* * EZ A LEGFONTOSABB JAVÍTÁS:
+     * Explicit méretet és viselkedést adunk a diagram konténerének,
+     * amit más szabályok nem tudnak felülírni vagy összenyomni.
+    */
+    .analytics-card .chart-container {
+        width: 100%;      /* Töltse ki a teljes szélességet */
+        min-height: 180px;  /* Legyen legalább 180px magas */
+        height: 180px;      /* Legyen pontosan 180px magas */
+        flex-shrink: 0;   /* Tiltjuk, hogy a flexbox összenyomja */
+        margin-bottom: 1rem;
+    }
+
+    /* A jelmagyarázat igazítása */
+    .analytics-card .legend {
+        width: 100%;
+        margin-left: 0;
+        margin-top: 1rem; /* Kis térköz a diagram felett */
+    }
+}

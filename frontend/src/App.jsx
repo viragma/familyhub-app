@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'; // Új import!
 import './index.css';
 import Nav from './components/Nav';
 import MobileNav from './components/MobileNav';
+import ProfilePage from './pages/ProfilePage';
 // A Header, BentoGrid, FAB, TaskModal már nem kellenek ide közvetlenül
 
 function App() {
