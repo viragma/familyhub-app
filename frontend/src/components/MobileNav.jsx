@@ -23,26 +23,14 @@ function MobileNav({ theme, toggleTheme }) { // Itt fogadjuk a prop-okat
           <span className="mobile-nav-icon">🎁</span>
           <span className="mobile-nav-label">Kívánságok</span>
         </NavLink>
-        
       
-        
-        {user && user.role === 'Családfő' && (
-          <NavLink to="/manage-family" className="mobile-nav-item">
-            <span className="mobile-nav-icon">⚙️</span>
-            <span className="mobile-nav-label">Kezelés</span>
-          </NavLink>
-        )}
 
-        <div className="mobile-nav-item" onClick={logout} style={{ cursor: 'pointer' }}>
+        <NavLink to="/profile" className="mobile-nav-item">
           <span className="mobile-nav-icon">👤</span>
           <span className="mobile-nav-label">Profil</span>
-        </div>
+        </NavLink>
 
-        {/* === ÚJ GOMB A TÉMA VÁLTÁSÁHOZ === */}
-        <div className="mobile-nav-item" onClick={toggleTheme} style={{ cursor: 'pointer' }}>
-            <span className="mobile-nav-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
-            <span className="mobile-nav-label">Téma</span>
-        </div>
+  {/* Téma váltó gomb eltávolítva, csak a profil oldalon lesz! */}
       </div>
     </nav>
   );

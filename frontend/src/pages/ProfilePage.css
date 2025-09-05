@@ -1,167 +1,720 @@
-/* frontend/src/pages/ProfilePage.css */
+/* ================================================
+   MODERN PROFILE PAGE - BEAUTIFUL & MOBILE-FIRST
+   ================================================ */
 
+/* --- BASE STYLES --- */
 .profile-page {
-    background-color: #f9fafb;
-    color: #1f2937;
-    min-height: 100vh;
-    padding: 2rem 1rem;
-    transition: background-color 0.3s, color 0.3s;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  padding-top: 6rem; /* Increased nav height offset for mobile */
 }
 
-.profile-page.dark {
-    background-color: #111827;
-    color: #f9fafb;
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.profile-container {
-    max-width: 56rem;
-    margin: 0 auto;
+/* --- HERO SECTION --- */
+.profile-hero {
+  position: relative;
+  background: var(--accent-gradient);
+  padding: 4rem 0 3rem;
+  margin-bottom: 2rem;
+  overflow: hidden;
+  border-radius: 0 0 30px 30px;
 }
 
-/* === FEJLÉC === */
-.profile-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 3rem;
-    text-align: center;
+.hero-background {
+  position: absolute;
+  inset: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+  opacity: 0.3;
 }
 
-.profile-picture-container {
-    position: relative;
-    cursor: pointer;
+.hero-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
 }
 
-.profile-picture-container .overlay {
-    position: absolute;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    border-radius: 9999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
+.profile-main-info {
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+  flex: 1;
 }
 
-.profile-picture-container:hover .overlay {
-    opacity: 1;
+.avatar-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
 }
 
-.profile-picture {
-    width: 8rem;
-    height: 8rem;
-    border-radius: 9999px;
-    object-fit: cover;
-    border: 4px solid white;
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+.avatar-container {
+  position: relative;
+  width: 100px;
+  height: 100px;
 }
 
-.profile-page.dark .profile-picture {
-    border-color: #1f2937;
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease;
 }
 
-.profile-info { flex-grow: 1; }
-.profile-name { font-size: 2.25rem; font-weight: 700; color: #111827; }
-.profile-page.dark .profile-name { color: white; }
-.profile-role { font-size: 1.125rem; font-weight: 500; color: #4f46e5; }
-.profile-page.dark .profile-role { color: #818cf8; }
-.profile-actions { margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+.avatar-edit-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--accent-primary);
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
 
-/* === GOMBOK === */
+.avatar-edit-btn:hover {
+  transform: scale(1.1);
+  background: white;
+}
+
+.profile-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.profile-details {
+  flex: 1;
+  color: white;
+}
+
+.profile-name {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  line-height: 1.1;
+}
+
+.profile-role {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  opacity: 0.9;
+}
+
+.profile-bio {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0 0 1.2rem;
+  opacity: 0.9;
+  max-width: 400px;
+}
+
+.profile-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  align-items: flex-end;
+}
+
+.theme-toggle-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1.2rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.theme-toggle-hero:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.theme-icon {
+  font-size: 1.1rem;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* --- BUTTONS --- */
 .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    border: 1px solid transparent;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.btn-primary { background-color: #4f46e5; color: white; }
-.btn-primary:hover { background-color: #4338ca; }
-.btn-success { background-color: #16a34a; color: white; }
-.btn-success:hover { background-color: #15803d; }
-
-.btn-secondary { background-color: #f3f4f6; color: #374151; border-color: #e5e7eb; }
-.btn-secondary:hover { background-color: #e5e7eb; }
-.profile-page.dark .btn-secondary { background-color: #374151; color: #f9fafb; border-color: #4b5563; }
-.profile-page.dark .btn-secondary:hover { background-color: #4b5563; }
-
-.btn-danger { background-color: rgba(239, 68, 68, 0.1); color: #dc2626; }
-.btn-danger:hover { background-color: rgba(239, 68, 68, 0.2); }
-.profile-page.dark .btn-danger { color: #f87171; }
-
-.btn-icon { padding: 0.625rem; }
-
-/* === KÁRTYÁK === */
-.profile-card {
-    background: white;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
-    margin-bottom: 2rem;
+.btn-primary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
-.profile-page.dark .profile-card { background-color: #1f2937; border-color: #374151; }
 
-.profile-card-title {
-    font-size: 1.25rem;
-    font-weight: 700;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    color: #111827;
+.btn-primary:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
 }
-.profile-page.dark .profile-card-title { color: #f9fafb; }
 
+.btn-success {
+  background: var(--success);
+  color: white;
+}
 
-/* Adatok és Beállítások */
-.info-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-.info-field label, .setting-row-title { font-size: 0.875rem; font-weight: 500; color: #6b7280; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
-.profile-page.dark .info-field label, .profile-page.dark .setting-row-title { color: #9ca3af; }
-.info-field p, .info-field input, .info-field textarea { font-size: 1rem; font-weight: 500; color: #111827; }
-.profile-page.dark .info-field p, .profile-page.dark .info-field input, .profile-page.dark .info-field textarea { color: #f9fafb; }
-.info-field input, .info-field textarea { width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; border: 1px solid #d1d5db; background-color: #f9fafb; }
-.profile-page.dark .info-field input, .profile-page.dark .info-field textarea { border-color: #4b5563; background-color: #374151; }
-.info-field textarea { min-height: 80px; }
+.btn-success:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
 
-.settings-list { display: flex; flex-direction: column; }
-.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #e5e7eb; }
-.setting-row:last-child { border-bottom: none; }
-.profile-page.dark .setting-row { border-color: #374151; }
-.setting-row-info { display: flex; align-items: center; gap: 1rem; }
-.setting-row-icon { background-color: #f3f4f6; padding: 0.5rem; border-radius: 0.5rem; }
-.profile-page.dark .setting-row-icon { background-color: #374151; }
-.setting-row-title { font-weight: 600; }
-.setting-row-description { font-size: 0.875rem; color: #6b7280; }
-.profile-page.dark .setting-row-description { color: #9ca3af; }
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* --- MAIN CONTENT --- */
+.profile-content {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.5rem;
+  padding-bottom: 3rem;
+}
+
+/*
+ * Profile Page - Modern, egyszerű, jól átlátható és mobilbarát
+ * Illeszkedik az egész oldal design rendszeréhez (CSS változók használata)
+ */
+
+.profile-page { width: 100%; }
+
+/* HERO / FEJLÉC */
+.profile-hero { position: relative; background: var(--accent-gradient); color: #fff; border-radius: 24px; padding: 2.5rem 1.75rem 2rem; margin-bottom: 2rem; overflow: hidden; box-shadow: var(--shadow-lg); }
+.profile-hero::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.25), transparent 60%), radial-gradient(circle at 70% 70%, rgba(255,255,255,0.15), transparent 60%); pointer-events: none; }
+.hero-content { display: flex; gap: 2rem; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+.profile-main-info { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center; }
+.avatar-section { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+.avatar-container { position: relative; width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border: 3px solid rgba(255,255,255,0.6); box-shadow: 0 6px 18px rgba(0,0,0,0.2); }
+.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-edit-btn { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.6); border: none; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: #fff; border-radius: 10px; cursor: pointer; backdrop-filter: blur(4px); transition: background .25s ease, transform .25s; }
+.avatar-edit-btn:hover { background: rgba(0,0,0,0.8); transform: scale(1.05); }
+.profile-status { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; font-weight: 500; }
+.status-indicator { width: 10px; height: 10px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px rgba(16,185,129,0.25); }
+.profile-details { max-width: 540px; }
+.profile-name { font-size: 1.9rem; font-weight: 700; line-height: 1.15; margin: 0 0 .5rem; }
+.profile-role { display: inline-flex; align-items: center; gap: .4rem; background: rgba(255,255,255,0.15); padding: .35rem .65rem; border-radius: 8px; font-size: .75rem; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; margin-bottom: .75rem; }
+.profile-bio { margin: 0 0 1rem; font-size: .9rem; font-weight: 400; line-height: 1.4; opacity: .95; }
+.profile-meta { display: flex; flex-wrap: wrap; gap: .85rem 1.25rem; }
+.meta-item { display: flex; align-items: center; gap: .4rem; font-size: .75rem; font-weight: 500; opacity: .9; }
+.hero-actions { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.theme-toggle-hero { background: rgba(255,255,255,0.18); color: #fff; border: 1px solid rgba(255,255,255,0.35); padding: .6rem .9rem; border-radius: 10px; font-size: .8rem; font-weight: 600; cursor: pointer; display: flex; gap: .5rem; align-items: center; backdrop-filter: blur(6px); transition: .25s ease; }
+.theme-toggle-hero:hover { background: rgba(255,255,255,0.28); }
+
+/* Gomb stílusok */
+.btn { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; font-size: .8rem; border-radius: 10px; padding: .65rem 1rem; cursor: pointer; border: 1px solid transparent; background: var(--bg-secondary); color: var(--text-primary); transition: .25s ease; }
+.btn-primary { background: #fff; color: #111827; }
+.btn-primary:hover { background: #f1f5f9; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { filter: brightness(1.1); }
+.btn-secondary { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+.btn-secondary:hover { background: rgba(255,255,255,0.25); }
+.edit-actions { display: flex; gap: .5rem; }
+
+/* Layout */
+.profile-content { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; align-items: start; }
+@media (max-width: 1024px) { .profile-content { grid-template-columns: 1fr; } }
+.profile-sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
+.profile-main { display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* Kártyák */
+.profile-card, .section-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 18px; padding: 1.25rem; box-shadow: var(--shadow-sm); transition: .25s ease; }
+.profile-card:hover, .section-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.card-header, .section-header { display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem; }
+.card-header h3, .section-title h2 { margin: 0; font-size: .95rem; font-weight: 700; letter-spacing: .3px; color: var(--text-primary); }
+.section-header { padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+.section-title { display: flex; align-items: center; gap: .6rem; }
+.section-content { padding: .25rem 0 0; }
+
+/* Kapcsolat */
+.contact-list { display: flex; flex-direction: column; gap: .6rem; }
+.contact-item { display: flex; align-items: center; gap: .7rem; background: var(--bg-primary); border: 1px solid var(--border); padding: .7rem .75rem; border-radius: 12px; transition: .25s ease; }
+.contact-item:hover { background: var(--accent-primary); color: #fff; }
+.contact-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-size: .8rem; flex-shrink: 0; transition: .25s ease; }
+.contact-item:hover .contact-icon { background: rgba(255,255,255,0.25); }
+.contact-info { display: flex; flex-direction: column; gap: .15rem; }
+.contact-label { font-size: .6rem; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-secondary); }
+.contact-item:hover .contact-label { color: rgba(255,255,255,0.85); }
+.contact-value { font-size: .75rem; font-weight: 600; color: var(--text-primary); }
+.contact-item:hover .contact-value { color: #fff; }
+
+/* Gyors műveletek */
+.quick-actions { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.75rem; 
+}
+
+.action-btn { 
+  display: flex; 
+  align-items: center; 
+  gap: 0.75rem; 
+  padding: 0.85rem 1rem; 
+  background: var(--bg-primary); 
+  border: 1px solid var(--border); 
+  border-radius: 12px; 
+  font-size: 0.85rem; 
+  font-weight: 600; 
+  cursor: pointer; 
+  color: var(--text-primary); 
+  transition: all 0.3s ease;
+  text-decoration: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.action-btn:hover { 
+  background: var(--accent-primary); 
+  color: #fff; 
+  transform: translateX(3px);
+  box-shadow: var(--shadow-sm);
+}
+
+.logout-action:hover { 
+  background: var(--danger) !important; 
+  color: #fff !important; 
+}
+
+.family-management-btn:hover { 
+  background: var(--success) !important; 
+  color: #fff !important; 
+}
+
+/* Infók */
+.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: .9rem; }
+.info-item { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 14px; padding: .85rem .9rem; display: flex; flex-direction: column; gap: .35rem; transition: .25s ease; }
+.info-item:hover { background: var(--bg-secondary); }
+.info-item label { font-size: .55rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-secondary); }
+.info-item span { font-size: .8rem; font-weight: 600; color: var(--text-primary); }
+
+/* Beállítások */
+.settings-list { display: flex; flex-direction: column; gap: .65rem; }
+.setting-item { display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 14px; padding: .85rem .9rem; transition: .25s ease; }
+.setting-item:hover { background: var(--bg-secondary); }
+.setting-info { display: flex; align-items: center; gap: .75rem; flex: 1; }
+.setting-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--accent-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .85rem; }
+.setting-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; display: block; color: var(--text-primary); margin-bottom: .15rem; }
+.setting-desc { font-size: .6rem; font-weight: 500; color: var(--text-secondary); display: block; }
+.setting-select { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: .4rem .6rem; font-size: .7rem; font-weight: 600; color: var(--text-primary); cursor: pointer; }
+.setting-value { font-size: .7rem; font-weight: 700; color: var(--accent-primary); }
 
 /* Kapcsoló */
-.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
-.toggle-switch input { opacity: 0; width: 0; height: 0; }
-.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
-.toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-input:checked + .toggle-slider { background-color: #4f46e5; }
-input:checked + .toggle-slider:before { transform: translateX(20px); }
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 34px; transition: .35s ease; }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; top: 50%; transform: translateY(-50%); background: var(--text-primary); border-radius: 50%; transition: .35s ease; }
+.switch input:checked + .slider { background: var(--accent-primary); border-color: var(--accent-primary); }
+.switch input:checked + .slider:before { transform: translate(20px,-50%); background: #fff; }
 
-/* Alsó gombok */
-.profile-bottom-actions { display: grid; grid-template-columns: 1fr; gap: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
-.profile-page.dark .profile-bottom-actions { border-color: #374151; }
+/* DARK mód finomítások */
+.profile-page.dark-mode .profile-hero { box-shadow: var(--shadow-md); }
+.profile-page.dark-mode .contact-item:hover, .profile-page.dark-mode .action-btn:hover { background: var(--accent-primary); }
 
-/* Reszponzív nézet */
-@media (min-width: 640px) {
-    .profile-header { flex-direction: row; text-align: left; }
-    .profile-actions { justify-content: flex-start; }
-    .info-grid { grid-template-columns: repeat(2, 1fr); }
-    .info-field.full-width { grid-column: span 2; }
-    .profile-bottom-actions { grid-template-columns: repeat(3, 1fr); }
+/* IDŐBEOSZTÁS ÉS ELÉRHETŐSÉG */
+.current-status-card { background: var(--accent-gradient); color: #fff; padding: 1.25rem; border-radius: 16px; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
+.current-status-card::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.2), transparent 50%); pointer-events: none; }
+.status-header { display: flex; align-items: center; gap: .6rem; margin-bottom: .75rem; position: relative; z-index: 1; }
+.status-text { font-weight: 700; font-size: .9rem; }
+.status-details { display: flex; flex-direction: column; gap: .4rem; position: relative; z-index: 1; }
+.status-detail { display: flex; align-items: center; gap: .4rem; font-size: .65rem; font-weight: 500; opacity: .95; }
+
+.status-section { margin-bottom: 1.5rem; }
+.status-section h4 { font-size: .75rem; font-weight: 700; color: var(--text-primary); margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .5px; }
+.status-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: .5rem; }
+.status-btn { padding: .5rem .65rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: .65rem; font-weight: 600; cursor: pointer; transition: .25s ease; }
+.status-btn:hover { background: var(--accent-primary); color: #fff; }
+.status-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+
+.events-section { margin-bottom: 1.5rem; }
+.events-section h4 { font-size: .75rem; font-weight: 700; color: var(--text-primary); margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .5px; }
+.events-list { display: flex; flex-direction: column; gap: .4rem; }
+.event-item { display: flex; align-items: center; gap: .6rem; padding: .6rem .75rem; border-radius: 10px; font-size: .65rem; font-weight: 500; }
+.event-blue { background: rgba(99, 102, 241, 0.1); color: var(--text-primary); }
+.event-green { background: rgba(16, 185, 129, 0.1); color: var(--text-primary); }
+.event-purple { background: rgba(168, 85, 247, 0.1); color: var(--text-primary); }
+.event-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.event-blue .event-dot { background: var(--accent-primary); }
+.event-green .event-dot { background: var(--success); }
+.event-purple .event-dot { background: var(--accent-secondary); }
+
+.time-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: .75rem; }
+.time-action-btn { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .75rem 1rem; border-radius: 12px; font-size: .7rem; font-weight: 600; cursor: pointer; transition: .25s ease; }
+.time-action-btn.primary { background: var(--accent-primary); color: #fff; border: 1px solid var(--accent-primary); }
+.time-action-btn.primary:hover { filter: brightness(1.1); }
+.time-action-btn.secondary { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); }
+.time-action-btn.secondary:hover { background: var(--bg-secondary); }
+
+/* RESPONSIVE */
+@media (max-width: 860px) { 
+  .hero-content { 
+    flex-direction: column; 
+    align-items: flex-start; 
+  } 
+  .profile-main-info { 
+    width: 100%; 
+  } 
+  .profile-details { 
+    width: 100%; 
+  } 
+  .hero-actions { 
+    width: 100%; 
+    justify-content: flex-start; 
+  } 
+}
+
+@media (max-width: 640px) { 
+  .profile-hero { 
+    padding: 1.75rem 1.25rem 1.5rem; 
+    border-radius: 20px; 
+  } 
+  .profile-name { 
+    font-size: 1.55rem; 
+  } 
+  .profile-bio { 
+    font-size: 0.8rem; 
+  } 
+  .profile-content { 
+    gap: 1.25rem; 
+  } 
+  .profile-card, .section-card { 
+    padding: 1rem; 
+    border-radius: 16px; 
+  } 
+  .info-grid { 
+    grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); 
+    gap: 0.7rem; 
+  } 
+  .setting-item { 
+    flex-direction: column; 
+    align-items: flex-start; 
+    gap: 0.5rem; 
+  } 
+  .hero-actions { 
+    gap: 0.6rem; 
+  } 
+  .btn { 
+    font-size: 0.8rem; 
+    padding: 0.7rem 1rem; 
+  } 
+  .contact-item { 
+    padding: 0.7rem 0.8rem; 
+  } 
+  .action-btn { 
+    padding: 0.8rem 1rem; 
+    font-size: 0.8rem;
+  } 
+  .status-buttons { 
+    grid-template-columns: repeat(2,1fr); 
+  } 
+  .time-actions { 
+    grid-template-columns: 1fr; 
+  } 
+}
+
+@media (max-width: 420px) { 
+  .avatar-container { 
+    width: 90px; 
+    height: 90px; 
+  } 
+  .profile-name { 
+    font-size: 1.4rem; 
+  } 
+  .profile-meta { 
+    flex-direction: column; 
+    align-items: flex-start; 
+  } 
+  .hero-content { 
+    gap: 1.25rem; 
+  } 
+  .status-buttons { 
+    grid-template-columns: 1fr; 
+  }
+  .action-btn {
+    padding: 0.75rem 0.9rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* --- TOGGLE SWITCH --- */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--accent-primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+/* --- RESPONSIVE DESIGN --- */
+@media (max-width: 1024px) {
+  .profile-content {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .profile-sidebar {
+    order: 2;
+  }
+  
+  .profile-main {
+    order: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-page {
+    padding-top: 2rem; /* Ensure 6rem top spacing on mobile */
+  }
+  
+  .profile-hero {
+    padding: 2rem 1rem 1.5rem; /* Reduced top padding since page has 6rem already */
+  }
+  
+  .hero-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2rem;
+  }
+  
+  .profile-main-info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.5rem;
+  }
+  
+  .profile-name {
+    font-size: 2rem;
+  }
+  
+  .profile-meta {
+    justify-content: center;
+    gap: 1rem;
+  }
+  
+  .hero-actions {
+    align-items: center;
+  }
+  
+  .edit-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .profile-card {
+    padding: 1.25rem;
+  }
+  
+  .section-content {
+    padding: 1.5rem;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .info-item {
+    padding: 1.25rem;
+  }
+  
+  .setting-item {
+    padding: 1.25rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .setting-info {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-page {
+    padding-top: 2rem; /* Ensure 6rem top spacing on small mobile */
+  }
+  
+  
+  
+  .profile-hero {
+    padding: 1.5rem 0.75rem 1.25rem; /* Reduced top padding since page has 6rem already */
+  }
+  
+  .avatar-container {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .profile-name {
+    font-size: 1.75rem;
+  }
+  
+  .profile-bio {
+    font-size: 1rem;
+  }
+  
+  .profile-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .profile-card {
+    padding: 1rem;
+  }
+  
+  .section-header {
+    padding: 1.5rem 1.5rem 0.75rem;
+  }
+  
+  .section-content {
+    padding: 1.25rem;
+  }
+  
+  .contact-item {
+    padding: 0.75rem;
+  }
+  
+  .setting-item {
+    padding: 1rem;
+  }
+}
+
+/* --- DARK MODE ADJUSTMENTS --- */
+.profile-page.dark-mode .contact-item:hover {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.profile-page.dark-mode .action-btn:hover {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.profile-page.dark-mode .setting-item:hover {
+  background: var(--bg-primary);
 }

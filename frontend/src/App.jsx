@@ -1,31 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom'; // Új import!
 import './index.css';
 import Nav from './components/Nav';
 import MobileNav from './components/MobileNav';
-import ProfilePage from './pages/ProfilePage';
+import { useTheme } from './context/ThemeContext';
+
 // A Header, BentoGrid, FAB, TaskModal már nem kellenek ide közvetlenül
 
 function App() {
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  
+  const { darkMode, toggleDarkMode } = useTheme();
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-  
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-  };
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   return (
     <div>
-      <Nav theme={theme} toggleTheme={toggleTheme} />
+      <Nav />
       <div className="container">
-        <Outlet /> 
+        <Outlet />
       </div>
-      {/* JAVÍTÁS: Átadjuk a 'theme' és 'toggleTheme' prop-okat */}
-      <MobileNav theme={theme} toggleTheme={toggleTheme} />
+      <MobileNav />
     </div>
   );
 }

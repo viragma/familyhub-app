@@ -1,178 +1,461 @@
-import React, { useState, useEffect } from 'react';
+
+
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  User, Settings, Moon, Sun, LogOut, Bell, Camera, Save, X, Edit3,
-  Mail, Phone, UserCircle, Home, Calendar, MessageSquare, Star,
-  Volume2, Eye, Clock, Users, Globe, Lock, Monitor, Heart, Shield
+  Camera, Save, X, Edit3, Settings, Shield, Bell,
+  Mail, Phone, User, UserCircle, Calendar, LogOut,
+  Clock, Globe, Smartphone, Monitor, Users, Home,
+  Eye, Volume2, MapPin, MessageSquare, Heart
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import './ProfilePage.css';
-
-// Segédkomponens
-const SettingRow = ({ icon, title, description, children }) => (
-  <div className="setting-row">
-    <div className="setting-row-info">
-      <div className="setting-row-icon">{icon}</div>
-      <div>
-        <h3 className="setting-row-title">{title}</h3>
-        <p className="setting-row-description">{description}</p>
-      </div>
-    </div>
-    <div>{children}</div>
-  </div>
-);
-
-// Kapcsoló segédkomponens
-const ToggleSwitch = ({ isChecked, onToggle }) => (
-    <label className="toggle-switch">
-        <input type="checkbox" checked={isChecked} onChange={onToggle} />
-        <span className="toggle-slider"></span>
-    </label>
-);
+import { useTheme } from '../context/ThemeContext';
 
 export default function ProfilePage() {
+  const { darkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
-  const { logout, theme, toggleTheme, user } = useAuth(); 
-  
   const [isEditing, setIsEditing] = useState(false);
-  
-  const [profileData, setProfileData] = useState({});
-  const [editData, setEditData] = useState({});
+  const [profileData, setProfileData] = useState({
+    name: 'Kovács János',
+    email: 'kovacs.janos@example.com',
+    phone: '+36 30 123 4567',
+    role: 'Családfő',
+    bio: 'Szerető családapa és tech rajongó. Szeretem a családommal töltött időt és az új technológiákat.',
+    avatar: 'https://via.placeholder.com/150',
+    joinDate: '2023. március',
+    lastActive: '2 perce',
+    birthday: '1985-05-15',
+    address: 'Budapest, Magyarország',
+    currentStatus: 'Home Office',
+    todaySchedule: '09:00 - 17:00',
+    availableUntil: '17:00'
+  });
 
-  useEffect(() => {
-    if(user) {
-        const initialData = {
-            name: user.display_name || user.name || 'Felhasználó',
-            email: user.email || 'Nincs megadva',
-            phone: user.phone || '+36 -- --- ----',
-            role: user.role || 'Nincs megadva',
-            bio: user.bio || '',
-            birthday: user.birth_date || '',
-            address: user.address || 'Nincs megadva'
-        };
-        setProfileData(initialData);
-        setEditData(initialData);
+  // Jogosultság ellenőrzés - csak családfő láthatja a család kezelése gombot
+  const isFamilyHead = profileData.role === 'Családfő';
+
+  const handleLogout = () => {
+    if (window.confirm('Biztosan ki szeretnél jelentkezni?')) {
+      alert('Kijelentkezés...');
     }
-  }, [user]);
-
-  const [notifications, setNotifications] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(false);
-  const [locationSharing, setLocationSharing] = useState(true);
-  const [onlineStatus, setOnlineStatus] = useState(true);
-
-  const handleSave = () => { setProfileData({ ...editData }); setIsEditing(false); };
-  const handleCancel = () => { setEditData({ ...profileData }); setIsEditing(false); };
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setEditData(prev => ({ ...prev, [name]: value }));
   };
-  const handleLogout = () => { logout(); navigate('/login'); };
+
+  const handleFamilyManagement = () => {
+    // Átirányítás család kezelés oldalra
+    navigate('/manage-family');
+  };
+
+  const handleStatusChange = (status) => {
+    setProfileData(prev => ({
+      ...prev,
+      currentStatus: status
+    }));
+  };
+
+  const themeClass = darkMode ? 'dark-mode' : '';
 
   return (
-    <div className={`profile-page ${theme}`}>
-      <div className="profile-container">
-        
-        <header className="profile-header">
-          <div className="profile-picture-container">
-            <img src={user?.avatar_url || `https://i.pravatar.cc/150?u=${profileData.email}`} alt="Profilkép" className="profile-picture" />
-            <div className="overlay"><Camera size={32} /></div>
-          </div>
-          <div className="profile-info">
-            <h1 className="profile-name">{profileData.name}</h1>
-            <p className="profile-role">{profileData.role}</p>
-            <div className="profile-actions">
-              {isEditing ? (
-                <>
-                  <button onClick={handleSave} className="btn btn-success"><Save size={16} /> Mentés</button>
-                  <button onClick={handleCancel} className="btn btn-secondary"><X size={16} /> Mégse</button>
-                </>
-              ) : (
-                <button onClick={() => setIsEditing(true)} className="btn btn-primary"><Edit3 size={16} /> Profil szerkesztése</button>
-              )}
-              <button onClick={toggleTheme} className="btn btn-secondary btn-icon">
-                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
-              <button onClick={handleLogout} className="btn btn-danger btn-icon">
-                <LogOut size={18} />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <main>
-            <section className="profile-card">
-              <h2 className="profile-card-title"><UserCircle size={20} /> Általános adatok</h2>
-              <div className="info-grid">
-                <div className="info-field">
-                  <label><Mail size={16} /> Email cím</label>
-                  {isEditing ? <input name="email" value={editData.email} onChange={handleInputChange} /> : <p>{profileData.email}</p>}
+    <div className={`profile-page ${themeClass}`}>
+      {/* Hero Header Section */}
+      <div className="profile-hero">
+        <div className="hero-background"></div>
+        <div className="container">
+          <div className="hero-content">
+            <div className="profile-main-info">
+              <div className="avatar-section">
+                <div className="avatar-container">
+                  <img src={profileData.avatar} alt="Profilkép" className="avatar-img" />
+                  <button className="avatar-edit-btn">
+                    <Camera size={20} />
+                  </button>
                 </div>
-                <div className="info-field">
-                  <label><Phone size={16} /> Telefonszám</label>
-                  {isEditing ? <input name="phone" value={editData.phone} onChange={handleInputChange} /> : <p>{profileData.phone}</p>}
-                </div>
-                <div className="info-field">
-                  <label><Calendar size={16} /> Születésnap</label>
-                  {isEditing ? <input name="birthday" value={editData.birthday} type="date" onChange={handleInputChange} /> : <p>{profileData.birthday || 'Nincs megadva'}</p>}
-                </div>
-                <div className="info-field">
-                  <label><Home size={16} /> Lakcím</label>
-                  {isEditing ? <input name="address" value={editData.address} onChange={handleInputChange} /> : <p>{profileData.address}</p>}
-                </div>
-                <div className="info-field full-width">
-                  <label><MessageSquare size={16} /> Bemutatkozás</label>
-                  {isEditing ? <textarea name="bio" value={editData.bio} onChange={handleInputChange}></textarea> : <p>"{profileData.bio || 'Nincs még bemutatkozás.'}"</p>}
+                <div className="profile-status">
+                  <div className="status-indicator online"></div>
+                  <span>Online</span>
                 </div>
               </div>
-            </section>
-
-            <section className="profile-card">
-                <h2 className="profile-card-title"><Settings size={20} /> Általános Beállítások</h2>
-                <div className="settings-list">
-                    <SettingRow icon={<Bell size={20}/>} title="Értesítések" description="Push értesítések az eszközön">
-                        <ToggleSwitch isChecked={notifications} onToggle={() => setNotifications(!notifications)} />
-                    </SettingRow>
-                    <SettingRow icon={<Volume2 size={20}/>} title="Hangok" description="Alkalmazáson belüli hangeffektek">
-                        <ToggleSwitch isChecked={soundEnabled} onToggle={() => setSoundEnabled(!soundEnabled)} />
-                    </SettingRow>
-                    <SettingRow icon={<Mail size={20}/>} title="Email riportok" description="Heti összefoglaló a postaládádba">
-                        <ToggleSwitch isChecked={emailNotifications} onToggle={() => setEmailNotifications(!emailNotifications)} />
-                    </SettingRow>
-                    <SettingRow icon={<Eye size={20}/>} title="Online státusz mutatása" description="Láthatják a családtagok, ha aktív vagy">
-                        <ToggleSwitch isChecked={onlineStatus} onToggle={() => setOnlineStatus(!onlineStatus)} />
-                    </SettingRow>
-                    <SettingRow icon={<Globe size={20}/>} title="Helymegosztás" description="Automatikus helyzetmegosztás eseményeknél">
-                        <ToggleSwitch isChecked={locationSharing} onToggle={() => setLocationSharing(!locationSharing)} />
-                    </SettingRow>
+              
+              <div className="profile-details">
+                <h1 className="profile-name">{profileData.name}</h1>
+                <div className="profile-role">
+                  <UserCircle size={18} />
+                  <span>{profileData.role}</span>
                 </div>
-            </section>
-
-            <section className="profile-card">
-                <h2 className="profile-card-title"><Shield size={20} /> Biztonság</h2>
-                <div className="settings-list">
-                    <SettingRow icon={<Lock size={20}/>} title="PIN kód módosítása" description="A gyors bejelentkezéshez használt kód">
-                        <button className="btn btn-secondary">Módosítás</button>
-                    </SettingRow>
-                    <SettingRow icon={<Monitor size={20}/>} title="Bejelentkezett eszközök" description="Aktív munkamenetek kezelése">
-                        <button className="btn btn-secondary">Kezelés</button>
-                    </SettingRow>
+                <p className="profile-bio">{profileData.bio}</p>
+                
+                <div className="profile-meta">
+                  <div className="meta-item">
+                    <Calendar size={16} />
+                    <span>Csatlakozott: {profileData.joinDate}</span>
+                  </div>
+                  <div className="meta-item">
+                    <Clock size={16} />
+                    <span>Utoljára aktív: {profileData.lastActive}</span>
+                  </div>
                 </div>
-            </section>
-            
-            <div className="profile-bottom-actions">
-                <button onClick={() => navigate('/time-management')} className="btn btn-secondary">
-                  <Clock size={16} /> Időkezelési Központ
-                </button>
-                <button onClick={() => navigate('/manage-family')} className="btn btn-secondary">
-                  <Users size={16} /> Családtagok kezelése
-                </button>
-                 <button className="btn btn-secondary">
-                  <Heart size={16} /> Támogatás & Visszajelzés
-                </button>
+              </div>
             </div>
-        </main>
+            
+            <div className="hero-actions">
+              <button className="theme-toggle-hero" onClick={toggleDarkMode}>
+                <span className="theme-icon">{darkMode ? '☀️' : '🌙'}</span>
+                <span>{darkMode ? 'Világos mód' : 'Sötét mód'}</span>
+              </button>
+              
+              {!isEditing ? (
+                <button onClick={() => setIsEditing(true)} className="btn btn-primary">
+                  <Edit3 size={18} />
+                  Profil szerkesztése
+                </button>
+              ) : (
+                <div className="edit-actions">
+                  <button className="btn btn-success">
+                    <Save size={18} />
+                    Mentés
+                  </button>
+                  <button onClick={() => setIsEditing(false)} className="btn btn-secondary">
+                    <X size={18} />
+                    Mégse
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
+      {/* Main Content */}
+      <div className="container">
+        <div className="profile-content">
+          {/* Left Column */}
+          <div className="profile-sidebar">
+            
+            {/* Contact Card */}
+            <div className="profile-card">
+              <div className="card-header">
+                <Mail size={20} />
+                <h3>Kapcsolat</h3>
+              </div>
+              <div className="contact-list">
+                <div className="contact-item">
+                  <div className="contact-icon">
+                    <Mail size={16} />
+                  </div>
+                  <div className="contact-info">
+                    <span className="contact-label">Email</span>
+                    <span className="contact-value">{profileData.email}</span>
+                  </div>
+                </div>
+                <div className="contact-item">
+                  <div className="contact-icon">
+                    <Phone size={16} />
+                  </div>
+                  <div className="contact-info">
+                    <span className="contact-label">Telefon</span>
+                    <span className="contact-value">{profileData.phone}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="profile-card">
+              <div className="card-header">
+                <Settings size={20} />
+                <h3>Gyors műveletek</h3>
+              </div>
+              <div className="quick-actions">
+                <button className="action-btn">
+                  <Shield size={16} />
+                  <span>Biztonság</span>
+                </button>
+                <button className="action-btn">
+                  <Bell size={16} />
+                  <span>Értesítések</span>
+                </button>
+                <button className="action-btn">
+                  <Globe size={16} />
+                  <span>Nyelv</span>
+                </button>
+                {isFamilyHead && (
+                  <button className="action-btn family-management-btn" onClick={handleFamilyManagement}>
+                    <Users size={16} />
+                    <span>Család kezelése</span>
+                  </button>
+                )}
+                <button className="action-btn logout-action" onClick={handleLogout}>
+                  <LogOut size={16} />
+                  <span>Kijelentkezés</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="profile-main">
+            
+            {/* Personal Information */}
+            <div className="section-card">
+              <div className="section-header">
+                <div className="section-title">
+                  <User size={24} />
+                  <h2>Személyes adatok</h2>
+                </div>
+              </div>
+              <div className="section-content">
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Teljes név</label>
+                    <span>{profileData.name}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Email cím</label>
+                    <span>{profileData.email}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Telefonszám</label>
+                    <span>{profileData.phone}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Családi szerepkör</label>
+                    <span>{profileData.role}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Notifications */}
+            <div className="section-card">
+              <div className="section-header">
+                <div className="section-title">
+                  <Bell size={24} />
+                  <h2>Értesítések</h2>
+                </div>
+              </div>
+              <div className="section-content">
+                <div className="settings-list">
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <div className="setting-icon">
+                        <Smartphone size={18} />
+                      </div>
+                      <div>
+                        <span className="setting-label">Push értesítések</span>
+                        <span className="setting-desc">Mobilon kapott értesítések</span>
+                      </div>
+                    </div>
+                    <label className="switch">
+                      <input type="checkbox" checked readOnly />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <div className="setting-icon">
+                        <Mail size={18} />
+                      </div>
+                      <div>
+                        <span className="setting-label">Email értesítések</span>
+                        <span className="setting-desc">Fontos események emailben</span>
+                      </div>
+                    </div>
+                    <label className="switch">
+                      <input type="checkbox" checked readOnly />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <div className="setting-icon">
+                        <Monitor size={18} />
+                      </div>
+                      <div>
+                        <span className="setting-label">Desktop értesítések</span>
+                        <span className="setting-desc">Böngészőben megjelenő értesítések</span>
+                      </div>
+                    </div>
+                    <label className="switch">
+                      <input type="checkbox" />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Privacy & Security */}
+            <div className="section-card">
+              <div className="section-header">
+                <div className="section-title">
+                  <Shield size={24} />
+                  <h2>Adatvédelem és biztonság</h2>
+                </div>
+              </div>
+              <div className="section-content">
+                <div className="settings-list">
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <div>
+                        <span className="setting-label">Profil láthatósága</span>
+                        <span className="setting-desc">Ki láthatja a profilodat</span>
+                      </div>
+                    </div>
+                    <select className="setting-select">
+                      <option>Csak család</option>
+                      <option>Barátok</option>
+                      <option>Nyilvános</option>
+                    </select>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <div>
+                        <span className="setting-label">Online státusz</span>
+                        <span className="setting-desc">Mások láthatják mikor vagy online</span>
+                      </div>
+                    </div>
+                    <label className="switch">
+                      <input type="checkbox" checked readOnly />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* App Settings */}
+            <div className="section-card">
+              <div className="section-header">
+                <div className="section-title">
+                  <Settings size={24} />
+                  <h2>Alkalmazás beállítások</h2>
+                </div>
+              </div>
+              <div className="section-content">
+                <div className="settings-list">
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <div>
+                        <span className="setting-label">Nyelv</span>
+                        <span className="setting-desc">Alkalmazás nyelve</span>
+                      </div>
+                    </div>
+                    <select className="setting-select">
+                      <option>Magyar</option>
+                      <option>English</option>
+                    </select>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <div>
+                        <span className="setting-label">Téma</span>
+                        <span className="setting-desc">Világos vagy sötét megjelenés</span>
+                      </div>
+                    </div>
+                    <label className="switch">
+                      <input type="checkbox" checked={darkMode} onChange={toggleDarkMode} />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Time Management Section */}
+            <div className="section-card">
+              <div className="section-header">
+                <div className="section-title">
+                  <Clock size={24} />
+                  <h2>Időbeosztás és elérhetőség</h2>
+                </div>
+              </div>
+              <div className="section-content">
+                {/* Current Status */}
+                <div className="current-status-card">
+                  <div className="status-header">
+                    <div className="status-indicator online"></div>
+                    <span className="status-text">Jelenleg: {profileData.currentStatus}</span>
+                  </div>
+                  <div className="status-details">
+                    <div className="status-detail">
+                      <Clock size={14} />
+                      <span>Mai program: {profileData.todaySchedule}</span>
+                    </div>
+                    <div className="status-detail">
+                      <UserCircle size={14} />
+                      <span>Elérhető: {profileData.availableUntil}-ig</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Status Buttons */}
+                <div className="status-section">
+                  <h4>Gyors státusz váltás:</h4>
+                  <div className="status-buttons">
+                    <button 
+                      className={`status-btn ${profileData.currentStatus === 'Reggeli' ? 'active' : ''}`}
+                      onClick={() => handleStatusChange('Reggeli')}
+                    >
+                      🌅 Reggeli
+                    </button>
+                    <button 
+                      className={`status-btn ${profileData.currentStatus === 'Home Office' ? 'active' : ''}`}
+                      onClick={() => handleStatusChange('Home Office')}
+                    >
+                      🏠 Home Office
+                    </button>
+                    <button 
+                      className={`status-btn ${profileData.currentStatus === 'Szolgálati út' ? 'active' : ''}`}
+                      onClick={() => handleStatusChange('Szolgálati út')}
+                    >
+                      ✈️ Szolgálati út
+                    </button>
+                    <button 
+                      className={`status-btn ${profileData.currentStatus === 'Szabadság' ? 'active' : ''}`}
+                      onClick={() => handleStatusChange('Szabadság')}
+                    >
+                      🏖️ Szabadság
+                    </button>
+                  </div>
+                </div>
+
+                {/* Today's Events */}
+                <div className="events-section">
+                  <h4>Mai programom:</h4>
+                  <div className="events-list">
+                    <div className="event-item event-blue">
+                      <div className="event-dot"></div>
+                      <span>11:00 Team meeting (Google naptár)</span>
+                    </div>
+                    <div className="event-item event-green">
+                      <div className="event-dot"></div>
+                      <span>14:00 Luca elhozása (Iskola)</span>
+                    </div>
+                    <div className="event-item event-purple">
+                      <div className="event-dot"></div>
+                      <span>19:00 Családi vacsora</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="time-actions">
+                  <button className="time-action-btn primary">
+                    <Settings size={16} />
+                    Részletes időkezelés
+                  </button>
+                  <button className="time-action-btn secondary">
+                    <Calendar size={16} />
+                    Naptár szinkronizálás
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

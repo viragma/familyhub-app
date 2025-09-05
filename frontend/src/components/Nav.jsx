@@ -18,19 +18,13 @@ function Nav({ theme, toggleTheme }) {
     <NavLink to="/finances" className="nav-item">Pénzügyek</NavLink>
 )}
     <NavLink to="/wishes" className="nav-item">Kívánságok</NavLink>
-  {user && user.role === 'Családfő' && (
-            <>
-              <NavLink to="/manage-family" className="nav-item">Család Kezelése</NavLink>
-            </>
-          )}
-         
+ 
+          <NavLink to="/profile" className="nav-item">Profil</NavLink>
           
 
           {user && <button onClick={logout} className="nav-item" style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)'}}>Kijelentkezés</button>}
           
-          <button className="theme-toggle" onClick={toggleTheme}>
-            <span id="theme-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
-          </button>
+          {/* Téma váltó gomb eltávolítva, csak a profil oldalon lesz! */}
         </div>
       </div>
     </nav>
