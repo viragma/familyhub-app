@@ -9,6 +9,7 @@ import { useTheme } from './context/ThemeContext';
 
 function App() {
   const { darkMode, toggleDarkMode } = useTheme();
+  
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Form, Body, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Form, Body, Query, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .scheduler import scheduler
@@ -7,8 +7,13 @@ from datetime import datetime, timedelta, date
 from typing import Optional, List
 from fastapi import Query
 from contextlib import asynccontextmanager
+import os
+import uuid
+import shutil
+from pathlib import Path
 
 
+from . import crud
 from .crud import (
     get_tasks, create_task, toggle_task_status, delete_task,
     create_family, create_user, get_user, update_user,
@@ -26,15 +31,23 @@ from .crud import (
     submit_wish_for_approval,process_wish_approval,
     get_dashboard_notifications,
     get_wish_history, create_and_submit_wish,close_goal_account,
-    get_dashboard_data
-   
+    get_dashboard_data,
+    # Time Management imports
+    create_work_shift, get_user_shifts, get_family_shifts, update_work_shift, delete_work_shift,
+    create_shift_template, get_user_shift_templates, get_family_shift_templates, update_shift_template, delete_shift_template,
+    create_shift_assignment, get_user_shift_assignments, get_family_shift_assignments, update_shift_assignment, delete_shift_assignment,
+    get_monthly_schedule,
+    create_calendar_integration, get_user_calendar_integrations, update_calendar_integration, delete_calendar_integration,
+    create_time_conflict, get_family_conflicts, resolve_time_conflict, snooze_time_conflict,
+    create_family_event, get_family_events, get_todays_events, update_family_event, delete_family_event,
+    update_user_status, get_family_status, get_dashboard_time_data
 )
 from .models import Base, Task, User as UserModel, Category as CategoryModel
-from . import models
+from . import models, schemas
 from .schemas import (
     Task as TaskSchema, TaskCreate,
     Family, FamilyCreate,
-    User, UserCreate, UserProfile,
+    User, UserCreate, UserUpdate, UserProfile,
     Account, Transaction, TransactionCreate, AccountCreate,
     Category as CategorySchema, CategoryCreate,TransferCreate, # CategoryCreate importálva
     RecurringRule, RecurringRuleCreate,
@@ -48,9 +61,19 @@ from .schemas import (
     WishHistory as WishHistorySchema,
     WishActivationRequest,
     GoalCloseRequest,
-    DashboardResponse
-
-
+    DashboardResponse,
+    UserSettings, UserSettingsCreate, UserSettingsUpdate,
+    UserEvent, UserEventCreate, UserEventUpdate,
+    UserStatusHistory, UserStatusHistoryCreate,
+    # Time Management schemas
+    WorkShift, WorkShiftCreate, WorkShiftUpdate,
+    ShiftTemplate, ShiftTemplateCreate, ShiftTemplateUpdate,
+    ShiftAssignment, ShiftAssignmentCreate, ShiftAssignmentUpdate,
+    MonthlySchedule, MonthlyScheduleEntry,
+    CalendarIntegration, CalendarIntegrationCreate, CalendarIntegrationUpdate,
+    TimeConflict, TimeConflictCreate, TimeConflictUpdate,
+    FamilyEvent, FamilyEventCreate, FamilyEventUpdate,
+    UserStatusUpdate, DashboardTimeData
 )
 from .database import SessionLocal, engine
 from .security import create_access_token, verify_pin, oauth2_scheme, SECRET_KEY, ALGORITHM
@@ -70,6 +93,16 @@ app = FastAPI(lifespan=lifespan)
 
 origins = ["*"]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# Statikus fájlok kiszolgálása
+from fastapi.responses import FileResponse
+
+@app.get("/uploads/avatars/{filename}")
+async def get_avatar(filename: str):
+    file_path = Path(f"/home/viragma/familyhub-app/uploads/avatars/{filename}")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Fájl nem található")
+    return FileResponse(file_path)
 
 def get_db():
     db = SessionLocal()
@@ -141,8 +174,154 @@ def read_family_users(family_id: int, db: Session = Depends(get_db)):
     return get_users_by_family(db=db, family_id=family_id)
     
 @app.put("/api/users/{user_id}", response_model=User)
-def update_user_details(user_id: int, user_data: UserCreate, db: Session = Depends(get_db), admin: UserModel = Depends(get_current_admin_user)):
+def update_user_details(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    # Only allow users to update their own profile or admin to update any
+    if current_user.id != user_id and current_user.role != 'Családfő':
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod ehhez a művelethez")
+    
     return update_user(db=db, user_id=user_id, user_data=user_data)
+
+@app.put("/api/users/{user_id}/status")
+def update_user_status(user_id: int, status_data: dict, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    # Only allow users to update their own status
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Csak a saját státuszodat módosíthatod")
+    
+    # Update user status
+    db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Felhasználó nem található")
+    
+    db_user.status = status_data.get("status", db_user.status)
+    db_user.last_active = func.now()
+    
+    # Save status history
+    status_history = models.UserStatusHistory(
+        user_id=user_id,
+        status=status_data.get("status"),
+        note=status_data.get("note")
+    )
+    db.add(status_history)
+    
+    db.commit()
+    db.refresh(db_user)
+    
+    return {"message": "Státusz frissítve", "status": db_user.status}
+
+@app.post("/api/users/{user_id}/avatar")
+async def upload_avatar(
+    user_id: int, 
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db), 
+    current_user: UserModel = Depends(get_current_user)
+):
+    # Only allow users to update their own avatar
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Csak a saját profilképedet módosíthatod")
+    
+    # Check if user exists
+    db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Felhasználó nem található")
+    
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Csak kép fájlokat lehet feltölteni (JPEG, PNG, GIF, WebP)")
+    
+    # Validate file size (5MB max)
+    if file.size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="A fájl mérete nem lehet nagyobb 5MB-nál")
+    
+    # Generate unique filename
+    file_extension = file.filename.split('.')[-1].lower()
+    unique_filename = f"{user_id}_{uuid.uuid4().hex}.{file_extension}"
+    
+    # Create uploads directory if it doesn't exist
+    upload_dir = Path("/home/viragma/familyhub-app/uploads/avatars")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save file
+    file_path = upload_dir / unique_filename
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fájl mentési hiba: {str(e)}")
+    
+    # Delete old avatar if exists
+    if db_user.avatar_url:
+        old_file_path = Path(db_user.avatar_url.replace("/uploads/", "/home/viragma/familyhub-app/uploads/"))
+        if old_file_path.exists():
+            try:
+                old_file_path.unlink()
+            except:
+                pass  # Ignore errors when deleting old file
+    
+    # Update user avatar URL
+    avatar_url = f"/uploads/avatars/{unique_filename}"
+    db_user.avatar_url = avatar_url
+    db_user.updated_at = func.now()
+    
+    db.commit()
+    db.refresh(db_user)
+    
+    return {
+        "message": "Profilkép sikeresen feltöltve",
+        "avatar_url": avatar_url,
+        "filename": unique_filename
+    }
+
+@app.get("/api/users/{user_id}/settings", response_model=UserSettings)
+def get_user_settings(user_id: int, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Csak a saját beállításaidat nézheted meg")
+    
+    settings = db.query(models.UserSettings).filter(models.UserSettings.user_id == user_id).first()
+    if not settings:
+        # Create default settings
+        settings = models.UserSettings(user_id=user_id)
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    
+    return settings
+
+@app.put("/api/users/{user_id}/settings")
+def update_user_settings(user_id: int, settings_data: UserSettingsUpdate, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Csak a saját beállításaidat módosíthatod")
+    
+    settings = db.query(models.UserSettings).filter(models.UserSettings.user_id == user_id).first()
+    if not settings:
+        # Create new settings
+        settings = models.UserSettings(user_id=user_id)
+        db.add(settings)
+    
+    # Update fields
+    update_data = settings_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(settings, field, value)
+    
+    settings.updated_at = func.now()
+    db.commit()
+    db.refresh(settings)
+    
+    return {"message": "Beállítások frissítve"}
+
+@app.get("/api/users/{user_id}/events", response_model=List[UserEvent])
+def get_user_events(user_id: int, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Csak a saját programjaidat nézheted meg")
+    
+    today = datetime.now().date()
+    events = db.query(models.UserEvent).filter(
+        models.UserEvent.user_id == user_id,
+        func.date(models.UserEvent.start_time) == today
+    ).order_by(models.UserEvent.start_time).all()
+    
+    return events
 
 @app.delete("/api/users/{user_id}", response_model=User)
 def remove_user(user_id: int, db: Session = Depends(get_db), admin: UserModel = Depends(get_current_admin_user)):
@@ -712,3 +891,316 @@ def close_account_goal_endpoint(
         user=current_user,
         request_data=request_data
     )
+
+# === TIME MANAGEMENT API ENDPOINTS ===
+
+# Work Shifts
+@app.post("/api/time-management/shifts", response_model=schemas.WorkShift)
+def create_shift(
+    shift: schemas.WorkShiftCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_work_shift(db=db, shift=shift, user_id=current_user.id)
+
+@app.get("/api/time-management/shifts", response_model=List[schemas.WorkShift])
+def get_my_shifts(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_user_shifts(db=db, user_id=current_user.id)
+
+@app.get("/api/time-management/shifts/family", response_model=List[schemas.WorkShift])
+def get_family_shifts(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_family_shifts(db=db, family_id=current_user.family_id)
+
+@app.put("/api/time-management/shifts/{shift_id}", response_model=schemas.WorkShift)
+def update_shift(
+    shift_id: int,
+    shift_update: schemas.WorkShiftUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    updated_shift = crud.update_work_shift(db=db, shift_id=shift_id, shift_update=shift_update, user_id=current_user.id)
+    if not updated_shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+    return updated_shift
+
+@app.delete("/api/time-management/shifts/{shift_id}")
+def delete_shift(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    success = crud.delete_work_shift(db=db, shift_id=shift_id, user_id=current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Shift not found")
+    return {"message": "Shift deleted successfully"}
+
+# Shift Templates
+@app.post("/api/time-management/shift-templates", response_model=schemas.ShiftTemplate)
+def create_shift_template(
+    template: schemas.ShiftTemplateCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_shift_template(db=db, template=template, user_id=current_user.id)
+
+@app.get("/api/time-management/shift-templates", response_model=List[schemas.ShiftTemplate])
+def get_my_shift_templates(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_user_shift_templates(db=db, user_id=current_user.id)
+
+@app.get("/api/time-management/shift-templates/family", response_model=List[schemas.ShiftTemplate])
+def get_family_shift_templates(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_family_shift_templates(db=db, family_id=current_user.family_id)
+
+@app.put("/api/time-management/shift-templates/{template_id}", response_model=schemas.ShiftTemplate)
+def update_shift_template(
+    template_id: int,
+    template_update: schemas.ShiftTemplateUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    updated_template = crud.update_shift_template(db=db, template_id=template_id, template_update=template_update, user_id=current_user.id)
+    if not updated_template:
+        raise HTTPException(status_code=404, detail="Shift template not found")
+    return updated_template
+
+@app.delete("/api/time-management/shift-templates/{template_id}")
+def delete_shift_template(
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    success = crud.delete_shift_template(db=db, template_id=template_id, user_id=current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Shift template not found")
+    return {"message": "Shift template deleted successfully"}
+
+# Shift Assignments
+@app.post("/api/time-management/shift-assignments", response_model=schemas.ShiftAssignment)
+def create_shift_assignment(
+    assignment: schemas.ShiftAssignmentCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_shift_assignment(db=db, assignment=assignment, user_id=current_user.id)
+
+@app.get("/api/time-management/shift-assignments", response_model=List[schemas.ShiftAssignment])
+def get_my_shift_assignments(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_user_shift_assignments(db=db, user_id=current_user.id, start_date=start_date, end_date=end_date)
+
+@app.get("/api/time-management/shift-assignments/family", response_model=List[schemas.ShiftAssignment])
+def get_family_shift_assignments(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_family_shift_assignments(db=db, family_id=current_user.family_id, start_date=start_date, end_date=end_date)
+
+@app.get("/api/time-management/monthly-schedule/{month}/{year}", response_model=schemas.MonthlySchedule)
+def get_monthly_schedule(
+    month: int,
+    year: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_monthly_schedule(db=db, user_id=current_user.id, month=month, year=year)
+
+@app.put("/api/time-management/shift-assignments/{assignment_id}", response_model=schemas.ShiftAssignment)
+def update_shift_assignment(
+    assignment_id: int,
+    assignment_update: schemas.ShiftAssignmentUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    updated_assignment = crud.update_shift_assignment(db=db, assignment_id=assignment_id, assignment_update=assignment_update, user_id=current_user.id)
+    if not updated_assignment:
+        raise HTTPException(status_code=404, detail="Shift assignment not found")
+    return updated_assignment
+
+@app.delete("/api/time-management/shift-assignments/{assignment_id}")
+def delete_shift_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    success = crud.delete_shift_assignment(db=db, assignment_id=assignment_id, user_id=current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Shift assignment not found")
+    return {"message": "Shift assignment deleted successfully"}
+
+# Calendar Integrations
+@app.post("/api/time-management/calendar-integrations", response_model=schemas.CalendarIntegration)
+def create_calendar_integration(
+    integration: schemas.CalendarIntegrationCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_calendar_integration(db=db, integration=integration, user_id=current_user.id)
+
+@app.get("/api/time-management/calendar-integrations", response_model=List[schemas.CalendarIntegration])
+def get_my_calendar_integrations(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_user_calendar_integrations(db=db, user_id=current_user.id)
+
+@app.put("/api/time-management/calendar-integrations/{integration_id}", response_model=schemas.CalendarIntegration)
+def update_calendar_integration(
+    integration_id: int,
+    integration_update: schemas.CalendarIntegrationUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    updated_integration = crud.update_calendar_integration(
+        db=db, integration_id=integration_id, integration_update=integration_update, user_id=current_user.id
+    )
+    if not updated_integration:
+        raise HTTPException(status_code=404, detail="Calendar integration not found")
+    return updated_integration
+
+@app.delete("/api/time-management/calendar-integrations/{integration_id}")
+def delete_calendar_integration(
+    integration_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    success = crud.delete_calendar_integration(db=db, integration_id=integration_id, user_id=current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Calendar integration not found")
+    return {"message": "Calendar integration deleted successfully"}
+
+# Time Conflicts
+@app.post("/api/time-management/conflicts", response_model=schemas.TimeConflict)
+def create_conflict(
+    conflict: schemas.TimeConflictCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_time_conflict(db=db, conflict=conflict, family_id=current_user.family_id)
+
+@app.get("/api/time-management/conflicts", response_model=List[schemas.TimeConflict])
+def get_family_conflicts(
+    status: Optional[str] = Query("active"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_family_conflicts(db=db, family_id=current_user.family_id, status=status)
+
+@app.put("/api/time-management/conflicts/{conflict_id}/resolve")
+def resolve_conflict(
+    conflict_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    resolved_conflict = crud.resolve_time_conflict(db=db, conflict_id=conflict_id, family_id=current_user.family_id)
+    if not resolved_conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
+    return {"message": "Conflict resolved successfully"}
+
+@app.put("/api/time-management/conflicts/{conflict_id}/snooze")
+def snooze_conflict(
+    conflict_id: int,
+    snooze_until: datetime,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    snoozed_conflict = crud.snooze_time_conflict(
+        db=db, conflict_id=conflict_id, family_id=current_user.family_id, snooze_until=snooze_until
+    )
+    if not snoozed_conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
+    return {"message": "Conflict snoozed successfully"}
+
+# Family Events
+@app.post("/api/time-management/events", response_model=schemas.FamilyEvent)
+def create_event(
+    event: schemas.FamilyEventCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_family_event(db=db, event=event, family_id=current_user.family_id, creator_id=current_user.id)
+
+@app.get("/api/time-management/events", response_model=List[schemas.FamilyEvent])
+def get_family_events(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_family_events(db=db, family_id=current_user.family_id, start_date=start_date, end_date=end_date)
+
+@app.get("/api/time-management/events/today", response_model=List[schemas.FamilyEvent])
+def get_todays_events(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_todays_events(db=db, family_id=current_user.family_id)
+
+@app.put("/api/time-management/events/{event_id}", response_model=schemas.FamilyEvent)
+def update_event(
+    event_id: int,
+    event_update: schemas.FamilyEventUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    updated_event = crud.update_family_event(
+        db=db, event_id=event_id, event_update=event_update, family_id=current_user.family_id
+    )
+    if not updated_event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return updated_event
+
+@app.delete("/api/time-management/events/{event_id}")
+def delete_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    success = crud.delete_family_event(db=db, event_id=event_id, family_id=current_user.family_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"message": "Event deleted successfully"}
+
+# User Status Management
+@app.put("/api/time-management/status")
+def update_my_status(
+    status_update: schemas.UserStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    updated_user = crud.update_user_status(db=db, user_id=current_user.id, status_update=status_update)
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "Status updated successfully"}
+
+@app.get("/api/time-management/family-status")
+def get_family_status(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_family_status(db=db, family_id=current_user.family_id)
+
+# Dashboard endpoint for time management
+@app.get("/api/time-management/dashboard", response_model=schemas.DashboardTimeData)
+def get_time_dashboard(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_dashboard_time_data(db=db, family_id=current_user.family_id)

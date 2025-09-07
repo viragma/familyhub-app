@@ -10,6 +10,45 @@ function LoginPage() {
   const navigate = useNavigate();
   const { apiUrl, login } = useAuth();
 
+  // Avatar komponens újrafelhasználható profilkép megjelenítéshez
+  const Avatar = ({ user, size = '80px' }) => (
+    <div className="member-avatar" style={{width: size, height: size, fontSize: '2rem'}}>
+      {user.avatar_url ? (
+        <img 
+          src={user.avatar_url.startsWith('http') ? user.avatar_url : `${apiUrl}${user.avatar_url}`}
+          alt={`${user.display_name} profilképe`}
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            objectFit: 'cover'
+          }}
+          onError={(e) => {
+            // Ha a kép betöltése sikertelen, fallback az első betűre
+            e.target.style.display = 'none';
+            e.target.nextSibling.style.display = 'flex';
+          }}
+        />
+      ) : null}
+      <div 
+        style={{
+          display: user.avatar_url ? 'none' : 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'var(--accent-primary)',
+          color: 'white',
+          borderRadius: '50%',
+          fontSize: '2rem',
+          fontWeight: 'bold'
+        }}
+      >
+        {user.display_name.charAt(0).toUpperCase()}
+      </div>
+    </div>
+  );
+
   // Profilok lekérése a backendtől
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -53,9 +92,7 @@ function LoginPage() {
         <div className="members-grid" style={{marginTop: '2rem'}}>
           {profiles.map((profile) => (
             <div className="member-card" key={profile.id} onClick={() => setSelectedUser(profile)}>
-              <div className="member-avatar" style={{width: '80px', height: '80px', fontSize: '2rem'}}>
-                {profile.display_name.charAt(0)}
-              </div>
+              <Avatar user={profile} />
               <div className="member-name">{profile.display_name}</div>
             </div>
           ))}
@@ -67,8 +104,11 @@ function LoginPage() {
   // PIN bekérő nézet
   return (
     <AuthLayout>
-      <h1 className="auth-title">Üdv, {selectedUser.display_name}!</h1>
-      <p className="auth-subtitle">Add meg a PIN kódodat a belépéshez.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
+        <Avatar user={selectedUser} size="100px" />
+        <h1 className="auth-title" style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>Üdv, {selectedUser.display_name}!</h1>
+        <p className="auth-subtitle">Add meg a PIN kódodat a belépéshez.</p>
+      </div>
       
       <form onSubmit={handleLogin}>
         <div className="form-group">

@@ -320,20 +320,35 @@ class Task(TaskBase):
 class UserBase(BaseModel):
     name: str
     display_name: str
+    email: str | None = None
+    phone: str | None = None
     birth_date: date | None = None
     avatar_url: str | None = None
+    bio: str | None = None
+    status: str | None = None
     role: str
 
 class UserCreate(UserBase):
     pin: str
     family_id: int
 
-
+class UserUpdate(BaseModel):
+    name: str | None = None
+    display_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    birth_date: date | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    status: str | None = None
 
 # User without family reference
 class User(UserBase):
     id: int
     family_id: int
+    last_active: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     expected_expenses: List[ExpectedExpense] = []
 
     class Config:
@@ -620,6 +635,88 @@ class Goals(BaseModel):
 
 class DashboardResponse(BaseModel):
     financial_summary: FinancialSummary
+    current_month_forecast: Optional[Forecast] = None
+    next_month_forecast: Optional[Forecast] = None
+    goals: Optional[Goals] = None
+
+# --- User Settings Schemas ---
+class UserSettingsBase(BaseModel):
+    push_notifications: bool = True
+    email_notifications: bool = True
+    desktop_notifications: bool = False
+    profile_visibility: str = 'family'
+    show_online_status: bool = True
+    language: str = 'hu'
+    theme: str = 'light'
+
+class UserSettingsCreate(UserSettingsBase):
+    user_id: int
+
+class UserSettingsUpdate(BaseModel):
+    push_notifications: bool | None = None
+    email_notifications: bool | None = None
+    desktop_notifications: bool | None = None
+    profile_visibility: str | None = None
+    show_online_status: bool | None = None
+    language: str | None = None
+    theme: str | None = None
+
+class UserSettings(UserSettingsBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- User Event Schemas ---
+class UserEventBase(BaseModel):
+    title: str
+    event_type: str
+    start_time: datetime
+    end_time: datetime | None = None
+    color: str | None = None
+    source: str | None = None
+    is_recurring: bool = False
+
+class UserEventCreate(UserEventBase):
+    user_id: int
+
+class UserEventUpdate(BaseModel):
+    title: str | None = None
+    event_type: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    color: str | None = None
+    source: str | None = None
+    is_recurring: bool | None = None
+
+class UserEvent(UserEventBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- User Status History Schemas ---
+class UserStatusHistoryBase(BaseModel):
+    status: str
+    changed_until: datetime | None = None
+    note: str | None = None
+
+class UserStatusHistoryCreate(UserStatusHistoryBase):
+    user_id: int
+
+class UserStatusHistory(UserStatusHistoryBase):
+    id: int
+    user_id: int
+    changed_at: datetime
+
+    class Config:
+        from_attributes = True
     next_month_forecast: Forecast
     current_month_forecast: Forecast
     goals: Goals
@@ -635,3 +732,209 @@ Family.model_rebuild() # Ha a Family sémába is bekerül a Wish
 Category.model_rebuild()
 CategoryWithParent.model_rebuild()
 ExpectedExpense.model_rebuild()
+
+# === TIME MANAGEMENT SCHEMAS ===
+
+# Shift Template Schemas
+class ShiftTemplateBase(BaseModel):
+    name: str
+    start_time: str  # "07:00"
+    end_time: str    # "15:00"
+    location: str = "office"  # "office", "home", "field", "other"
+    location_details: Optional[str] = None
+    color: Optional[str] = "#3b82f6"
+    description: Optional[str] = None
+    is_active: bool = True
+
+class ShiftTemplateCreate(ShiftTemplateBase):
+    pass
+
+class ShiftTemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    location: Optional[str] = None
+    location_details: Optional[str] = None
+    color: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class ShiftTemplate(ShiftTemplateBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Shift Assignment Schemas
+class ShiftAssignmentBase(BaseModel):
+    template_id: int
+    date: date
+    status: str = "scheduled"  # scheduled, completed, cancelled
+    notes: Optional[str] = None
+
+class ShiftAssignmentCreate(ShiftAssignmentBase):
+    pass
+
+class ShiftAssignmentUpdate(BaseModel):
+    template_id: Optional[int] = None
+    date: Optional["date"] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+class ShiftAssignment(ShiftAssignmentBase):
+    id: int
+    user_id: int
+    template: ShiftTemplate
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Monthly Schedule Schema
+class MonthlyScheduleEntry(BaseModel):
+    date: "date"
+    assignment: Optional[ShiftAssignment] = None
+    template: Optional[ShiftTemplate] = None
+
+class MonthlySchedule(BaseModel):
+    user_id: int
+    month: int
+    year: int
+    entries: List[MonthlyScheduleEntry]
+
+class WorkShiftBase(BaseModel):
+    name: str
+    start_time: str  # "07:00"
+    end_time: str    # "15:00"
+    days_of_week: str  # "1,2,3,4,5"
+    color: Optional[str] = "#3b82f6"
+    is_active: bool = True
+
+class WorkShiftCreate(WorkShiftBase):
+    pass
+
+class WorkShiftUpdate(BaseModel):
+    name: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    days_of_week: Optional[str] = None
+    color: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class WorkShift(WorkShiftBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CalendarIntegrationBase(BaseModel):
+    name: str
+    type: str  # 'google', 'outlook', 'school', 'icloud'
+    sync_enabled: bool = True
+
+class CalendarIntegrationCreate(CalendarIntegrationBase):
+    pass
+
+class CalendarIntegrationUpdate(BaseModel):
+    name: Optional[str] = None
+    sync_enabled: Optional[bool] = None
+    status: Optional[str] = None
+
+class CalendarIntegration(CalendarIntegrationBase):
+    id: int
+    user_id: int
+    status: str
+    last_sync: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TimeConflictBase(BaseModel):
+    title: str
+    description: str
+    suggestion: Optional[str] = None
+    severity: str = 'medium'  # 'high', 'medium', 'low'
+    conflict_date: date
+    conflict_time_start: Optional[str] = None
+    conflict_time_end: Optional[str] = None
+
+class TimeConflictCreate(TimeConflictBase):
+    affected_user_id: int
+
+class TimeConflictUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    suggestion: Optional[str] = None
+    severity: Optional[str] = None
+    status: Optional[str] = None
+    snooze_until: Optional[datetime] = None
+
+class TimeConflict(TimeConflictBase):
+    id: int
+    family_id: int
+    affected_user_id: int
+    status: str
+    resolved_at: Optional[datetime] = None
+    snooze_until: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class FamilyEventBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    event_type: str  # 'family', 'work', 'school', 'health', 'transport'
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    location: Optional[str] = None
+    color: Optional[str] = None
+    is_recurring: bool = False
+    recurrence_pattern: Optional[str] = None
+    involves_members: Optional[str] = None  # "1,2,3" user IDs
+
+class FamilyEventCreate(FamilyEventBase):
+    pass
+
+class FamilyEventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    event_type: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    location: Optional[str] = None
+    color: Optional[str] = None
+    is_recurring: Optional[bool] = None
+    recurrence_pattern: Optional[str] = None
+    involves_members: Optional[str] = None
+
+class FamilyEvent(FamilyEventBase):
+    id: int
+    family_id: int
+    creator_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserStatusUpdate(BaseModel):
+    status: str
+    note: Optional[str] = None
+    until: Optional[datetime] = None
+
+class DashboardTimeData(BaseModel):
+    family_members: List[dict]
+    upcoming_events: List[dict]
+    conflicts: List[TimeConflict]
+    calendar_sync_status: List[CalendarIntegration]

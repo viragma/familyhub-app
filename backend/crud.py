@@ -108,12 +108,17 @@ def get_users_by_family(db: Session, family_id: int):
     return db.query(models.User).filter(models.User.family_id == family_id).all()
 
 
-def update_user(db: Session, user_id: int, user_data: schemas.UserCreate):
+def update_user(db: Session, user_id: int, user_data: schemas.UserUpdate):
     db_user = get_user(db, user_id)
     if db_user:
-        db_user.name = user_data.name
-        db_user.display_name = user_data.display_name
-        db_user.role = user_data.role
+        # Only update fields that are provided (not None)
+        update_data = user_data.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_user, field, value)
+        
+        # Update the updated_at timestamp
+        db_user.updated_at = func.now()
+        
         db.commit()
         db.refresh(db_user)
     return db_user
@@ -2106,11 +2111,14 @@ def close_goal_account(db: Session, account_id: int, user: models.User, request_
 
 def get_financial_forecast(db: Session, user: models.User, family_members_ids: list[int], start_date: date, end_date: date):
     """
-    Univerzális előrejelző funkció, ami egy adott időintervallumra számol.
-    A VALÓS adatbázis-logika alapján ('type' oszlop).
+    Előrejelző funkció egy adott időintervallumra.
+    - start_date: az időszak kezdete
+    - end_date: az időszak vége
+    
+    Visszaadja az aktuális felhasználó várható bevételeit és kiadásait az adott időszakra.
     """
-    # --- Személyes előrejelzés ---
-    personal_recurring_q = db.query(
+    # Csak az aktuális felhasználó ismétlődő szabályai az adott időszakra
+    user_recurring_q = db.query(
         func.sum(case((models.RecurringRule.type == 'bevétel', models.RecurringRule.amount), else_=Decimal('0.0'))).label("income"),
         func.sum(case((models.RecurringRule.type == 'kiadás', models.RecurringRule.amount), else_=Decimal('0.0'))).label("expense")
     ).filter(
@@ -2120,7 +2128,8 @@ def get_financial_forecast(db: Session, user: models.User, family_members_ids: l
         models.RecurringRule.is_active == True
     ).first()
 
-    personal_expected_expenses_q = db.query(
+    # Csak az aktuális felhasználó várható kiadásai az adott időszakra
+    user_expected_expenses_q = db.query(
         func.sum(models.ExpectedExpense.estimated_amount)
     ).filter(
         models.ExpectedExpense.owner_id == user.id,
@@ -2129,43 +2138,52 @@ def get_financial_forecast(db: Session, user: models.User, family_members_ids: l
         models.ExpectedExpense.status == 'tervezett'
     ).scalar()
 
-    personal_income = personal_recurring_q.income or Decimal('0.0')
-    personal_recurring_expense = personal_recurring_q.expense or Decimal('0.0')
-    personal_expected_expenses = personal_expected_expenses_q or Decimal('0.0')
-    personal_total_expense = personal_recurring_expense + personal_expected_expenses
+    # Számítások
+    projected_income = user_recurring_q.income or Decimal('0.0')
+    recurring_expenses = user_recurring_q.expense or Decimal('0.0')
+    expected_expenses = user_expected_expenses_q or Decimal('0.0')
+    total_expenses = recurring_expenses + expected_expenses
 
+    # Személyes előrejelzés (mindig csak az aktuális felhasználó)
     personal_forecast = schemas.ForecastData(
-        projected_income=float(personal_income),
-        projected_expenses=float(personal_total_expense)
+        projected_income=float(projected_income),
+        projected_expenses=float(total_expenses)
     )
 
-    # --- Családi előrejelzés ---
+    # Családi előrejelzés - csak parent role esetén, és csak a többi családtag adatai
     family_forecast = None
     is_parent_role = user.role in ['Szülő', 'Családfő']
     if is_parent_role:
-        family_recurring_q = db.query(
-            func.sum(case((models.RecurringRule.type == 'bevétel', models.RecurringRule.amount), else_=Decimal('0.0'))).label("income"),
-            func.sum(case((models.RecurringRule.type == 'kiadás', models.RecurringRule.amount), else_=Decimal('0.0'))).label("expense")
-        ).filter(
-            models.RecurringRule.owner_id.in_(family_members_ids),
-            models.RecurringRule.start_date <= end_date,
-            (models.RecurringRule.end_date == None) | (models.RecurringRule.end_date >= start_date),
-            models.RecurringRule.is_active == True
-        ).first()
-
-        family_expected_expenses_q = db.query(
-            func.sum(models.ExpectedExpense.estimated_amount)
-        ).filter(
-            models.ExpectedExpense.owner_id.in_(family_members_ids),
-            models.ExpectedExpense.due_date >= start_date,
-            models.ExpectedExpense.due_date <= end_date,
-            models.ExpectedExpense.status == 'tervezett'
-        ).scalar()
+        other_family_members = [member_id for member_id in family_members_ids if member_id != user.id]
         
-        family_income = family_recurring_q.income or Decimal('0.0')
-        family_recurring_expense = family_recurring_q.expense or Decimal('0.0')
-        family_expected_expenses = family_expected_expenses_q or Decimal('0.0')
-        family_total_expense = family_recurring_expense + family_expected_expenses
+        if other_family_members:
+            family_recurring_q = db.query(
+                func.sum(case((models.RecurringRule.type == 'bevétel', models.RecurringRule.amount), else_=Decimal('0.0'))).label("income"),
+                func.sum(case((models.RecurringRule.type == 'kiadás', models.RecurringRule.amount), else_=Decimal('0.0'))).label("expense")
+            ).filter(
+                models.RecurringRule.owner_id.in_(other_family_members),
+                models.RecurringRule.start_date <= end_date,
+                (models.RecurringRule.end_date == None) | (models.RecurringRule.end_date >= start_date),
+                models.RecurringRule.is_active == True
+            ).first()
+
+            family_expected_expenses_q = db.query(
+                func.sum(models.ExpectedExpense.estimated_amount)
+            ).filter(
+                models.ExpectedExpense.owner_id.in_(other_family_members),
+                models.ExpectedExpense.due_date >= start_date,
+                models.ExpectedExpense.due_date <= end_date,
+                models.ExpectedExpense.status == 'tervezett'
+            ).scalar()
+            
+            family_income = family_recurring_q.income or Decimal('0.0')
+            family_recurring_expense = family_recurring_q.expense or Decimal('0.0')
+            family_expected_expenses = family_expected_expenses_q or Decimal('0.0')
+            family_total_expense = family_recurring_expense + family_expected_expenses
+        else:
+            # Ha nincs más családtag, akkor nulla értékek
+            family_income = Decimal('0.0')
+            family_total_expense = Decimal('0.0')
 
         family_forecast = schemas.ForecastData(
             projected_income=float(family_income),
@@ -2249,4 +2267,496 @@ def get_dashboard_data(db: Session, user: models.User):
         current_month_forecast=current_month_forecast,
         next_month_forecast=next_month_forecast,
         goals=goals,
+    )
+
+# === TIME MANAGEMENT CRUD OPERATIONS ===
+
+# WorkShift CRUD
+def create_work_shift(db: Session, shift: schemas.WorkShiftCreate, user_id: int):
+    db_shift = models.WorkShift(
+        user_id=user_id,
+        name=shift.name,
+        start_time=shift.start_time,
+        end_time=shift.end_time,
+        days_of_week=shift.days_of_week,
+        color=shift.color,
+        is_active=shift.is_active
+    )
+    db.add(db_shift)
+    db.commit()
+    db.refresh(db_shift)
+    return db_shift
+
+def get_user_shifts(db: Session, user_id: int):
+    return db.query(models.WorkShift).filter(
+        models.WorkShift.user_id == user_id,
+        models.WorkShift.is_active == True
+    ).all()
+
+def get_family_shifts(db: Session, family_id: int):
+    return db.query(models.WorkShift).join(models.User).filter(
+        models.User.family_id == family_id,
+        models.WorkShift.is_active == True
+    ).all()
+
+def update_work_shift(db: Session, shift_id: int, shift_update: schemas.WorkShiftUpdate, user_id: int):
+    db_shift = db.query(models.WorkShift).filter(
+        models.WorkShift.id == shift_id,
+        models.WorkShift.user_id == user_id
+    ).first()
+    
+    if not db_shift:
+        return None
+    
+    for field, value in shift_update.dict(exclude_unset=True).items():
+        setattr(db_shift, field, value)
+    
+    db.commit()
+    db.refresh(db_shift)
+    return db_shift
+
+def delete_work_shift(db: Session, shift_id: int, user_id: int):
+    db_shift = db.query(models.WorkShift).filter(
+        models.WorkShift.id == shift_id,
+        models.WorkShift.user_id == user_id
+    ).first()
+    
+    if db_shift:
+        db_shift.is_active = False
+        db.commit()
+        return True
+    return False
+
+# Shift Template CRUD
+def create_shift_template(db: Session, template: schemas.ShiftTemplateCreate, user_id: int):
+    db_template = models.ShiftTemplate(
+        user_id=user_id,
+        name=template.name,
+        start_time=template.start_time,
+        end_time=template.end_time,
+        location=template.location,
+        location_details=template.location_details,
+        color=template.color,
+        description=template.description,
+        is_active=template.is_active
+    )
+    db.add(db_template)
+    db.commit()
+    db.refresh(db_template)
+    return db_template
+
+def get_user_shift_templates(db: Session, user_id: int):
+    return db.query(models.ShiftTemplate).filter(
+        models.ShiftTemplate.user_id == user_id,
+        models.ShiftTemplate.is_active == True
+    ).all()
+
+def get_family_shift_templates(db: Session, family_id: int):
+    return db.query(models.ShiftTemplate).join(models.User).filter(
+        models.User.family_id == family_id,
+        models.ShiftTemplate.is_active == True
+    ).all()
+
+def update_shift_template(db: Session, template_id: int, template_update: schemas.ShiftTemplateUpdate, user_id: int):
+    db_template = db.query(models.ShiftTemplate).filter(
+        models.ShiftTemplate.id == template_id,
+        models.ShiftTemplate.user_id == user_id
+    ).first()
+    
+    if not db_template:
+        return None
+    
+    for field, value in template_update.dict(exclude_unset=True).items():
+        setattr(db_template, field, value)
+    
+    db.commit()
+    db.refresh(db_template)
+    return db_template
+
+def delete_shift_template(db: Session, template_id: int, user_id: int):
+    db_template = db.query(models.ShiftTemplate).filter(
+        models.ShiftTemplate.id == template_id,
+        models.ShiftTemplate.user_id == user_id
+    ).first()
+    
+    if db_template:
+        db_template.is_active = False
+        db.commit()
+        return True
+    return False
+
+# Shift Assignment CRUD
+def create_shift_assignment(db: Session, assignment: schemas.ShiftAssignmentCreate, user_id: int):
+    # Check if assignment already exists for this date
+    existing = db.query(models.ShiftAssignment).filter(
+        models.ShiftAssignment.user_id == user_id,
+        models.ShiftAssignment.date == assignment.date
+    ).first()
+    
+    if existing:
+        # Update existing assignment
+        existing.template_id = assignment.template_id
+        existing.status = assignment.status
+        existing.notes = assignment.notes
+        db.commit()
+        db.refresh(existing)
+        return existing
+    
+    # Create new assignment
+    db_assignment = models.ShiftAssignment(
+        user_id=user_id,
+        template_id=assignment.template_id,
+        date=assignment.date,
+        status=assignment.status,
+        notes=assignment.notes
+    )
+    db.add(db_assignment)
+    db.commit()
+    db.refresh(db_assignment)
+    return db_assignment
+
+def get_user_shift_assignments(db: Session, user_id: int, start_date: date = None, end_date: date = None):
+    query = db.query(models.ShiftAssignment).options(
+        joinedload(models.ShiftAssignment.template)
+    ).filter(models.ShiftAssignment.user_id == user_id)
+    
+    if start_date:
+        query = query.filter(models.ShiftAssignment.date >= start_date)
+    if end_date:
+        query = query.filter(models.ShiftAssignment.date <= end_date)
+    
+    return query.order_by(models.ShiftAssignment.date).all()
+
+def get_family_shift_assignments(db: Session, family_id: int, start_date: date = None, end_date: date = None):
+    query = db.query(models.ShiftAssignment).options(
+        joinedload(models.ShiftAssignment.template),
+        joinedload(models.ShiftAssignment.user)
+    ).join(models.User).filter(models.User.family_id == family_id)
+    
+    if start_date:
+        query = query.filter(models.ShiftAssignment.date >= start_date)
+    if end_date:
+        query = query.filter(models.ShiftAssignment.date <= end_date)
+    
+    return query.order_by(models.ShiftAssignment.date).all()
+
+def update_shift_assignment(db: Session, assignment_id: int, assignment_update: schemas.ShiftAssignmentUpdate, user_id: int):
+    db_assignment = db.query(models.ShiftAssignment).filter(
+        models.ShiftAssignment.id == assignment_id,
+        models.ShiftAssignment.user_id == user_id
+    ).first()
+    
+    if not db_assignment:
+        return None
+    
+    for field, value in assignment_update.dict(exclude_unset=True).items():
+        setattr(db_assignment, field, value)
+    
+    db.commit()
+    db.refresh(db_assignment)
+    return db_assignment
+
+def delete_shift_assignment(db: Session, assignment_id: int, user_id: int):
+    db_assignment = db.query(models.ShiftAssignment).filter(
+        models.ShiftAssignment.id == assignment_id,
+        models.ShiftAssignment.user_id == user_id
+    ).first()
+    
+    if db_assignment:
+        db.delete(db_assignment)
+        db.commit()
+        return True
+    return False
+
+def get_monthly_schedule(db: Session, user_id: int, month: int, year: int):
+    """Get complete monthly schedule for a user"""
+    from datetime import date, timedelta
+    import calendar
+    
+    # Get first and last day of month
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
+    
+    # Get all assignments for the month
+    assignments = get_user_shift_assignments(db, user_id, first_day, last_day)
+    
+    # Create a dictionary for quick lookup
+    assignment_dict = {assignment.date: assignment for assignment in assignments}
+    
+    # Generate all days in the month
+    entries = []
+    current_date = first_day
+    while current_date <= last_day:
+        assignment = assignment_dict.get(current_date)
+        template = assignment.template if assignment else None
+        
+        entries.append(schemas.MonthlyScheduleEntry(
+            date=current_date,
+            assignment=assignment,
+            template=template
+        ))
+        
+        current_date += timedelta(days=1)
+    
+    return schemas.MonthlySchedule(
+        user_id=user_id,
+        month=month,
+        year=year,
+        entries=entries
+    )
+
+# Calendar Integration CRUD
+def create_calendar_integration(db: Session, integration: schemas.CalendarIntegrationCreate, user_id: int):
+    db_integration = models.CalendarIntegration(
+        user_id=user_id,
+        name=integration.name,
+        type=integration.type,
+        sync_enabled=integration.sync_enabled
+    )
+    db.add(db_integration)
+    db.commit()
+    db.refresh(db_integration)
+    return db_integration
+
+def get_user_calendar_integrations(db: Session, user_id: int):
+    return db.query(models.CalendarIntegration).filter(
+        models.CalendarIntegration.user_id == user_id
+    ).all()
+
+def update_calendar_integration(db: Session, integration_id: int, integration_update: schemas.CalendarIntegrationUpdate, user_id: int):
+    db_integration = db.query(models.CalendarIntegration).filter(
+        models.CalendarIntegration.id == integration_id,
+        models.CalendarIntegration.user_id == user_id
+    ).first()
+    
+    if not db_integration:
+        return None
+    
+    for field, value in integration_update.dict(exclude_unset=True).items():
+        setattr(db_integration, field, value)
+    
+    db.commit()
+    db.refresh(db_integration)
+    return db_integration
+
+def delete_calendar_integration(db: Session, integration_id: int, user_id: int):
+    db_integration = db.query(models.CalendarIntegration).filter(
+        models.CalendarIntegration.id == integration_id,
+        models.CalendarIntegration.user_id == user_id
+    ).first()
+    
+    if db_integration:
+        db.delete(db_integration)
+        db.commit()
+        return True
+    return False
+
+# Time Conflict CRUD
+def create_time_conflict(db: Session, conflict: schemas.TimeConflictCreate, family_id: int):
+    db_conflict = models.TimeConflict(
+        family_id=family_id,
+        affected_user_id=conflict.affected_user_id,
+        title=conflict.title,
+        description=conflict.description,
+        suggestion=conflict.suggestion,
+        severity=conflict.severity,
+        conflict_date=conflict.conflict_date,
+        conflict_time_start=conflict.conflict_time_start,
+        conflict_time_end=conflict.conflict_time_end
+    )
+    db.add(db_conflict)
+    db.commit()
+    db.refresh(db_conflict)
+    return db_conflict
+
+def get_family_conflicts(db: Session, family_id: int, status: str = "active"):
+    query = db.query(models.TimeConflict).filter(
+        models.TimeConflict.family_id == family_id
+    )
+    
+    if status:
+        query = query.filter(models.TimeConflict.status == status)
+    
+    return query.order_by(models.TimeConflict.severity.desc(), models.TimeConflict.created_at.desc()).all()
+
+def resolve_time_conflict(db: Session, conflict_id: int, family_id: int):
+    db_conflict = db.query(models.TimeConflict).filter(
+        models.TimeConflict.id == conflict_id,
+        models.TimeConflict.family_id == family_id
+    ).first()
+    
+    if db_conflict:
+        db_conflict.status = "resolved"
+        db_conflict.resolved_at = datetime.utcnow()
+        db.commit()
+        return db_conflict
+    return None
+
+def snooze_time_conflict(db: Session, conflict_id: int, family_id: int, snooze_until: datetime):
+    db_conflict = db.query(models.TimeConflict).filter(
+        models.TimeConflict.id == conflict_id,
+        models.TimeConflict.family_id == family_id
+    ).first()
+    
+    if db_conflict:
+        db_conflict.status = "snoozed"
+        db_conflict.snooze_until = snooze_until
+        db.commit()
+        return db_conflict
+    return None
+
+# Family Event CRUD
+def create_family_event(db: Session, event: schemas.FamilyEventCreate, family_id: int, creator_id: int):
+    db_event = models.FamilyEvent(
+        family_id=family_id,
+        creator_id=creator_id,
+        title=event.title,
+        description=event.description,
+        event_type=event.event_type,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        location=event.location,
+        color=event.color,
+        is_recurring=event.is_recurring,
+        recurrence_pattern=event.recurrence_pattern,
+        involves_members=event.involves_members
+    )
+    db.add(db_event)
+    db.commit()
+    db.refresh(db_event)
+    return db_event
+
+def get_family_events(db: Session, family_id: int, start_date: date = None, end_date: date = None):
+    query = db.query(models.FamilyEvent).filter(
+        models.FamilyEvent.family_id == family_id
+    )
+    
+    if start_date:
+        query = query.filter(func.date(models.FamilyEvent.start_time) >= start_date)
+    
+    if end_date:
+        query = query.filter(func.date(models.FamilyEvent.start_time) <= end_date)
+    
+    return query.order_by(models.FamilyEvent.start_time).all()
+
+def get_todays_events(db: Session, family_id: int):
+    today = date.today()
+    return get_family_events(db, family_id, today, today)
+
+def update_family_event(db: Session, event_id: int, event_update: schemas.FamilyEventUpdate, family_id: int):
+    db_event = db.query(models.FamilyEvent).filter(
+        models.FamilyEvent.id == event_id,
+        models.FamilyEvent.family_id == family_id
+    ).first()
+    
+    if not db_event:
+        return None
+    
+    for field, value in event_update.dict(exclude_unset=True).items():
+        setattr(db_event, field, value)
+    
+    db.commit()
+    db.refresh(db_event)
+    return db_event
+
+def delete_family_event(db: Session, event_id: int, family_id: int):
+    db_event = db.query(models.FamilyEvent).filter(
+        models.FamilyEvent.id == event_id,
+        models.FamilyEvent.family_id == family_id
+    ).first()
+    
+    if db_event:
+        db.delete(db_event)
+        db.commit()
+        return True
+    return False
+
+# User Status Management
+def update_user_status(db: Session, user_id: int, status_update: schemas.UserStatusUpdate):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        return None
+    
+    # Update current status
+    user.status = status_update.status
+    user.last_active = datetime.utcnow()
+    
+    # Create status history entry
+    status_history = models.UserStatusHistory(
+        user_id=user_id,
+        status=status_update.status,
+        changed_until=status_update.until,
+        note=status_update.note
+    )
+    db.add(status_history)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+def get_family_status(db: Session, family_id: int):
+    members = db.query(models.User).filter(
+        models.User.family_id == family_id
+    ).all()
+    
+    family_status = []
+    for member in members:
+        # Get current shifts
+        today_weekday = datetime.now().weekday() + 1  # Monday = 1
+        current_shifts = db.query(models.WorkShift).filter(
+            models.WorkShift.user_id == member.id,
+            models.WorkShift.is_active == True,
+            models.WorkShift.days_of_week.contains(str(today_weekday))
+        ).all()
+        
+        # Get today's events
+        today_events = db.query(models.UserEvent).filter(
+            models.UserEvent.user_id == member.id,
+            func.date(models.UserEvent.start_time) == date.today()
+        ).all()
+        
+        family_status.append({
+            'id': member.id,
+            'name': member.display_name,
+            'role': member.role,
+            'status': member.status or 'offline',
+            'last_active': member.last_active,
+            'current_shifts': [{'name': s.name, 'start_time': s.start_time, 'end_time': s.end_time} for s in current_shifts],
+            'today_events': [{'title': e.title, 'start_time': e.start_time, 'end_time': e.end_time} for e in today_events]
+        })
+    
+    return family_status
+
+# Dashboard Time Data
+def get_dashboard_time_data(db: Session, family_id: int):
+    # Get family status
+    family_members = get_family_status(db, family_id)
+    
+    # Get today's events
+    today_events = get_todays_events(db, family_id)
+    upcoming_events = [
+        {
+            'time': event.start_time.strftime('%H:%M'),
+            'title': event.title,
+            'type': event.event_type,
+            'member': 'Család' if not event.involves_members else 'Résztvevők'
+        }
+        for event in today_events
+    ]
+    
+    # Get active conflicts
+    conflicts = get_family_conflicts(db, family_id, "active")
+    
+    # Get calendar sync status for all family members
+    family_member_ids = [member['id'] for member in family_members]
+    calendar_integrations = []
+    for member_id in family_member_ids:
+        integrations = get_user_calendar_integrations(db, member_id)
+        calendar_integrations.extend(integrations)
+    
+    return schemas.DashboardTimeData(
+        family_members=family_members,
+        upcoming_events=upcoming_events,
+        conflicts=conflicts,
+        calendar_sync_status=calendar_integrations
     )

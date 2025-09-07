@@ -23,6 +23,11 @@ function MobileNav({ theme, toggleTheme }) { // Itt fogadjuk a prop-okat
           <span className="mobile-nav-icon">🎁</span>
           <span className="mobile-nav-label">Kívánságok</span>
         </NavLink>
+        
+        <NavLink to="/time-management" className="mobile-nav-item"> {/* <--- ÚJ IDŐKEZELÉSI MENÜPONT */}
+          <span className="mobile-nav-icon">🕒</span>
+          <span className="mobile-nav-label">Időkezelés</span>
+        </NavLink>
       
 
         <NavLink to="/profile" className="mobile-nav-item">

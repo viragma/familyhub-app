@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Boolean, Column, Integer, String, Date, ForeignKey,
-    Numeric, DateTime, Table, Enum,Text
+    Numeric, DateTime, Table, Enum, Text
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -38,6 +38,10 @@ class Family(Base):
     expected_expenses = relationship("ExpectedExpense", back_populates="family")
     wishes = relationship("Wish", back_populates="family")
     account_history = relationship("AccountHistory", back_populates="family")
+    
+    # Time Management relationships
+    time_conflicts = relationship("TimeConflict", back_populates="family")
+    family_events = relationship("FamilyEvent", back_populates="family")
 
 
 class User(Base):
@@ -45,10 +49,17 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
     display_name = Column(String)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
     birth_date = Column(Date, nullable=True)
     role = Column(String)
     pin_hash = Column(String)
     avatar_url = Column(String, nullable=True)
+    bio = Column(Text, nullable=True)
+    status = Column(String, nullable=True, default='Online')
+    last_active = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=True, default=func.now())
+    updated_at = Column(DateTime, nullable=True, default=func.now(), onupdate=func.now())
     family_id = Column(Integer, ForeignKey("families.id"))
     
     family = relationship("Family", back_populates="members")
@@ -57,12 +68,22 @@ class User(Base):
     transactions = relationship("Transaction", back_populates="creator")
     expected_expenses = relationship("ExpectedExpense", back_populates="owner")
     recurring_rules = relationship("RecurringRule", back_populates="owner_user")
+    settings = relationship("UserSettings", back_populates="user", uselist=False)
+    events = relationship("UserEvent", back_populates="user")
+    status_history = relationship("UserStatusHistory", back_populates="user")
     
     # JAVÍTOTT KAPCSOLAT: User -> Account (many-to-many)
     visible_accounts = relationship("Account", secondary=account_visibility_association, back_populates="viewers")
     owned_accounts = relationship("Account", back_populates="owner_user", foreign_keys="[Account.owner_user_id]")
     wishes = relationship("Wish", back_populates="owner", foreign_keys="[Wish.owner_user_id]")
     account_history_entries = relationship("AccountHistory", back_populates="user")
+    
+    # Time Management relationships
+    shifts = relationship("WorkShift", back_populates="user")
+    shift_templates = relationship("ShiftTemplate", back_populates="user")
+    shift_assignments = relationship("ShiftAssignment", back_populates="user")
+    calendar_integrations = relationship("CalendarIntegration", back_populates="user")
+    time_conflicts = relationship("TimeConflict", back_populates="affected_user")
 
 
 
@@ -253,6 +274,49 @@ class WishHistory(Base):
     wish = relationship("Wish", back_populates="history")
     user = relationship("User")
 
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    push_notifications = Column(Boolean, nullable=False, default=True)
+    email_notifications = Column(Boolean, nullable=False, default=True)
+    desktop_notifications = Column(Boolean, nullable=False, default=False)
+    profile_visibility = Column(String, nullable=False, default='family')
+    show_online_status = Column(Boolean, nullable=False, default=True)
+    language = Column(String, nullable=False, default='hu')
+    theme = Column(String, nullable=False, default='light')
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", back_populates="settings")
+
+class UserEvent(Base):
+    __tablename__ = "user_events"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    event_type = Column(String, nullable=False)  # 'meeting', 'personal', 'family', etc.
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    color = Column(String, nullable=True)
+    source = Column(String, nullable=True)  # 'manual', 'google', 'school', etc.
+    is_recurring = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", back_populates="events")
+
+class UserStatusHistory(Base):
+    __tablename__ = "user_status_history"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String, nullable=False)
+    changed_at = Column(DateTime, nullable=False, default=func.now())
+    changed_until = Column(DateTime, nullable=True)
+    note = Column(String, nullable=True)
+    
+    user = relationship("User", back_populates="status_history")
+
 class AccountHistory(Base):
     __tablename__ = "account_history"
     id = Column(Integer, primary_key=True, index=True)
@@ -266,3 +330,111 @@ class AccountHistory(Base):
     account = relationship("Account", back_populates="history_entries")
     user = relationship("User", back_populates="account_history_entries")
     family = relationship("Family", back_populates="account_history")
+
+# Time Management Models
+
+class ShiftTemplate(Base):
+    __tablename__ = "shift_templates"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)  # "Reggeli műszak", "Délutáni műszak"
+    start_time = Column(String, nullable=False)  # "07:00"
+    end_time = Column(String, nullable=False)    # "15:00"
+    location = Column(String, nullable=False, default="office")  # "office", "home", "field", "other"
+    location_details = Column(String, nullable=True)  # Custom location if "other"
+    color = Column(String, nullable=True, default="#3b82f6")
+    description = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", back_populates="shift_templates")
+    shift_assignments = relationship("ShiftAssignment", back_populates="template")
+
+class ShiftAssignment(Base):
+    __tablename__ = "shift_assignments"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    template_id = Column(Integer, ForeignKey("shift_templates.id"), nullable=False)
+    date = Column(Date, nullable=False)  # Specific date for this assignment
+    status = Column(String, nullable=False, default="scheduled")  # scheduled, completed, cancelled
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", back_populates="shift_assignments")
+    template = relationship("ShiftTemplate", back_populates="shift_assignments")
+
+class WorkShift(Base):
+    __tablename__ = "work_shifts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    start_time = Column(String, nullable=False)  # "07:00"
+    end_time = Column(String, nullable=False)    # "15:00"
+    days_of_week = Column(String, nullable=False)  # "1,2,3,4,5" (Monday to Friday)
+    color = Column(String, nullable=True, default="#3b82f6")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", back_populates="shifts")
+
+class CalendarIntegration(Base):
+    __tablename__ = "calendar_integrations"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)  # 'google', 'outlook', 'school', 'icloud'
+    status = Column(String, nullable=False, default='pending')  # 'connected', 'pending', 'error'
+    last_sync = Column(DateTime, nullable=True)
+    access_token = Column(String, nullable=True)
+    refresh_token = Column(String, nullable=True)
+    external_calendar_id = Column(String, nullable=True)
+    sync_enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", back_populates="calendar_integrations")
+
+class TimeConflict(Base):
+    __tablename__ = "time_conflicts"
+    id = Column(Integer, primary_key=True, index=True)
+    family_id = Column(Integer, ForeignKey("families.id"), nullable=False)
+    affected_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    suggestion = Column(Text, nullable=True)
+    severity = Column(String, nullable=False, default='medium')  # 'high', 'medium', 'low'
+    conflict_date = Column(Date, nullable=False)
+    conflict_time_start = Column(String, nullable=True)  # "14:00"
+    conflict_time_end = Column(String, nullable=True)    # "15:00"
+    status = Column(String, nullable=False, default='active')  # 'active', 'resolved', 'snoozed'
+    resolved_at = Column(DateTime, nullable=True)
+    snooze_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    family = relationship("Family")
+    affected_user = relationship("User", back_populates="time_conflicts")
+
+class FamilyEvent(Base):
+    __tablename__ = "family_events"
+    id = Column(Integer, primary_key=True, index=True)
+    family_id = Column(Integer, ForeignKey("families.id"), nullable=False)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    event_type = Column(String, nullable=False)  # 'family', 'work', 'school', 'health', 'transport'
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    location = Column(String, nullable=True)
+    color = Column(String, nullable=True)
+    is_recurring = Column(Boolean, nullable=False, default=False)
+    recurrence_pattern = Column(String, nullable=True)  # 'daily', 'weekly', 'monthly'
+    involves_members = Column(String, nullable=True)  # "1,2,3" user IDs
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    family = relationship("Family")
+    creator = relationship("User")

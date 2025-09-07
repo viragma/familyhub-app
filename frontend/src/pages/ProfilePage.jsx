@@ -1,55 +1,279 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Camera, Save, X, Edit3, Settings, Shield, Bell,
   Mail, Phone, User, UserCircle, Calendar, LogOut,
   Clock, Globe, Smartphone, Monitor, Users, Home,
-  Eye, Volume2, MapPin, MessageSquare, Heart
+  Eye, Volume2, MapPin, MessageSquare, Heart, Loader
 } from 'lucide-react';
 import './ProfilePage.css';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import ProfileEditModal from '../components/ProfileEditModal';
 
 export default function ProfilePage() {
   const { darkMode, toggleDarkMode } = useTheme();
+  const { user, token, apiUrl, logout } = useAuth();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [userSettings, setUserSettings] = useState({
+    push_notifications: true,
+    email_notifications: true,
+    desktop_notifications: false,
+    profile_visibility: 'family',
+    show_online_status: true,
+    language: 'hu',
+    theme: 'light'
+  });
+  const [todaysEvents, setTodaysEvents] = useState([]);
   const [profileData, setProfileData] = useState({
-    name: 'Kovács János',
-    email: 'kovacs.janos@example.com',
-    phone: '+36 30 123 4567',
-    role: 'Családfő',
-    bio: 'Szerető családapa és tech rajongó. Szeretem a családommal töltött időt és az új technológiákat.',
-    avatar: 'https://via.placeholder.com/150',
-    joinDate: '2023. március',
-    lastActive: '2 perce',
-    birthday: '1985-05-15',
-    address: 'Budapest, Magyarország',
-    currentStatus: 'Home Office',
+    name: '',
+    display_name: '',
+    email: '',
+    phone: '',
+    role: '',
+    bio: '',
+    avatar_url: '',
+    birth_date: '',
+    joinDate: '',
+    lastActive: '',
+    currentStatus: 'Online',
     todaySchedule: '09:00 - 17:00',
     availableUntil: '17:00'
   });
 
+  // Load user data from backend
+  useEffect(() => {
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        name: user.name || '',
+        display_name: user.display_name || '',
+        role: user.role || '',
+        avatar_url: user.avatar_url 
+          ? (user.avatar_url.startsWith('http') ? user.avatar_url : `http://localhost:8000${user.avatar_url}`)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.display_name || user.name || 'U')}&background=6366f1&color=fff&size=128`,
+        birth_date: user.birth_date || '',
+        email: user.email || `${(user.name || '').toLowerCase().replace(' ', '.')}@email.com`,
+        phone: user.phone || '+36 30 123 4567',
+        bio: user.bio || `${user.role} a családban`,
+        joinDate: new Date(user.created_at || Date.now()).toLocaleDateString('hu-HU'),
+        lastActive: 'Most aktív',
+        currentStatus: user.status || 'Online'
+      }));
+
+      // Load user settings
+      loadUserSettings();
+      // Load today's events
+      loadTodaysEvents();
+    }
+  }, [user]);
+
+  // Load user settings from backend
+  const loadUserSettings = async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`${apiUrl}/api/users/${user.id}/settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const settings = await response.json();
+        setUserSettings(settings);
+      }
+    } catch (error) {
+      console.error('Hiba a beállítások betöltésekor:', error);
+    }
+  };
+
+  // Load today's events from backend
+  const loadTodaysEvents = async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`${apiUrl}/api/users/${user.id}/events`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const events = await response.json();
+        setTodaysEvents(events);
+      }
+    } catch (error) {
+      console.error('Hiba az események betöltésekor:', error);
+      // Set some demo events if API fails
+      setTodaysEvents([
+        { id: 1, title: 'Team meeting', event_type: 'work', start_time: '2025-09-05T11:00:00' },
+        { id: 2, title: 'Luca elhozása', event_type: 'family', start_time: '2025-09-05T14:00:00' },
+        { id: 3, title: 'Családi vacsora', event_type: 'family', start_time: '2025-09-05T19:00:00' }
+      ]);
+    }
+  };
+
   // Jogosultság ellenőrzés - csak családfő láthatja a család kezelése gombot
-  const isFamilyHead = profileData.role === 'Családfő';
+  const isFamilyHead = user?.role === 'Családfő';
 
   const handleLogout = () => {
     if (window.confirm('Biztosan ki szeretnél jelentkezni?')) {
-      alert('Kijelentkezés...');
+      logout();
+      navigate('/login');
     }
   };
 
   const handleFamilyManagement = () => {
-    // Átirányítás család kezelés oldalra
     navigate('/manage-family');
   };
 
-  const handleStatusChange = (status) => {
+  // Save profile changes to backend
+  const handleSaveProfile = async (formData) => {
+    if (!user?.id) return;
+
+    setIsLoading(true);
+    try {
+      const userData = {
+        name: formData.name,
+        display_name: formData.display_name,
+        email: formData.email,
+        phone: formData.phone,
+        bio: formData.bio,
+        avatar_url: formData.avatar_url.startsWith('http://localhost:8000') 
+          ? formData.avatar_url.replace('http://localhost:8000', '') 
+          : formData.avatar_url,
+        birth_date: formData.birth_date || null,
+        family_id: user.family_id
+      };
+
+      const response = await fetch(`${apiUrl}/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(userData)
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        
+        // Update local profile data
+        setProfileData(prev => ({
+          ...prev,
+          ...formData
+        }));
+        
+        setIsEditModalOpen(false);
+        alert('Profil sikeresen frissítve!');
+      } else {
+        throw new Error('Hiba a profil mentésekor');
+      }
+    } catch (error) {
+      console.error('Hiba a profil mentésekor:', error);
+      alert('Hiba történt a profil mentésekor!');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle avatar upload
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // For now, just use a placeholder URL
+    // In a real app, you'd upload to a service like AWS S3 or similar
+    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.display_name)}&background=random&color=fff&size=128`;
+    
     setProfileData(prev => ({
       ...prev,
-      currentStatus: status
+      avatar_url: avatarUrl
     }));
+  };
+
+  const handleStatusChange = async (status) => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`${apiUrl}/api/users/${user.id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          status: status,
+          note: `Státusz váltás: ${status}` 
+        })
+      });
+
+      if (response.ok) {
+        setProfileData(prev => ({
+          ...prev,
+          currentStatus: status
+        }));
+      } else {
+        throw new Error('Státusz frissítése sikertelen');
+      }
+    } catch (error) {
+      console.error('Hiba a státusz frissítésekor:', error);
+      // Fallback to local state update
+      setProfileData(prev => ({
+        ...prev,
+        currentStatus: status
+      }));
+    }
+  };
+
+  // Handle settings change
+  const handleSettingsChange = async (settingKey, value) => {
+    if (!user?.id) return;
+
+    try {
+      const updatedSettings = { ...userSettings, [settingKey]: value };
+      
+      const response = await fetch(`${apiUrl}/api/users/${user.id}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ [settingKey]: value })
+      });
+
+      if (response.ok) {
+        setUserSettings(updatedSettings);
+      } else {
+        throw new Error('Beállítás frissítése sikertelen');
+      }
+    } catch (error) {
+      console.error('Hiba a beállítás frissítésekor:', error);
+      // Fallback to local state update
+      setUserSettings(prev => ({ ...prev, [settingKey]: value }));
+    }
+  };
+
+  // Helper function to get event color class
+  const getEventColorClass = (eventType) => {
+    switch (eventType) {
+      case 'work':
+      case 'meeting':
+        return 'event-blue';
+      case 'family':
+      case 'personal':
+        return 'event-green';
+      case 'school':
+      case 'education':
+        return 'event-purple';
+      default:
+        return 'event-blue';
+    }
   };
 
   const themeClass = darkMode ? 'dark-mode' : '';
@@ -64,8 +288,12 @@ export default function ProfilePage() {
             <div className="profile-main-info">
               <div className="avatar-section">
                 <div className="avatar-container">
-                  <img src={profileData.avatar} alt="Profilkép" className="avatar-img" />
-                  <button className="avatar-edit-btn">
+                  <img 
+                    src={profileData.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.display_name)}&background=random&color=fff&size=128`} 
+                    alt="Profilkép" 
+                    className="avatar-img" 
+                  />
+                  <button className="avatar-edit-btn" onClick={() => setIsEditModalOpen(true)}>
                     <Camera size={20} />
                   </button>
                 </div>
@@ -76,12 +304,13 @@ export default function ProfilePage() {
               </div>
               
               <div className="profile-details">
-                <h1 className="profile-name">{profileData.name}</h1>
+                <h1 className="profile-name">{profileData.display_name}</h1>
                 <div className="profile-role">
                   <UserCircle size={18} />
                   <span>{profileData.role}</span>
                 </div>
-                <p className="profile-bio">{profileData.bio}</p>
+                
+                <p className="profile-bio">{profileData.bio || 'Nincs megadva bemutatkozás.'}</p>
                 
                 <div className="profile-meta">
                   <div className="meta-item">
@@ -102,22 +331,16 @@ export default function ProfilePage() {
                 <span>{darkMode ? 'Világos mód' : 'Sötét mód'}</span>
               </button>
               
-              {!isEditing ? (
-                <button onClick={() => setIsEditing(true)} className="btn btn-primary">
+              {!isLoading ? (
+                <button onClick={() => setIsEditModalOpen(true)} className="btn btn-primary">
                   <Edit3 size={18} />
                   Profil szerkesztése
                 </button>
               ) : (
-                <div className="edit-actions">
-                  <button className="btn btn-success">
-                    <Save size={18} />
-                    Mentés
-                  </button>
-                  <button onClick={() => setIsEditing(false)} className="btn btn-secondary">
-                    <X size={18} />
-                    Mégse
-                  </button>
-                </div>
+                <button className="btn btn-primary" disabled>
+                  <Loader size={18} className="spinner" />
+                  Mentés...
+                </button>
               )}
             </div>
           </div>
@@ -214,7 +437,11 @@ export default function ProfilePage() {
                   </div>
                   <div className="info-item">
                     <label>Telefonszám</label>
-                    <span>{profileData.phone}</span>
+                    <span>{profileData.phone || 'Nincs megadva'}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Születési dátum</label>
+                    <span>{profileData.birth_date ? new Date(profileData.birth_date).toLocaleDateString('hu-HU') : 'Nincs megadva'}</span>
                   </div>
                   <div className="info-item">
                     <label>Családi szerepkör</label>
@@ -245,7 +472,11 @@ export default function ProfilePage() {
                       </div>
                     </div>
                     <label className="switch">
-                      <input type="checkbox" checked readOnly />
+                      <input 
+                        type="checkbox" 
+                        checked={userSettings.push_notifications} 
+                        onChange={(e) => handleSettingsChange('push_notifications', e.target.checked)}
+                      />
                       <span className="slider"></span>
                     </label>
                   </div>
@@ -261,7 +492,11 @@ export default function ProfilePage() {
                       </div>
                     </div>
                     <label className="switch">
-                      <input type="checkbox" checked readOnly />
+                      <input 
+                        type="checkbox" 
+                        checked={userSettings.email_notifications}
+                        onChange={(e) => handleSettingsChange('email_notifications', e.target.checked)}
+                      />
                       <span className="slider"></span>
                     </label>
                   </div>
@@ -277,7 +512,11 @@ export default function ProfilePage() {
                       </div>
                     </div>
                     <label className="switch">
-                      <input type="checkbox" />
+                      <input 
+                        type="checkbox" 
+                        checked={userSettings.desktop_notifications}
+                        onChange={(e) => handleSettingsChange('desktop_notifications', e.target.checked)}
+                      />
                       <span className="slider"></span>
                     </label>
                   </div>
@@ -302,10 +541,14 @@ export default function ProfilePage() {
                         <span className="setting-desc">Ki láthatja a profilodat</span>
                       </div>
                     </div>
-                    <select className="setting-select">
-                      <option>Csak család</option>
-                      <option>Barátok</option>
-                      <option>Nyilvános</option>
+                    <select 
+                      className="setting-select"
+                      value={userSettings.profile_visibility}
+                      onChange={(e) => handleSettingsChange('profile_visibility', e.target.value)}
+                    >
+                      <option value="family">Csak család</option>
+                      <option value="friends">Barátok</option>
+                      <option value="public">Nyilvános</option>
                     </select>
                   </div>
                   
@@ -317,7 +560,11 @@ export default function ProfilePage() {
                       </div>
                     </div>
                     <label className="switch">
-                      <input type="checkbox" checked readOnly />
+                      <input 
+                        type="checkbox" 
+                        checked={userSettings.show_online_status}
+                        onChange={(e) => handleSettingsChange('show_online_status', e.target.checked)}
+                      />
                       <span className="slider"></span>
                     </label>
                   </div>
@@ -342,9 +589,13 @@ export default function ProfilePage() {
                         <span className="setting-desc">Alkalmazás nyelve</span>
                       </div>
                     </div>
-                    <select className="setting-select">
-                      <option>Magyar</option>
-                      <option>English</option>
+                    <select 
+                      className="setting-select"
+                      value={userSettings.language}
+                      onChange={(e) => handleSettingsChange('language', e.target.value)}
+                    >
+                      <option value="hu">Magyar</option>
+                      <option value="en">English</option>
                     </select>
                   </div>
                   
@@ -426,18 +677,25 @@ export default function ProfilePage() {
                 <div className="events-section">
                   <h4>Mai programom:</h4>
                   <div className="events-list">
-                    <div className="event-item event-blue">
-                      <div className="event-dot"></div>
-                      <span>11:00 Team meeting (Google naptár)</span>
-                    </div>
-                    <div className="event-item event-green">
-                      <div className="event-dot"></div>
-                      <span>14:00 Luca elhozása (Iskola)</span>
-                    </div>
-                    <div className="event-item event-purple">
-                      <div className="event-dot"></div>
-                      <span>19:00 Családi vacsora</span>
-                    </div>
+                    {todaysEvents.length > 0 ? (
+                      todaysEvents.map((event, index) => (
+                        <div key={event.id || index} className={`event-item ${getEventColorClass(event.event_type)}`}>
+                          <div className="event-dot"></div>
+                          <span>
+                            {new Date(event.start_time).toLocaleTimeString('hu-HU', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })} {event.title}
+                            {event.source && ` (${event.source})`}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="event-item event-blue">
+                        <div className="event-dot"></div>
+                        <span>Nincs tervezett program ma</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -457,6 +715,15 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Profile Edit Modal */}
+      <ProfileEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        profileData={{...profileData, id: user?.id}}
+        onSave={handleSaveProfile}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

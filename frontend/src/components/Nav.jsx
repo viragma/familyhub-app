@@ -18,6 +18,7 @@ function Nav({ theme, toggleTheme }) {
     <NavLink to="/finances" className="nav-item">Pénzügyek</NavLink>
 )}
     <NavLink to="/wishes" className="nav-item">Kívánságok</NavLink>
+    <NavLink to="/time-management" className="nav-item">Időkezelés</NavLink>
  
           <NavLink to="/profile" className="nav-item">Profil</NavLink>
           
