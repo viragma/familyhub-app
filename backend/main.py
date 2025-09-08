@@ -169,7 +169,7 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
 def read_users_me(current_user: UserModel = Depends(get_current_user)):
     return current_user
 
-@app.get("/api/families/{family_id}/users", response_model=list[UserProfile])
+@app.get("/api/families/{family_id}/users", response_model=list[User])
 def read_family_users(family_id: int, db: Session = Depends(get_db)):
     return get_users_by_family(db=db, family_id=family_id)
     
@@ -990,10 +990,20 @@ def delete_shift_template(
 @app.post("/api/time-management/shift-assignments", response_model=schemas.ShiftAssignment)
 def create_shift_assignment(
     assignment: schemas.ShiftAssignmentCreate,
+    assigned_to: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    return crud.create_shift_assignment(db=db, assignment=assignment, user_id=current_user.id)
+    # If assigned_to is provided, verify it's a family member, otherwise use current user
+    target_user_id = assigned_to if assigned_to else current_user.id
+    
+    if assigned_to:
+        # Verify the assigned user is in the same family
+        target_user = db.query(models.User).filter(models.User.id == assigned_to).first()
+        if not target_user or target_user.family_id != current_user.family_id:
+            raise HTTPException(status_code=403, detail="Cannot assign to user outside your family")
+    
+    return crud.create_shift_assignment(db=db, assignment=assignment, user_id=target_user_id)
 
 @app.get("/api/time-management/shift-assignments", response_model=List[schemas.ShiftAssignment])
 def get_my_shift_assignments(

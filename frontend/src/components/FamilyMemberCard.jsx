@@ -77,7 +77,17 @@ function FamilyMemberCard({ member, onClick, isCurrentUser = false }) {
       <div className="member-avatar-section">
         <div className={`member-avatar-large ${isOnline ? 'online' : 'offline'}`}>
           {member.avatar_url ? (
-            <img src={member.avatar_url} alt={member.display_name} className="avatar-image" />
+            <img 
+              src={(() => {
+                if (member.avatar_url.includes('/uploads/avatars/')) {
+                  const filename = member.avatar_url.split('/uploads/avatars/')[1];
+                  return `${apiUrl}/uploads/avatars/${filename}`;
+                }
+                return member.avatar_url.startsWith('http') ? member.avatar_url : `${apiUrl}${member.avatar_url}`;
+              })()} 
+              alt={member.display_name} 
+              className="avatar-image" 
+            />
           ) : (
             <span className="avatar-initials">
               {member.display_name?.charAt(0)?.toUpperCase() || '?'}

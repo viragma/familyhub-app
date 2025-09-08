@@ -79,8 +79,8 @@ const TimeManagement = () => {
         }
       });
 
-      // Fetch shift assignments (for assignments data) - Use family endpoint to get all family assignments
-      const assignmentsResponse = await fetch(`${baseUrl}/api/time-management/shift-assignments/family`, {
+      // Fetch shift assignments (for assignments data)
+      const assignmentsResponse = await fetch(`${baseUrl}/api/time-management/shift-assignments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -123,10 +123,6 @@ const TimeManagement = () => {
         const assignmentsData = await assignmentsResponse.json();
         setAssignments(assignmentsData);
         console.log('Assignments loaded:', assignmentsData);
-        console.log('Assignment count:', assignmentsData.length);
-        if (assignmentsData.length > 0) {
-          console.log('First assignment example:', assignmentsData[0]);
-        }
       } else {
         console.error('Failed to fetch assignments:', assignmentsResponse.status);
       }

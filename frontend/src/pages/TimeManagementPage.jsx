@@ -1,7 +1,7 @@
 // frontend/src/pages/TimeManagementPage.jsx
 import React from 'react';
-import TimeManagement from '../components/TimeManagement';
+import FamilyScheduler from '../components/FamilyScheduler';
 
 export default function TimeManagementPage() {
-  return <TimeManagement />;
+  return <FamilyScheduler />;
 }

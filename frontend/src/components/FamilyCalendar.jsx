@@ -172,43 +172,61 @@ const FamilyCalendar = ({
   // Filter items by selected family members and other criteria
   const filterByMembers = (items) => {
     return items.filter(item => {
-      // If no specific member selected (common calendar), show all items
-      if (filters.selectedMemberId === null) {
-        return true;
-      }
-      
       // If specific member is selected, show only their items
-      // Check if item belongs to the selected member
-      if (item.user_id === filters.selectedMemberId) {
-        return true;
+      if (filters.selectedMemberId !== null) {
+        // For events: check involves_members field or creator
+        if (item.involves_members) {
+          const memberIds = Array.isArray(item.involves_members) 
+            ? item.involves_members 
+            : item.involves_members.split(',').map(id => parseInt(id.trim()));
+          return memberIds.includes(filters.selectedMemberId) || item.user_id === filters.selectedMemberId;
+        }
+        // For shifts and assignments: check user_id field
+        else if (item.user_id) {
+          return item.user_id === filters.selectedMemberId;
+        }
       }
       
-      // For events: check involves_members field
-      if (item.involves_members) {
-        const memberIds = Array.isArray(item.involves_members) 
-          ? item.involves_members 
-          : [item.involves_members];
-        return memberIds.includes(filters.selectedMemberId);
+      // Legacy member filtering (if using old filteredMembers)
+      if (filteredMembers.size > 0) {
+        // For events: check involves_members field
+        if (item.involves_members) {
+          const memberIds = Array.isArray(item.involves_members) 
+            ? item.involves_members 
+            : item.involves_members.split(',').map(id => parseInt(id.trim()));
+          if (!memberIds.some(id => filteredMembers.has(id))) return false;
+        }
+        // For shifts and assignments: check user_id field
+        else if (item.user_id) {
+          if (!filteredMembers.has(item.user_id)) return false;
+        }
       }
       
-      return false;
+      return true;
     });
   };
 
   // Apply all filters
   const applyFilters = (items, type) => {
+    console.log(`Applying filters for ${type}:`, items);
+    console.log('Current filters state:', filters);
+    
     // Re-enable filtering now that debugging is done
     if (type === 'shifts' && !filters.showShifts) {
+      console.log('Shifts filtered out by showShifts=false');
       return [];
     }
     if (type === 'events' && !filters.showEvents) {
+      console.log('Events filtered out by showEvents=false');
       return [];
     }
     if (type === 'assignments' && !filters.showAssignments) {
+      console.log('Assignments filtered out by showAssignments=false');
       return [];
     }
     
     let filtered = filterByMembers(items);
+    console.log(`After member filtering (${type}):`, filtered);
     
     // Event type filtering
     if (type === 'events') {
@@ -217,6 +235,7 @@ const FamilyCalendar = ({
         if (event.event_type !== 'family' && !filters.showPersonalEvents) return false;
         return true;
       });
+      console.log('After event type filtering:', filtered);
     }
     
     return filtered;
@@ -229,6 +248,8 @@ const FamilyCalendar = ({
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
+    
+    console.log('=== Getting items for date:', dateStr, 'Original date:', date);
     
     // Events from FamilyEvent API
     const dayEvents = events.filter(event => {
@@ -275,7 +296,7 @@ const FamilyCalendar = ({
         const templateData = template || assignment.template;
         
         if (templateData) {
-          const shiftData = {
+          return {
             id: `assignment-${assignment.id}`,
             assignment_id: assignment.id,
             template_id: templateData.id,
@@ -291,7 +312,6 @@ const FamilyCalendar = ({
             notes: assignment.notes,
             type: 'shift_assignment'
           };
-          return shiftData;
         }
         
         // Ha nincs template, akkor alapértelmezett adatokkal
@@ -618,38 +638,28 @@ const FamilyCalendar = ({
                 <span>Közös naptár</span>
               </button>
               
-              {console.log('FamilyMembers in render:', familyMembers)}
-              {familyMembers && familyMembers.length > 0 ? familyMembers.map(member => {
-                console.log('Rendering member:', member);
-                return (
-                  <button
-                    key={member.id}
-                    className={`member-calendar-option ${filters.selectedMemberId === member.id ? 'active' : ''}`}
-                    onClick={() => setFilters(prev => ({...prev, selectedMemberId: member.id}))}
-                  >
-                    <div className="member-calendar-avatar">
-                      {member.avatar_url ? (
-                        <img 
-                          src={member.avatar_url} 
-                          alt={member.full_name || member.name || member.username}
-                          className="member-avatar-image"
-                        />
-                      ) : (
-                        <span className="member-avatar-initial">
-                          {(member.full_name || member.name || member.username || '?').charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <span style={{display: 'block', visibility: 'visible'}}>
-                      {member.full_name || member.name || member.username || 'Ismeretlen'}
-                    </span>
-                  </button>
-                );
-              }) : (
-                <div style={{padding: '1rem', color: 'red'}}>
-                  Nincsenek családtagok betöltve (familyMembers: {JSON.stringify(familyMembers)})
-                </div>
-              )}
+              {familyMembers.map(member => (
+                <button
+                  key={member.id}
+                  className={`member-calendar-option ${filters.selectedMemberId === member.id ? 'active' : ''}`}
+                  onClick={() => setFilters(prev => ({...prev, selectedMemberId: member.id}))}
+                >
+                  <div className="member-calendar-avatar">
+                    {member.avatar_url ? (
+                      <img 
+                        src={member.avatar_url} 
+                        alt={member.full_name || member.name || member.username}
+                        className="member-avatar-image"
+                      />
+                    ) : (
+                      <span className="member-avatar-initial">
+                        {(member.full_name || member.name || member.username || '?').charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span>{member.full_name || member.name || member.username}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
