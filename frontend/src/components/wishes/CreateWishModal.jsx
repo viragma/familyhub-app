@@ -1,36 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Camera, Link as LinkIcon, XCircle, Save, Send } from 'lucide-react';
+import UniversalModal, { ModalSection, ModalActions } from '../universal/UniversalModal';
+import FormField, { TextField, TextareaField, NumberField, SelectField, DateField, FileField } from '../universal/FormField';
+import { useFormValidation, createSchema, validationRules } from '../universal/ValidationEngine';
+
+const wishSchema = createSchema()
+  .field('name', validationRules.required, validationRules.minLength(2))
+  .field('estimated_price', validationRules.number, validationRules.min(0));
 
 function CreateWishModal({ isOpen, onClose, onSave, wishToEdit = null }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    estimated_price: '',
-    priority: 'medium',
-    category_id: '',
-    deadline: ''
-  });
   const [categories, setCategories] = useState([]);
   const [images, setImages] = useState([]);
   const [links, setLinks] = useState([]);
   const [currentLink, setCurrentLink] = useState({ url: '', title: '' });
-
   const { token, apiUrl } = useAuth();
 
-  const resetState = () => {
-    setFormData({
-        name: '',
-        description: '',
-        estimated_price: '',
-        priority: 'medium',
-        category_id: '',
-        deadline: ''
-    });
-    setImages([]);
-    setLinks([]);
-    setCurrentLink({ url: '', title: '' });
-  };
+  const { values, getFieldProps, handleSubmit, setValues, reset, isSubmitting } = useFormValidation({
+    name: '', description: '', estimated_price: '', priority: 'medium', category_id: '', deadline: ''
+  }, wishSchema);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -43,7 +31,7 @@ function CreateWishModal({ isOpen, onClose, onSave, wishToEdit = null }) {
             setCategories(await response.json());
           }
         } catch (error) { 
-          console.error("Hiba a kategóriák lekérésekor:", error); 
+          console.error("Error fetching categories:", error); 
         }
       }
     };
@@ -51,7 +39,7 @@ function CreateWishModal({ isOpen, onClose, onSave, wishToEdit = null }) {
     fetchCategories();
 
     if (isOpen && wishToEdit) {
-      setFormData({
+      setValues({
         name: wishToEdit.name || '',
         description: wishToEdit.description || '',
         estimated_price: wishToEdit.estimated_price || '',
@@ -59,167 +47,160 @@ function CreateWishModal({ isOpen, onClose, onSave, wishToEdit = null }) {
         category_id: wishToEdit.category_id || '',
         deadline: wishToEdit.deadline ? wishToEdit.deadline.split('T')[0] : ''
       });
-      // TODO: Képek és linkek betöltése szerkesztéskor
     } else if (isOpen) {
-      resetState();
+      reset();
+      setImages([]);
+      setLinks([]);
+      setCurrentLink({ url: '', title: '' });
     }
-  }, [isOpen, wishToEdit, token, apiUrl]);
+  }, [isOpen, wishToEdit, token, apiUrl, setValues, reset]);
   
-  const handleImageChange = (e) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      files.forEach(file => {
+  const handleImageChange = (files) => {
+    if (files && files.length > 0) {
+      Array.from(files).forEach(file => {
         if (file.size > 5 * 1024 * 1024) {
           alert("A kép mérete nem haladhatja meg az 5MB-ot!");
           return;
         }
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            alert("Csak .jpg, .png vagy .webp formátumú képet tölthetsz fel!");
-            return;
+          alert("Csak .jpg, .png vagy .webp formátumú képet tölthetsz fel!");
+          return;
         }
         
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setImages(prev => [...prev, reader.result]);
+        reader.onload = () => {
+          setImages(prev => [...prev, { file, preview: reader.result }]);
         };
         reader.readAsDataURL(file);
       });
     }
   };
-  
+
   const removeImage = (index) => {
-      setImages(prev => prev.filter((_, i) => i !== index));
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
-  
-  const handleAddLink = () => {
-      if (currentLink.url) {
-          setLinks(prev => [...prev, currentLink]);
-          setCurrentLink({ url: '', title: '' });
-      }
+
+  const addLink = () => {
+    if (currentLink.url && currentLink.title) {
+      setLinks(prev => [...prev, currentLink]);
+      setCurrentLink({ url: '', title: '' });
+    }
   };
-  
+
   const removeLink = (index) => {
-      setLinks(prev => prev.filter((_, i) => i !== index));
+    setLinks(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const onSubmit = async (formData) => {
+    const wishData = {
+      ...formData,
+      estimated_price: formData.estimated_price ? parseFloat(formData.estimated_price) : null,
+      category_id: formData.category_id ? parseInt(formData.category_id) : null,
+      images: images.map(img => img.file),
+      links: links
+    };
+    
+    await onSave(wishData);
+    onClose();
   };
-  
-  const handleAction = (action) => {
-      if (!formData.name || !formData.estimated_price) {
-          alert("A név és a becsült ár megadása kötelező!");
-          return;
-      }
-      const dataToSend = {
-          ...formData,
-          category_id: formData.category_id ? parseInt(formData.category_id, 10) : null,
-          deadline: formData.deadline || null,
-          estimated_price: formData.estimated_price,
-          images: images,
-          links: links
-      };
-      onSave(dataToSend, action, wishToEdit ? wishToEdit.id : null);
-  }
 
-  if (!isOpen) return null;
+  const priorityOptions = [
+    { value: 'low', label: 'Alacsony' },
+    { value: 'medium', label: 'Közepes' },
+    { value: 'high', label: 'Magas' },
+    { value: 'urgent', label: 'Sürgős' }
+  ];
+
+  const categoryOptions = categories
+    .filter(cat => !cat.parent_id)
+    .map(cat => ({ value: cat.id.toString(), label: cat.name }));
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{wishToEdit ? 'Kívánság szerkesztése' : 'Új Kívánság'}</h2>
-          <button onClick={onClose} className="modal-close-btn">&times;</button>
+    <UniversalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={wishToEdit ? 'Kívánság Szerkesztése' : 'Új Kívánság'}
+      size="large"
+      loading={isSubmitting}
+    >
+      <ModalSection title="🎯 Alapadatok" icon="🎯">
+        <TextField {...getFieldProps('name')} label="Kívánság neve" placeholder="Pl. Új laptop" required />
+        <TextareaField {...getFieldProps('description')} label="Leírás" placeholder="Részletes leírás..." rows={4} />
+        <NumberField {...getFieldProps('estimated_price')} label="Becsült ár (Ft)" min={0} step={100} />
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+          <SelectField {...getFieldProps('priority')} label="Prioritás" options={priorityOptions} />
+          <SelectField {...getFieldProps('category_id')} label="Kategória" options={[{ value: '', label: 'Nincs kategória' }, ...categoryOptions]} />
         </div>
-        
-        <div className="form-group">
-          <label className="form-label">Mit szeretnél? *</label>
-          <input type="text" name="name" className="form-input" onChange={handleChange} value={formData.name} />
-        </div>
-        <div className="form-group">
-            <label className="form-label">Miért szeretnéd?</label>
-            <textarea name="description" className="form-input" onChange={handleChange} value={formData.description} rows="3"></textarea>
-        </div>
-        <div className="form-group">
-            <label className="form-label">Becsült ár (Ft) *</label>
-            <input type="number" name="estimated_price" className="form-input" onChange={handleChange} value={formData.estimated_price} />
-        </div>
-         <div className="form-group">
-            <label className="form-label">Kategória</label>
-            <select className="form-input" name="category_id" value={formData.category_id} onChange={handleChange}>
-                <option value="">Nincs kategória</option>
-                {categories.map(cat => (
-                <optgroup label={cat.name} key={cat.id}>
-                    <option value={cat.id}>{cat.name} (Főkategória)</option>
-                    {cat.children.map(child => (
-                    <option key={child.id} value={child.id}>&nbsp;&nbsp;{child.name}</option>
-                    ))}
-                </optgroup>
-                ))}
-            </select>
-        </div>
+        <DateField {...getFieldProps('deadline')} label="Határidő (opcionális)" />
+      </ModalSection>
 
-        <div className="form-group">
-            <label className="form-label">Prioritás</label>
-            <select className="form-input" name="priority" value={formData.priority} onChange={handleChange}>
-                <option value="low">Alacsony</option>
-                <option value="medium">Közepes</option>
-                <option value="high">Magas</option>
-            </select>
-        </div>
-        
-        {/* IDE került be a Határidő mező */}
-        <div className="form-group">
-            <label className="form-label">Határidő (opcionális)</label>
-            <input type="date" name="deadline" className="form-input" onChange={handleChange} value={formData.deadline} />
-        </div>
-        
-        <div className="form-group">
-            <label className="form-label">Képek</label>
-            <div className="image-preview-area">
-                {images.map((imgSrc, index) => (
-                    <div key={index} className="image-preview">
-                        <img src={imgSrc} alt={`preview ${index}`} />
-                        <button onClick={() => removeImage(index)} className="remove-btn"><XCircle size={18} /></button>
-                    </div>
-                ))}
-            </div>
-            <label htmlFor="image-upload" className="media-btn">
-                <Camera size={16} /> Kép hozzáadása
-            </label>
-            <input id="image-upload" type="file" multiple accept="image/png, image/jpeg, image/webp" onChange={handleImageChange} style={{ display: 'none' }} />
-        </div>
+      <ModalSection title="📷 Képek" icon="📷">
+        <FileField
+          label="Képek feltöltése"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          onChange={handleImageChange}
+        />
+        {images.length > 0 && (
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '1rem', marginTop: '1rem'}}>
+            {images.map((img, index) => (
+              <div key={index} style={{position: 'relative', borderRadius: '8px', overflow: 'hidden'}}>
+                <img src={img.preview} alt="Preview" style={{width: '100%', height: '120px', objectFit: 'cover'}} />
+                <button
+                  type="button"
+                  onClick={() => removeImage(index)}
+                  style={{position: 'absolute', top: '0.25rem', right: '0.25rem', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', padding: '0.25rem', cursor: 'pointer'}}
+                >
+                  <XCircle size={16} color="white" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </ModalSection>
 
-        <div className="form-group">
-            <label className="form-label">Linkek</label>
-            <div className="links-list">
-                {links.map((link, index) => (
-                    <div key={index} className="link-item">
-                        <LinkIcon size={16} />
-                        <a href={link.url} target="_blank" rel="noopener noreferrer">{link.title || link.url}</a>
-                        <button onClick={() => removeLink(index)} className="remove-btn"><XCircle size={18} /></button>
-                    </div>
-                ))}
-            </div>
-            <div className="add-link-form">
-                <input type="text" className="form-input" placeholder="Link címe (opcionális)" value={currentLink.title} onChange={e => setCurrentLink({...currentLink, title: e.target.value})} />
-                <input type="url" className="form-input" placeholder="https://..." value={currentLink.url} onChange={e => setCurrentLink({...currentLink, url: e.target.value})} />
-                <button className="btn btn-secondary" onClick={handleAddLink}>+</button>
-            </div>
+      <ModalSection title="🔗 Linkek" icon="🔗">
+        <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '0.5rem', alignItems: 'end'}}>
+          <TextField
+            label="URL"
+            value={currentLink.url}
+            onChange={(e) => setCurrentLink(prev => ({ ...prev, url: e.target.value }))}
+            placeholder="https://..."
+          />
+          <TextField
+            label="Cím"
+            value={currentLink.title}
+            onChange={(e) => setCurrentLink(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="Link címe"
+          />
+          <button type="button" className="btn btn-primary" onClick={addLink} disabled={!currentLink.url || !currentLink.title}>
+            <LinkIcon size={16} /> Hozzáadás
+          </button>
         </div>
-        
-        <div className="modal-actions">
-            <button onClick={onClose} className="btn btn-secondary">Mégse</button>
-            <button onClick={() => handleAction('draft')} className="btn btn-tertiary">
-                <Save size={16} /> Mentés vázlatként
-            </button>
-            <button onClick={() => handleAction('submit')} className="btn btn-primary">
-                <Send size={16} /> Jóváhagyásra küldés
-            </button>
-        </div>
-      </div>
-    </div>
+        {links.length > 0 && (
+          <div style={{marginTop: '1rem'}}>
+            {links.map((link, index) => (
+              <div key={index} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: 'var(--surface-secondary)', borderRadius: '8px', marginBottom: '0.5rem'}}>
+                <div>
+                  <div style={{fontWeight: '600'}}>{link.title}</div>
+                  <div style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>{link.url}</div>
+                </div>
+                <button type="button" onClick={() => removeLink(index)} style={{background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer'}}>
+                  <XCircle size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </ModalSection>
+
+      <ModalActions align="space-between">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>Mégse</button>
+        <button type="button" className="btn btn-primary" onClick={() => handleSubmit(onSubmit)}>
+          <Save size={16} /> {wishToEdit ? 'Frissítés' : 'Mentés'}
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 

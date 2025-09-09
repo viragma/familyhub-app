@@ -1,17 +1,80 @@
 <!doctype html>
-<html lang="en">
+<html lang="hu" translate="no">
   <head>
     <meta charset="UTF-8" />
-   <link rel="manifest" href="/manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Standard favicon -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icon-16x16.png">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-180x180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="57x57" href="/icon-57x57.png">
+    
+    <!-- Apple specific meta tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FamilyHub">
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/icon-192x192.png">
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <meta name="apple-touch-fullscreen" content="yes">
+    
+    <!-- Android specific meta tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="FamilyHub">
+    
+    <!-- Microsoft specific meta tags -->
+    <meta name="msapplication-TileColor" content="#6366f1">
+    <meta name="msapplication-TileImage" content="/icon-144x144.png">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+    
+    <!-- Theme colors -->
+    <meta name="theme-color" content="#6366f1">
+    <meta name="msapplication-navbutton-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Language and locale -->
+    <meta http-equiv="Content-Language" content="hu">
+    <meta name="language" content="Hungarian">
+    
+    <!-- Disable translation -->
+    <meta name="google" content="notranslate">
+    <meta name="translate" content="no">
+    <meta http-equiv="content-language" content="hu-HU">
+    <meta name="google-translate-customization" content="">
+    
+    <!-- Browser specific translation disable -->
+    <meta name="yandex-verification" content="notranslate">
+    <meta name="msvalidate.01" content="notranslate">
+    
+    <!-- Additional translation blocking -->
+    <meta name="robots" content="notranslate">
+    <meta name="googlebot" content="notranslate">
+    
+    <!-- Language specification -->
+    <meta property="og:locale" content="hu_HU">
+    <meta name="DC.language" content="hu">
+    
+    <!-- SEO and description -->
+    <meta name="description" content="FamilyHub - Családi pénzügyek, beosztások és események kezelése egy helyen">
+    <meta name="keywords" content="család, pénzügy, beosztás, időbeosztás, családi alkalmazás">
+    <meta name="author" content="FamilyHub">
+    
+    <!-- Preload critical resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <title>FamilyHub - Családi Menedzsment</title>
   </head>
   <body>
     <div id="root"></div>

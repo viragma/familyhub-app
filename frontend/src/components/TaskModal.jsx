@@ -1,81 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { TextField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
+
+const taskSchema = createSchema()
+  .field('title', validationRules.required, validationRules.minLength(2))
+  .field('owner', validationRules.minLength(2))
+  .field('reward', validationRules.minLength(1));
 
 function TaskModal({ isOpen, onClose, onSave }) {
-  const [title, setTitle] = useState('');
-  const [owner, setOwner] = useState('');
-  const [reward, setReward] = useState('');
+  const { values, getFieldProps, handleSubmit, reset, isSubmitting } = useFormValidation({
+    title: '', owner: '', reward: ''
+  }, taskSchema);
 
-  const handleSave = () => {
-    // Alap validáció, hogy a cím ne legyen üres
-    if (!title.trim()) {
-      alert('A feladat címe nem lehet üres!');
-      return;
+  useEffect(() => {
+    if (isOpen) {
+      reset();
     }
-    
-    onSave({
-      title,
-      owner,
-      reward,
+  }, [isOpen, reset]);
+
+  const onSubmit = async (formData) => {
+    await onSave({
+      title: formData.title,
+      owner: formData.owner,
+      reward: formData.reward,
       done: false
     });
-    
-    // Mezők ürítése mentés után
-    setTitle('');
-    setOwner('');
-    setReward('');
+    onClose();
   };
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">Új Feladat Létrehozása</h2>
-          <button className="modal-close-btn" onClick={onClose}>&times;</button>
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="title">Mi a feladat?</label>
-          <input 
-            id="title" 
-            type="text" 
-            value={title} 
-            onChange={e => setTitle(e.target.value)} 
-            placeholder="Pl. Porszívózás"
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="owner">Kié a feladat?</label>
-          <input 
-            id="owner" 
-            type="text" 
-            value={owner} 
-            onChange={e => setOwner(e.target.value)} 
-            placeholder="Pl. Peti"
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="reward">Mi a jutalom?</label>
-          <input 
-            id="reward" 
-            type="text" 
-            value={reward} 
-            onChange={e => setReward(e.target.value)} 
-            placeholder="Pl. 500 Ft"
-          />
-        </div>
-        
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
-        </div>
-      </div>
-    </div>
+    <UniversalModal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title="Új Feladat Létrehozása" 
+      size="small" 
+      loading={isSubmitting}
+    >
+      <ModalSection title="📝 Feladat Adatok" icon="📝">
+        <TextField 
+          {...getFieldProps('title')} 
+          label="Mi a feladat?" 
+          placeholder="Pl. Porszívózás" 
+          required 
+        />
+        <TextField 
+          {...getFieldProps('owner')} 
+          label="Kié a feladat?" 
+          placeholder="Pl. Peti" 
+        />
+        <TextField 
+          {...getFieldProps('reward')} 
+          label="Mi a jutalom?" 
+          placeholder="Pl. 500 Ft" 
+        />
+      </ModalSection>
+
+      <ModalActions align="space-between">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
+          Mégse
+        </button>
+        <button type="button" className="btn btn-primary" onClick={() => handleSubmit(onSubmit)}>
+          Mentés
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 

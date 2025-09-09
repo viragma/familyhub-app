@@ -1,76 +1,104 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import UniversalModal, { ModalSection, ModalActions } from '../universal/UniversalModal';
+import FormField, { NumberField, TextField, SelectField } from '../universal/FormField';
+import { useFormValidation, createSchema, validationRules } from '../universal/ValidationEngine';
+
+const completeExpenseSchema = createSchema()
+  .field('actualAmount', validationRules.required, validationRules.number, validationRules.min(0.01))
+  .field('accountId', validationRules.required);
 
 function ExpectedExpenseCompleteModal({ isOpen, onClose, onComplete, expenseData, accounts }) {
-  const [actualAmount, setActualAmount] = useState('');
-  const [accountId, setAccountId] = useState('');
+  const { values, getFieldProps, handleSubmit, setValues, reset, isSubmitting } = useFormValidation({
+    actualAmount: '', accountId: ''
+  }, completeExpenseSchema);
 
   useEffect(() => {
     if (isOpen && expenseData) {
-      // Alapértelmezetten a becsült összeget ajánljuk fel
-      setActualAmount(expenseData.estimated_amount || '');
-      setAccountId(''); // Mindig üresen indul
+      setValues({
+        actualAmount: expenseData.estimated_amount || '',
+        accountId: ''
+      });
     }
-  }, [isOpen, expenseData]);
+  }, [isOpen, expenseData, setValues]);
 
-  const handleComplete = () => {
-    if (!actualAmount || !accountId) {
-      alert('Kérlek, add meg a végleges összeget és válaszd ki a kasszát!');
-      return;
-    }
-    onComplete(expenseData.id, {
-      actual_amount: parseFloat(actualAmount),
-      account_id: parseInt(accountId),
+  const onSubmit = async (formData) => {
+    await onComplete(expenseData.id, {
+      actual_amount: parseFloat(formData.actualAmount),
+      account_id: parseInt(formData.accountId),
     });
+    onClose();
   };
 
-  if (!isOpen) return null;
+  if (!expenseData) return null;
+
+  const accountOptions = accounts
+    .filter(acc => ['személyes', 'közös', 'vész'].includes(acc.type))
+    .map(acc => ({
+      value: acc.id.toString(),
+      label: `${acc.name} (${parseFloat(acc.balance).toLocaleString('hu-HU')} Ft)`
+    }));
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">Kiadás Teljesítése</h2>
-          <button className="modal-close-btn" onClick={onClose}>&times;</button>
+    <UniversalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Kiadás Teljesítése"
+      subtitle="Erősítsd meg a végleges összeget és válaszd ki a forrás kasszát"
+      size="small"
+      loading={isSubmitting}
+    >
+      <ModalSection title="📋 Kiadás Adatok" icon="📋">
+        <TextField
+          label="Tétel"
+          value={expenseData.description}
+          disabled
+        />
+        <div style={{
+          padding: '0.75rem', borderRadius: '8px',
+          background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(29,78,216,0.05) 100%)',
+          border: '1px solid rgba(59,130,246,0.2)', marginBottom: '1rem'
+        }}>
+          <div style={{fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.25rem'}}>
+            Becsült összeg
+          </div>
+          <div style={{fontSize: '1.1rem', fontWeight: '600', color: 'var(--accent-primary)'}}>
+            {parseFloat(expenseData.estimated_amount).toLocaleString('hu-HU')} Ft
+          </div>
         </div>
-        
-        <p className="auth-subtitle" style={{marginBottom: '1.5rem'}}>
-          Erősítsd meg a végleges összeget és válaszd ki, melyik kasszából történt a kifizetés.
-        </p>
+      </ModalSection>
 
-        <div className="form-group">
-          <label className="form-label">Tétel</label>
-          <input className="form-input" type="text" value={expenseData.description} readOnly disabled />
-        </div>
+      <ModalSection title="💰 Végleges Adatok" icon="💰">
+        <NumberField
+          {...getFieldProps('actualAmount')}
+          label="Végleges Összeg (Ft)"
+          min={0.01}
+          step={0.01}
+          required
+          autoFocus
+        />
+        <SelectField
+          {...getFieldProps('accountId')}
+          label="Forrás Kassza"
+          options={[{ value: '', label: 'Válassz kasszát...' }, ...accountOptions]}
+          required
+        />
+      </ModalSection>
 
-        <div className="form-group">
-          <label className="form-label">Végleges Összeg (Ft)</label>
-          <input 
-            className="form-input" 
-            type="number" 
-            value={actualAmount} 
-            onChange={(e) => setActualAmount(e.target.value)} 
-            autoFocus 
-          />
-        </div>
-        
-        <div className="form-group">
-          <label className="form-label">Forrás Kassza</label>
-          <select className="form-input" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            <option value="">Válassz kasszát...</option>
-            {/* Csak a személyes és közös kasszákból lehet fizetni */}
-            {accounts.filter(acc => ['személyes', 'közös', 'vész'].includes(acc.type)).map(acc => (
-              <option key={acc.id} value={acc.id}>{acc.name} ({parseFloat(acc.balance).toLocaleString('hu-HU')} Ft)</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" style={{backgroundColor: 'var(--success)'}} onClick={handleComplete}>Teljesítés</button>
-        </div>
-      </div>
-    </div>
+      <ModalActions align="space-between">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
+          Mégse
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{backgroundColor: 'var(--success)'}}
+          onClick={() => handleSubmit(onSubmit)}
+        >
+          ✅ Teljesítés
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 

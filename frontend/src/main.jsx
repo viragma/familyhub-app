@@ -5,6 +5,11 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider } from './context/AuthContext.jsx';
 
+// PWA imports
+import './styles/pwa.css';
+import './styles/mobile-modal.css';
+import { pwaManager } from './utils/pwa.js';
+
 import App from './App.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AdminRoute from './components/AdminRoute.jsx';

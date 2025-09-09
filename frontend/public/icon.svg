@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#gradient)"/>
+  
+  <!-- Family icon -->
+  <g fill="white">
+    <!-- Parent 1 -->
+    <circle cx="180" cy="180" r="35"/>
+    <path d="M125 280 C125 240, 145 220, 180 220 C215 220, 235 240, 235 280 L235 320 L125 320 Z"/>
+    
+    <!-- Parent 2 -->
+    <circle cx="332" cy="180" r="35"/>
+    <path d="M277 280 C277 240, 297 220, 332 220 C367 220, 387 240, 387 280 L387 320 L277 320 Z"/>
+    
+    <!-- Child -->
+    <circle cx="256" cy="280" r="25"/>
+    <path d="M216 360 C216 330, 231 315, 256 315 C281 315, 296 330, 296 360 L296 390 L216 390 Z"/>
+    
+    <!-- House symbol -->
+    <path d="M150 400 L362 400 L362 450 L150 450 Z" fill="rgba(255,255,255,0.8)"/>
+    <path d="M130 400 L256 320 L382 400 L362 400 L256 340 L150 400 Z" fill="rgba(255,255,255,0.8)"/>
+  </g>
+</svg>

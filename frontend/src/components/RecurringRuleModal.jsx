@@ -1,39 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { NumberField, TextField, SelectField, DateField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
+
+const recurringRuleSchema = createSchema()
+  .field('description', validationRules.required, validationRules.minLength(2))
+  .field('amount', validationRules.required, validationRules.number, validationRules.min(0.01))
+  .field('frequency', validationRules.required)
+  .field('startDate', validationRules.required);
 
 function RecurringRuleModal({ isOpen, onClose, onSave, ruleData }) {
-  const [formData, setFormData] = useState({});
   const { user, token, apiUrl } = useAuth();
 
- useEffect(() => {
+  const { values, getFieldProps, handleSubmit, setValues, reset, setValue, isSubmitting } = useFormValidation({
+    description: '', amount: '', type: 'kiadás', from_account_id: '', to_account_id: '', category_id: '',
+    frequency: 'havi', dayOfMonth: '1', dayOfWeek: '1', startDate: '', endDate: ''
+  }, recurringRuleSchema);
+
+  useEffect(() => {
     if (isOpen) {
       if (ruleData) {
-        setFormData({
-          description: ruleData.description || '',
-          amount: ruleData.amount || '',
-          type: ruleData.type || 'kiadás',
-          from_account_id: ruleData.from_account_id || '',
-          to_account_id: ruleData.to_account_id || '',
-          category_id: ruleData.category_id || '',
-          frequency: ruleData.frequency || 'havi',
-          day_of_month: ruleData.day_of_month || 1,
-          day_of_week: ruleData.day_of_week || 1,
-          start_date: ruleData.start_date ? new Date(ruleData.start_date).toISOString().split('T')[0] : '',
-          end_date: ruleData.end_date ? new Date(ruleData.end_date).toISOString().split('T')[0] : '',
-        });
+        // Use individual setValue calls instead of setValues
+        setValue('description', ruleData.description || '');
+        setValue('amount', ruleData.amount || '');
+        setValue('type', ruleData.type || 'kiadás');
+        setValue('from_account_id', ruleData.from_account_id || '');
+        setValue('to_account_id', ruleData.to_account_id || '');
+        setValue('category_id', ruleData.category_id || '');
+        setValue('frequency', ruleData.frequency || 'havi');
+        setValue('dayOfMonth', ruleData.day_of_month || '1');
+        setValue('dayOfWeek', ruleData.day_of_week || '1');
+        setValue('startDate', ruleData.start_date ? new Date(ruleData.start_date).toISOString().split('T')[0] : '');
+        setValue('endDate', ruleData.end_date ? new Date(ruleData.end_date).toISOString().split('T')[0] : '');
       } else {
-        setFormData({}); // Új szabály létrehozásakor üres
+        // Reset form with individual setValue calls
+        setValue('description', '');
+        setValue('amount', '');
+        setValue('type', 'kiadás');
+        setValue('from_account_id', '');
+        setValue('to_account_id', '');
+        setValue('category_id', '');
+        setValue('frequency', 'havi');
+        setValue('dayOfMonth', '1');
+        setValue('dayOfWeek', '1');
+        setValue('startDate', '');
+        setValue('endDate', '');
       }
     }
-    
-  }, [isOpen, ruleData]);
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  }, [isOpen, ruleData?.id]); // Only depend on stable values
 
-  const handleSave = () => {
-    // JAVÍTÁS: Itt alakítjuk át az adatokat a backend által várt formátumra
+  const onSubmit = async (formData) => {
     const dataToSend = {
       description: formData.description,
       amount: parseFloat(formData.amount),
@@ -42,76 +59,57 @@ function RecurringRuleModal({ isOpen, onClose, onSave, ruleData }) {
       to_account_id: formData.to_account_id ? parseInt(formData.to_account_id) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       frequency: formData.frequency,
-      day_of_month: formData.frequency === 'havi' ? parseInt(formData.day_of_month) : null,
-      day_of_week: formData.frequency === 'heti' ? parseInt(formData.day_of_week) : null,
-      start_date: formData.start_date,
-      end_date: formData.end_date || null,
+      day_of_month: formData.frequency === 'havi' ? parseInt(formData.dayOfMonth) : null,
+      day_of_week: formData.frequency === 'heti' ? parseInt(formData.dayOfWeek) : null,
+      start_date: formData.startDate,
+      end_date: formData.endDate || null,
     };
-    onSave(dataToSend);
+    await onSave(dataToSend);
+    onClose();
   };
 
-  if (!isOpen) return null;
+  const frequencyOptions = [
+    { value: 'napi', label: 'Naponta' },
+    { value: 'heti', label: 'Hetente' },
+    { value: 'havi', label: 'Havonta' },
+    { value: 'éves', label: 'Évente' }
+  ];
+
+  const dayOfWeekOptions = [
+    { value: '1', label: 'Hétfő' }, { value: '2', label: 'Kedd' }, { value: '3', label: 'Szerda' },
+    { value: '4', label: 'Csütörtök' }, { value: '5', label: 'Péntek' }, { value: '6', label: 'Szombat' }, { value: '7', label: 'Vasárnap' }
+  ];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">Szabály Szerkesztése</h2>
-          <button className="modal-close-btn" onClick={onClose}>&times;</button>
-        </div>
-        
-        <div className="form-group">
-          <label className="form-label">Leírás</label>
-          <input className="form-input" type="text" name="description" value={formData.description || ''} onChange={handleChange} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Összeg (Ft)</label>
-          <input className="form-input" type="number" inputMode="decimal" name="amount" value={formData.amount || ''} onChange={handleChange} />
-        </div>
-        
-        <div className="form-group">
-          <label className="form-label">Gyakoriság</label>
-          <select className="form-input" name="frequency" value={formData.frequency || 'havi'} onChange={handleChange}>
-            <option value="napi">Naponta</option>
-            <option value="heti">Hetente</option>
-            <option value="havi">Havonta</option>
-            <option value="éves">Évente</option>
-          </select>
-        </div>
+    <UniversalModal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title={ruleData ? 'Szabály Szerkesztése' : 'Új Szabály Létrehozása'} 
+      size="medium" 
+      loading={isSubmitting}
+    >
+      <ModalSection title="📝 Szabály Adatok" icon="📝">
+        <TextField {...getFieldProps('description')} label="Leírás" required />
+        <NumberField {...getFieldProps('amount')} label="Összeg (Ft)" min={0.01} step={0.01} required />
+      </ModalSection>
 
-        {formData.frequency === 'heti' && (
-          <div className="form-group">
-            <label className="form-label">A hét napja:</label>
-            <select className="form-input" name="dayOfWeek" value={formData.dayOfWeek || '1'} onChange={handleChange}>
-              <option value="1">Hétfő</option>
-              <option value="2">Kedd</option>
-              <option value="3">Szerda</option>
-              <option value="4">Csütörtök</option>
-              <option value="5">Péntek</option>
-              <option value="6">Szombat</option>
-              <option value="7">Vasárnap</option>
-            </select>
-          </div>
+      <ModalSection title="⏰ Ismétlődés" icon="⏰">
+        <SelectField {...getFieldProps('frequency')} label="Gyakoriság" options={frequencyOptions} required />
+        {values.frequency === 'heti' && (
+          <SelectField {...getFieldProps('dayOfWeek')} label="A hét napja" options={dayOfWeekOptions} required />
         )}
-
-        {formData.frequency === 'havi' && (
-          <div className="form-group">
-            <label className="form-label">A hónap napja:</label>
-            <input className="form-input" type="number" name="dayOfMonth" value={formData.dayOfMonth || '1'} onChange={handleChange} min="1" max="31" />
-          </div>
+        {values.frequency === 'havi' && (
+          <NumberField {...getFieldProps('dayOfMonth')} label="A hónap napja" min={1} max={31} required />
         )}
+        <DateField {...getFieldProps('startDate')} label="Érvényesség Kezdete" required />
+        <DateField {...getFieldProps('endDate')} label="Érvényesség Vége (opcionális)" />
+      </ModalSection>
 
-        <div className="form-group">
-          <label className="form-label">Érvényesség Kezdete:</label>
-          <input className="form-input" type="date" name="startDate" value={formData.startDate || ''} onChange={handleChange} />
-        </div>
-        
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
-        </div>
-      </div>
-    </div>
+      <ModalActions align="space-between">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>Mégse</button>
+        <button type="button" className="btn btn-primary" onClick={() => handleSubmit(onSubmit)}>Mentés</button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 

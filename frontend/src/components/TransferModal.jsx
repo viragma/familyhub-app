@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { NumberField, TextField, SelectField, DateField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
+
+const transferSchema = createSchema()
+  .field('toAccountId', validationRules.required)
+  .field('amount', validationRules.required, validationRules.number, validationRules.min(0.01))
+  .field('description', validationRules.required, validationRules.minLength(2));
 
 function TransferModal({ isOpen, onClose, onSave, onSaveRecurring, fromAccount }) {
   const [activeTab, setActiveTab] = useState('single');
   const [recipients, setRecipients] = useState([]);
+  const { token, apiUrl } = useAuth();
 
-  // Külön state-ek a két fülnek
-  const [singleData, setSingleData] = useState({ toAccountId: '', amount: '', description: '' });
-  const [recurringData, setRecurringData] = useState({
-    toAccountId: '', amount: '', description: '',
-    frequency: 'havi', dayOfWeek: '1', dayOfMonth: '1', startDate: new Date().toISOString().split('T')[0]
-  });
-  
-  const { token,apiUrl } = useAuth();
-
+  const { values, getFieldProps, handleSubmit, setValues, reset, setValue, isSubmitting } = useFormValidation({
+    toAccountId: '', 
+    amount: '', 
+    description: '', 
+    frequency: 'havi', 
+    dayOfWeek: '1', 
+    dayOfMonth: '1', 
+    startDate: new Date().toISOString().split('T')[0], 
+    isRecurring: false
+  }, transferSchema);
 
   useEffect(() => {
     const fetchRecipients = async () => {
@@ -24,7 +34,9 @@ function TransferModal({ isOpen, onClose, onSave, onSaveRecurring, fromAccount }
           });
           const data = await response.json();
           setRecipients(data.filter(acc => acc.id !== fromAccount?.id));
-        } catch (error) { console.error("Hiba a címzettek lekérésekor:", error); }
+        } catch (error) { 
+          console.error("Error fetching recipients:", error); 
+        }
       }
     };
     fetchRecipients();
@@ -33,84 +45,175 @@ function TransferModal({ isOpen, onClose, onSave, onSaveRecurring, fromAccount }
   useEffect(() => {
     if (isOpen) {
       setActiveTab('single');
-      setSingleData({ toAccountId: '', amount: '', description: '' });
-      setRecurringData({
-        toAccountId: '', amount: '', description: '',
-        frequency: 'havi', dayOfWeek: '1', dayOfMonth: '1', startDate: new Date().toISOString().split('T')[0]
-      });
+      // Reset form values directly without depending on reset function
+      setValue('amount', '');
+      setValue('recipientAccount', '');
+      setValue('description', '');
+      setValue('isRecurring', false);
     }
-  }, [isOpen]);
+  }, [isOpen]); // Remove reset dependency
 
-  const handleSave = () => {
-    if (activeTab === 'single') {
-      if (!fromAccount || !singleData.toAccountId || !singleData.amount) { /* validáció */ return; }
-      onSave({
-        from_account_id: fromAccount.id, to_account_id: parseInt(singleData.toAccountId),
-        amount: parseFloat(singleData.amount), description: singleData.description
-      });
-    } else { // recurring
-      if (!fromAccount || !recurringData.toAccountId || !recurringData.amount) { /* validáció */ return; }
-      onSaveRecurring({
-        description: recurringData.description, amount: parseFloat(recurringData.amount),
-        type: 'átutalás', from_account_id: fromAccount.id, to_account_id: parseInt(recurringData.toAccountId),
-        frequency: recurringData.frequency,
-        day_of_week: recurringData.frequency === 'heti' ? parseInt(recurringData.dayOfWeek) : null,
-        day_of_month: recurringData.frequency === 'havi' ? parseInt(recurringData.dayOfMonth) : null,
-        start_date: recurringData.startDate
-      });
-    }
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setValue('isRecurring', tab === 'recurring');
   };
 
-  if (!isOpen) return null;
+  const onSubmit = async (formData) => {
+    if (formData.isRecurring) {
+      await onSaveRecurring({
+        description: formData.description, 
+        amount: parseFloat(formData.amount), 
+        type: 'átutalás',
+        from_account_id: fromAccount.id, 
+        to_account_id: parseInt(formData.toAccountId),
+        frequency: formData.frequency,
+        day_of_week: formData.frequency === 'heti' ? parseInt(formData.dayOfWeek) : null,
+        day_of_month: formData.frequency === 'havi' ? parseInt(formData.dayOfMonth) : null,
+        start_date: formData.startDate
+      });
+    } else {
+      await onSave({
+        from_account_id: fromAccount.id, 
+        to_account_id: parseInt(formData.toAccountId),
+        amount: parseFloat(formData.amount), 
+        description: formData.description
+      });
+    }
+    onClose();
+  };
+
+  const recipientOptions = recipients.map(acc => ({ 
+    value: acc.id.toString(), 
+    label: acc.name 
+  }));
+  
+  const frequencyOptions = [
+    { value: 'heti', label: 'Hetente' }, 
+    { value: 'havi', label: 'Havonta' }
+  ];
+
+  const dayOfWeekOptions = [
+    { value: '1', label: 'Hétfő' },
+    { value: '2', label: 'Kedd' },
+    { value: '3', label: 'Szerda' },
+    { value: '4', label: 'Csütörtök' },
+    { value: '5', label: 'Péntek' },
+    { value: '6', label: 'Szombat' },
+    { value: '7', label: 'Vasárnap' }
+  ];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">Átutalás</h2>
-          <p className="auth-subtitle" style={{margin: 0}}>Forrás: {fromAccount?.name}</p>
+    <UniversalModal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title="Átutalás" 
+      subtitle={`Forrás: ${fromAccount?.name}`} 
+      size="medium" 
+      loading={isSubmitting}
+    >
+      <ModalSection title="💸 Utalás Típusa" icon="💸">
+        <div style={{
+          display: 'flex', 
+          gap: '0.5rem', 
+          marginBottom: '1rem'
+        }}>
+          <button 
+            type="button" 
+            onClick={() => handleTabChange('single')} 
+            style={{
+              flex: 1, 
+              padding: '0.75rem', 
+              border: activeTab === 'single' ? '2px solid var(--accent-primary)' : '2px solid rgba(148,163,184,0.2)', 
+              borderRadius: '12px', 
+              background: activeTab === 'single' ? 'rgba(99,102,241,0.1)' : 'transparent', 
+              color: activeTab === 'single' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
+              fontWeight: '600'
+            }}
+          >
+            💰 Egyszeri
+          </button>
+          <button 
+            type="button" 
+            onClick={() => handleTabChange('recurring')}
+            style={{
+              flex: 1, 
+              padding: '0.75rem', 
+              border: activeTab === 'recurring' ? '2px solid var(--accent-primary)' : '2px solid rgba(148,163,184,0.2)', 
+              borderRadius: '12px', 
+              background: activeTab === 'recurring' ? 'rgba(99,102,241,0.1)' : 'transparent', 
+              color: activeTab === 'recurring' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
+              fontWeight: '600'
+            }}
+          >
+            🔄 Rendszeres
+          </button>
         </div>
-        
-        <div className="modal-tabs">
-          <button className={`modal-tab ${activeTab === 'single' ? 'active' : ''}`} onClick={() => setActiveTab('single')}>Egyszeri Utalás</button>
-          <button className={`modal-tab ${activeTab === 'recurring' ? 'active' : ''}`} onClick={() => setActiveTab('recurring')}>Rendszeres</button>
-        </div>
+      </ModalSection>
 
-        {/* Egyszeri Utalás Fül */}
-        <div className={`tab-content ${activeTab === 'single' ? 'active' : ''}`}>
-          <div className="form-group"><label className="form-label">Hova</label><select className="form-input" name="toAccountId" value={singleData.toAccountId} onChange={(e) => setSingleData({...singleData, toAccountId: e.target.value})}><option value="">Válassz...</option>{recipients.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select></div>
-          <div className="form-group"><label className="form-label">Összeg (Ft)</label><input className="form-input" type="number" inputMode="decimal" name="amount" value={singleData.amount} onChange={(e) => setSingleData({...singleData, amount: e.target.value})} autoFocus /></div>
-          <div className="form-group"><label className="form-label">Közlemény</label><input className="form-input" type="text" name="description" value={singleData.description} onChange={(e) => setSingleData({...singleData, description: e.target.value})}/></div>
-        </div>
+      <ModalSection title="📝 Utalás Adatok" icon="📝">
+        <SelectField 
+          {...getFieldProps('toAccountId')} 
+          label="Címzett kassza" 
+          options={recipientOptions} 
+          required 
+        />
+        <NumberField 
+          {...getFieldProps('amount')} 
+          label="Összeg (Ft)" 
+          min={0.01} 
+          step={0.01} 
+          required 
+        />
+        <TextField 
+          {...getFieldProps('description')} 
+          label="Megjegyzés" 
+          required 
+        />
+      </ModalSection>
 
-        {/* Ismétlődő Fül */}
-        <div className={`tab-content ${activeTab === 'recurring' ? 'active' : ''}`}>
-          <div className="form-group"><label className="form-label">Hova</label><select className="form-input" name="toAccountId" value={recurringData.toAccountId} onChange={(e) => setRecurringData({...recurringData, toAccountId: e.target.value})}><option value="">Válassz...</option>{recipients.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select></div>
-          <div className="form-group"><label className="form-label">Összeg (Ft)</label><input className="form-input" type="number" inputMode="decimal" name="amount" value={recurringData.amount} onChange={(e) => setRecurringData({...recurringData, amount: e.target.value})} /></div>
-          <div className="form-group"><label className="form-label">Közlemény</label><input className="form-input" type="text" name="description" value={recurringData.description} onChange={(e) => setRecurringData({...recurringData, description: e.target.value})}/></div>
-          
-          <div className="form-group">
-            <label className="form-label">Gyakoriság</label>
-            <select className="form-input" name="frequency" value={recurringData.frequency} onChange={(e) => setRecurringData({...recurringData, frequency: e.target.value})}>
-              <option value="napi">Naponta</option>
-              <option value="heti">Hetente</option>
-              <option value="havi">Havonta</option>
-              <option value="éves">Évente</option>
-            </select>
-          </div>
-          
-          {recurringData.frequency === 'heti' && <div className="form-group"><label className="form-label">A hét napja:</label><select className="form-input" name="dayOfWeek" value={recurringData.dayOfWeek} onChange={(e) => setRecurringData({...recurringData, dayOfWeek: e.target.value})}><option value="1">Hétfő</option><option value="2">Kedd</option><option value="3">Szerda</option><option value="4">Csütörtök</option><option value="5">Péntek</option><option value="6">Szombat</option><option value="7">Vasárnap</option></select></div>}
-          {recurringData.frequency === 'havi' && <div className="form-group"><label className="form-label">A hónap napja:</label><input className="form-input" type="number" inputMode="numeric" name="dayOfMonth" value={recurringData.dayOfMonth} onChange={(e) => setRecurringData({...recurringData, dayOfMonth: e.target.value})} min="1" max="31" /></div>}
-          
-          <div className="form-group"><label className="form-label">Első végrehajtás dátuma:</label><input className="form-input" type="date" name="startDate" value={recurringData.startDate} onChange={(e) => setRecurringData({...recurringData, startDate: e.target.value})} min={new Date().toISOString().split('T')[0]} /></div>
-        </div>
-        
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
-        </div>
-      </div>
-    </div>
+      {values.isRecurring && (
+        <ModalSection title="⏰ Ismétlődés" icon="⏰">
+          <SelectField 
+            {...getFieldProps('frequency')} 
+            label="Gyakoriság" 
+            options={frequencyOptions} 
+            required 
+          />
+          {values.frequency === 'heti' && (
+            <SelectField 
+              {...getFieldProps('dayOfWeek')} 
+              label="Hét napja" 
+              options={dayOfWeekOptions} 
+              required 
+            />
+          )}
+          {values.frequency === 'havi' && (
+            <NumberField 
+              {...getFieldProps('dayOfMonth')} 
+              label="Hónap napja" 
+              min={1} 
+              max={31} 
+              required 
+            />
+          )}
+          <DateField 
+            {...getFieldProps('startDate')} 
+            label="Kezdési dátum" 
+            min={new Date().toISOString().split('T')[0]} 
+            required 
+          />
+        </ModalSection>
+      )}
+
+      <ModalActions align="space-between">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
+          Mégse
+        </button>
+        <button type="button" className="btn btn-primary" onClick={() => handleSubmit(onSubmit)}>
+          {values.isRecurring ? 'Szabály Létrehozása' : 'Utalás Végrehajtása'}
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 

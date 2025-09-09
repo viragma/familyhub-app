@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { PlusCircle, Link as LinkIcon, X, CheckCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle, ArrowRight } from 'lucide-react';
+import UniversalModal, { ModalSection, ModalActions } from '../universal/UniversalModal';
+import FormField, { SelectField } from '../universal/FormField';
 
 const AssignGoalModal = ({ isOpen, onClose, wish, onAssignmentSuccess }) => {
   const { token, apiUrl } = useAuth();
@@ -13,6 +15,7 @@ const AssignGoalModal = ({ isOpen, onClose, wish, onAssignmentSuccess }) => {
     if (isOpen) {
       setIsSuccess(false);
       setIsLoading(true);
+      setSelectedAccountId('');
       const fetchGoalAccounts = async () => {
         try {
           const response = await fetch(`${apiUrl}/api/accounts?type=cél`, {
@@ -21,10 +24,10 @@ const AssignGoalModal = ({ isOpen, onClose, wish, onAssignmentSuccess }) => {
           if (response.ok) {
             setGoalAccounts(await response.json());
           } else {
-            console.error("Hiba a célkasszák lekérdezésekor:", response.status);
+            console.error("Error fetching goal accounts:", response.status);
           }
         } catch (error) {
-          console.error("Hiba a célkasszák lekérdezésekor:", error);
+          console.error("Error fetching goal accounts:", error);
         }
         setIsLoading(false);
       };
@@ -32,118 +35,123 @@ const AssignGoalModal = ({ isOpen, onClose, wish, onAssignmentSuccess }) => {
     }
   }, [isOpen, apiUrl, token]);
 
-  const handleSubmit = async (goal_account_id) => {
+  const handleSubmit = async () => {
+    if (!selectedAccountId) {
+      alert('Kérlek válassz egy célkasszát!');
+      return;
+    }
+
     setIsLoading(true);
     try {
-        const response = await fetch(`${apiUrl}/api/wishes/${wish.id}/activate`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ goal_account_id }),
-        });
+      const response = await fetch(`${apiUrl}/api/wishes/${wish.id}/activate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal_account_id: parseInt(selectedAccountId) }),
+      });
 
-        if (response.ok) {
-            setIsSuccess(true);
-            setTimeout(() => {
-              onAssignmentSuccess();
-            }, 1500); // 1.5 másodperc után automatikusan bezár
-        } else {
-            const err = await response.json();
-            alert(`Hiba a hozzárendelés során: ${err.detail}`);
-            setIsLoading(false);
-        }
+      if (response.ok) {
+        setIsSuccess(true);
+        setTimeout(() => {
+          onAssignmentSuccess();
+          onClose();
+        }, 1500);
+      } else {
+        const err = await response.json();
+        alert(`Hiba a hozzárendelés során: ${err.detail}`);
+      }
     } catch (error) {
-        console.error("Hiba a gyűjtés aktiválásakor:", error);
-        alert("Hálózati hiba történt.");
-        setIsLoading(false);
+      console.error("Error activating wish:", error);
+      alert("Hálózati hiba történt.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleAssign = () => handleSubmit(parseInt(selectedAccountId, 10));
-  const handleCreateNew = () => handleSubmit(null);
+  const accountOptions = goalAccounts.map(acc => ({
+    value: acc.id.toString(),
+    label: `${acc.name} (${parseFloat(acc.balance || 0).toLocaleString('hu-HU')} Ft)`
+  }));
 
-  if (!isOpen) return null;
+  if (!wish) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Gyűjtés indítása</h3>
-          <button onClick={onClose} className="modal-close-btn"><X size={24} /></button>
-        </div>
-        
-        <div className="modal-body">
-          {isSuccess ? (
-            <div className="success-animation">
-              <CheckCircle size={64} className="success-icon" />
-              <h4>Sikeres!</h4>
-              <p>A gyűjtés elindult.</p>
+    <UniversalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Kívánság Aktiválása"
+      subtitle="Válassz egy célkasszát a kívánság gyűjtéséhez"
+      size="medium"
+      loading={isLoading}
+    >
+      {isSuccess ? (
+        <ModalSection title="✅ Sikeres Aktiválás" icon="✅">
+          <div style={{
+            textAlign: 'center', padding: '2rem',
+            background: 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(21,128,61,0.05) 100%)',
+            borderRadius: '12px', border: '1px solid rgba(34,197,94,0.2)'
+          }}>
+            <CheckCircle size={48} color="var(--success)" style={{marginBottom: '1rem'}} />
+            <h3 style={{color: 'var(--success)', marginBottom: '0.5rem'}}>Sikeresen aktiválva!</h3>
+            <p style={{color: 'var(--text-secondary)', margin: 0}}>
+              A kívánság mostantól aktív és elkezdődött a gyűjtés.
+            </p>
+          </div>
+        </ModalSection>
+      ) : (
+        <>
+          <ModalSection title="🎯 Kívánság Adatok" icon="🎯">
+            <div style={{
+              padding: '1rem', borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(29,78,216,0.05) 100%)',
+              border: '1px solid rgba(59,130,246,0.2)', marginBottom: '1rem'
+            }}>
+              <h4 style={{margin: '0 0 0.5rem 0', color: 'var(--accent-primary)'}}>{wish.name}</h4>
+              {wish.estimated_price && (
+                <p style={{margin: '0 0 0.5rem 0', fontSize: '1.1rem', fontWeight: '600'}}>
+                  Becsült ár: {parseFloat(wish.estimated_price).toLocaleString('hu-HU')} Ft
+                </p>
+              )}
+              {wish.description && (
+                <p style={{margin: 0, color: 'var(--text-secondary)'}}>{wish.description}</p>
+              )}
             </div>
-          ) : (
-            <>
-              <div className="wish-summary-in-modal">
-                <p>Kívánság:</p>
-                <h4>{wish.name}</h4>
-                <span>~ {(wish.estimated_price ?? 0).toLocaleString('hu-HU')} Ft</span>
-              </div>
+          </ModalSection>
 
-              <div className="choice-container">
-                {/* 1. OPCIÓ: MEGLÉVŐHÖZ RENDELÉS */}
-                <div 
-                  className={`choice-card ${selectedAccountId ? 'selected' : ''}`}
-                  onClick={() => document.getElementById('goal-select')?.focus()}
-                >
-                  <div className="choice-header">
-                    <LinkIcon />
-                    <h5>Hozzárendelés meglévő célhoz</h5>
-                  </div>
-                  <p>Válaszd ki a listából, melyik közös célhoz adod hozzá ezt a kívánságot.</p>
-                  {isLoading ? <p>Töltés...</p> : (
-                    <select 
-                      id="goal-select"
-                      className="form-input" 
-                      value={selectedAccountId}
-                      onChange={(e) => setSelectedAccountId(e.target.value)}
-                    >
-                      <option value="">Válassz egy kasszát...</option>
-                      {goalAccounts.map(acc => (
-                          <option key={acc.id} value={acc.id}>
-                              {acc.name} ({ (acc.balance ?? 0).toLocaleString() } Ft)
-                          </option>
-                      ))}
-                    </select>
-                  )}
-                  <button 
-                      className="btn btn-primary" 
-                      onClick={handleAssign}
-                      disabled={!selectedAccountId || isLoading}
-                  >
-                      Hozzárendelés <ArrowRight size={16} />
-                  </button>
-                </div>
-                
-                <div className="or-divider">VAGY</div>
+          <ModalSection title="🎯 Célkassza Kiválasztása" icon="🎯">
+            <SelectField
+              label="Célkassza"
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              options={[
+                { value: '', label: goalAccounts.length === 0 ? 'Töltés...' : 'Válassz célkasszát...' },
+                ...accountOptions
+              ]}
+              required
+              disabled={goalAccounts.length === 0}
+            />
+            {goalAccounts.length === 0 && !isLoading && (
+              <p style={{fontSize: '0.9rem', color: 'var(--warning)', marginTop: '0.5rem'}}>
+                Nincs elérhető célkassza. Kérlek, hozz létre egyet a Kasszák menüpontban.
+              </p>
+            )}
+          </ModalSection>
+        </>
+      )}
 
-                {/* 2. OPCIÓ: ÚJ LÉTREHOZÁSA */}
-                <div className="choice-card" onClick={handleCreateNew}>
-                  <div className="choice-header">
-                    <PlusCircle />
-                    <h5>Új kassza létrehozása</h5>
-                  </div>
-                  <p>Létrehozunk egy új, önálló kasszát, kifejezetten ennek a kívánságnak.</p>
-                   <button 
-                      className="btn btn-secondary"
-                      onClick={handleCreateNew}
-                      disabled={isLoading}
-                  >
-                      Létrehozás <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+      {!isSuccess && (
+        <ModalActions align="space-between">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Mégse</button>
+          <button 
+            type="button" 
+            className="btn btn-primary" 
+            onClick={handleSubmit}
+            disabled={!selectedAccountId || goalAccounts.length === 0}
+          >
+            <ArrowRight size={16} /> Aktiválás
+          </button>
+        </ModalActions>
+      )}
+    </UniversalModal>
   );
 };
 

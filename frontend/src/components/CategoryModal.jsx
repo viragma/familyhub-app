@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { TextField, ColorField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
 
 const suggestedEmojis = [
     { group: 'Otthon és Háztartás', emojis: ['🏠', '🔌', '💧', '🔧', '🛋️', '🧹'] },
@@ -8,75 +11,73 @@ const suggestedEmojis = [
     { group: 'Pénzügyek és Munka', emojis: ['💰', '💼', '📈', '🧾', '🏦', '📎'] },
 ];
 
+const categorySchema = createSchema()
+  .field('name', validationRules.required, validationRules.minLength(2))
+  .field('color', validationRules.required)
+  .field('icon', validationRules.required);
+
 function CategoryModal({ isOpen, onClose, onSave, categoryData = null, parentId = null }) {
-  const [formData, setFormData] = useState({ name: '', color: '#818cf8', icon: '' });
+  const { values, getFieldProps, handleSubmit, setValues, reset, setValue } = useFormValidation({
+    name: '', color: '#818cf8', icon: ''
+  }, categorySchema);
 
   useEffect(() => {
-    if (categoryData) {
-      setFormData({
-        name: categoryData.name || '',
-        color: categoryData.color || '#818cf8',
-        icon: categoryData.icon || ''
-      });
-    } else {
-      setFormData({ name: '', color: '#818cf8', icon: '' });
+    if (isOpen) {
+      if (categoryData) {
+        // Use individual setValue calls instead of setValues
+        setValue('name', categoryData.name || '');
+        setValue('color', categoryData.color || '#818cf8');
+        setValue('icon', categoryData.icon || '');
+      } else {
+        // Reset form with individual setValue calls
+        setValue('name', '');
+        setValue('color', '#818cf8');
+        setValue('icon', '');
+      }
     }
-  }, [categoryData, isOpen]);
+  }, [categoryData?.id, isOpen]); // Only depend on stable values
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSave = () => onSave({ ...formData, parent_id: parentId });
-  const handleEmojiClick = (emoji) => setFormData({ ...formData, icon: emoji });
-
-  if (!isOpen) return null;
+  const onSubmit = async (formData) => {
+    await onSave({ ...formData, parent_id: parentId });
+    onClose();
+  };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{categoryData ? 'Kategória Szerkesztése' : 'Új Kategória'}</h2>
-          <button className="modal-close-btn" onClick={onClose}>&times;</button>
+    <UniversalModal isOpen={isOpen} onClose={onClose} title={categoryData ? 'Kategória Szerkesztése' : 'Új Kategória'} size="medium">
+      <ModalSection title="📝 Alapadatok" icon="📝">
+        <TextField {...getFieldProps('name')} label="Kategória neve" required />
+        <div style={{display: 'flex', gap: '1rem'}}>
+          <ColorField {...getFieldProps('color')} label="Szín" required />
+          <TextField {...getFieldProps('icon')} label="Ikon (Emoji)" placeholder="🚗" required />
         </div>
-        
-        <div className="form-group">
-          <label className="form-label">Név</label>
-          <input className="form-input" name="name" value={formData.name} onChange={handleChange} />
-        </div>
-        
-        <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
-          <div className="form-group">
-            <label className="form-label">Szín</label>
-            <input type="color" name="color" value={formData.color} onChange={handleChange} style={{width: '50px', height: '40px', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border)'}}/>
-          </div>
-          <div className="form-group" style={{flexGrow: 1}}>
-            <label className="form-label">Ikon (Emoji)</label>
-            <input className="form-input" name="icon" value={formData.icon} onChange={handleChange} placeholder="Pl. 🚗 vagy válassz alul" />
-          </div>
-        </div>
-        
-        {/* === MEGSZEBBÍTETT IKONVÁLASZTÓ === */}
-        <div className="emoji-picker-container">
-          <div className="emoji-picker">
-            {suggestedEmojis.map(group => (
-              <div key={group.group}>
-                <h3 className="emoji-group-title">{group.group}</h3>
-                <div className="emoji-grid">
-                  {group.emojis.map(emoji => (
-                    <button key={emoji} className="emoji-btn" onClick={() => handleEmojiClick(emoji)}>
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
+      </ModalSection>
+      
+      <ModalSection title="😀 Ikon Választó" icon="😀">
+        <div className="emoji-picker">
+          {suggestedEmojis.map(group => (
+            <div key={group.group}>
+              <h4 style={{margin: '1rem 0 0.5rem', color: 'var(--text-secondary)'}}>{group.group}</h4>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 50px)', gap: '0.5rem', marginBottom: '1rem'}}>
+                {group.emojis.map(emoji => (
+                  <button key={emoji} type="button" onClick={() => setValue('icon', emoji)}
+                    style={{padding: '0.75rem', fontSize: '1.25rem', border: '2px solid rgba(148,163,184,0.2)', borderRadius: '8px', background: 'white', cursor: 'pointer', transition: 'all 0.2s ease'}}
+                    onMouseOver={(e) => e.target.style.borderColor = 'var(--accent-primary, #6366f1)'}
+                    onMouseOut={(e) => e.target.style.borderColor = 'rgba(148,163,184,0.2)'}>
+                    {emoji}
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
-        
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
-        </div>
-      </div>
-    </div>
+      </ModalSection>
+
+      <ModalActions align="space-between">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>Mégse</button>
+        <button type="button" className="btn btn-primary" onClick={() => handleSubmit(onSubmit)}>Mentés</button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
+
 export default CategoryModal;

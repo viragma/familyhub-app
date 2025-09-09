@@ -1,0 +1,631 @@
+/* Universal Modal System - Enhanced Beautiful Design + Mobile Fullscreen */
+
+/* === MODAL OVERLAY === */
+.universal-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Gyönyörű gradiens háttér */
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(168, 85, 247, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  
+  /* Scroll blokkolás */
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+  
+  /* Smooth entrance animation */
+  animation: modalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Priority-based z-index */
+.modal-priority-base {
+  z-index: 2600;
+}
+
+.modal-priority-elevated {
+  z-index: 2700;
+}
+
+.modal-priority-critical {
+  z-index: 2800;
+}
+
+/* === MODAL CONTENT === */
+.universal-modal-content {
+  position: relative;
+  background: 
+    linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  
+  /* Gyönyörű árnyékok és glow */
+  box-shadow: 
+    0 0 60px rgba(99, 102, 241, 0.25),
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 40px 80px -20px rgba(99, 102, 241, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  
+  /* Smooth entrance animation */
+  animation: modalScaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+  
+  /* Touch optimalizálás */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  
+  /* Gyönyörű átmenet hover-re */
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.universal-modal-content:hover {
+  box-shadow: 
+    0 0 80px rgba(99, 102, 241, 0.3),
+    0 30px 60px -12px rgba(0, 0, 0, 0.3),
+    0 50px 100px -20px rgba(99, 102, 241, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Dark mode támogatás */
+@media (prefers-color-scheme: dark) {
+  .universal-modal-content {
+    background: 
+      linear-gradient(145deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    box-shadow: 
+      0 0 80px rgba(99, 102, 241, 0.4),
+      0 25px 50px -12px rgba(0, 0, 0, 0.7),
+      0 40px 80px -20px rgba(168, 85, 247, 0.2),
+      inset 0 1px 0 rgba(148, 163, 184, 0.2);
+  }
+  
+  .universal-modal-content:hover {
+    box-shadow: 
+      0 0 100px rgba(99, 102, 241, 0.5),
+      0 30px 60px -12px rgba(0, 0, 0, 0.8),
+      0 50px 100px -20px rgba(168, 85, 247, 0.3);
+  }
+}
+
+/* === SIZE VARIANTS === */
+/* Desktop sizes */
+.modal-size-small {
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  margin: 2rem;
+}
+
+.modal-size-medium {
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  margin: 2rem;
+}
+
+.modal-size-large {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  margin: 2rem;
+}
+
+.modal-size-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  margin: 0;
+}
+
+/* === HEADER === */
+.universal-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 2rem 2rem 1.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  background: 
+    linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border-radius: 28px 28px 0 0;
+  position: relative;
+}
+
+.universal-modal-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(99, 102, 241, 0.3) 20%, 
+    rgba(168, 85, 247, 0.3) 80%, 
+    transparent 100%);
+}
+
+.modal-title-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: var(--text-primary, #1e293b);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-subtitle {
+  margin: 0.5rem 0 0;
+  font-size: 0.925rem;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.modal-close-btn {
+  background: rgba(148, 163, 184, 0.1);
+  border: none;
+  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-left: 1rem;
+  flex-shrink: 0;
+}
+
+.modal-close-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  transform: scale(1.05);
+}
+
+.modal-close-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.modal-close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === BODY === */
+.universal-modal-body {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* Csak a modal body scrollozhat */
+  touch-action: pan-y;
+}
+
+/* === FOOTER === */
+.universal-modal-footer {
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(248, 250, 252, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 0 0 24px 24px;
+}
+
+/* === MODAL SECTIONS === */
+.modal-section {
+  margin-bottom: 1.5rem;
+}
+
+.modal-section:last-child {
+  margin-bottom: 0;
+}
+
+.modal-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 12px;
+  border-left: 4px solid var(--accent-primary, #6366f1);
+}
+
+.modal-section-header.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-section-header.clickable:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.section-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  flex: 1;
+}
+
+.collapse-arrow {
+  transition: transform 0.2s ease;
+  color: var(--text-secondary, #64748b);
+}
+
+.collapse-arrow.open {
+  transform: rotate(180deg);
+}
+
+.modal-section-content {
+  animation: sectionSlideIn 0.2s ease-out;
+}
+
+/* === MODAL ACTIONS === */
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.modal-actions.align-left {
+  justify-content: flex-start;
+}
+
+.modal-actions.align-center {
+  justify-content: center;
+}
+
+.modal-actions.align-right {
+  justify-content: flex-end;
+}
+
+.modal-actions.align-space-between {
+  justify-content: space-between;
+}
+
+/* === LOADING OVERLAY === */
+.modal-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  z-index: 10;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(99, 102, 241, 0.1);
+  border-top: 3px solid var(--accent-primary, #6366f1);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.modal-loading-overlay p {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+}
+
+/* === ANIMATIONS === */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes sectionSlideIn {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* === MOBILE OPTIMALIZÁLÁS - TELJES KÉPERNYŐS === */
+
+/* Mobil eszközök - teljes képernyős modal */
+@media (max-width: 768px) {
+  .universal-modal-overlay {
+    padding: 0;
+    align-items: stretch;
+    background: 
+      radial-gradient(circle at 30% 20%, rgba(99, 102, 241, 0.4) 0%, transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(168, 85, 247, 0.3) 0%, transparent 50%),
+      linear-gradient(135deg, rgba(0, 0, 0, 0.98) 0%, rgba(15, 23, 42, 1) 100%);
+  }
+  
+  .universal-modal-content {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border-radius: 0;
+    animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    
+    /* Gyönyörű mobile árnyékok */
+    box-shadow: 
+      0 0 100px rgba(99, 102, 241, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  
+  /* Mobile header */
+  .universal-modal-header {
+    padding: max(2rem, calc(env(safe-area-inset-top) + 1.5rem)) 1.5rem 1.5rem;
+    border-radius: 0;
+    background: 
+      linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%);
+    backdrop-filter: blur(30px) saturate(150%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    position: relative;
+  }
+  
+  .universal-modal-header::before {
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(99, 102, 241, 0.4) 20%, 
+      rgba(168, 85, 247, 0.4) 80%, 
+      transparent 100%);
+    height: 2px;
+  }
+  
+  .modal-title {
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+  }
+  
+  .modal-subtitle {
+    font-size: 1rem;
+    margin-top: 0.75rem;
+  }
+  
+  .modal-close-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 20px;
+    background: rgba(148, 163, 184, 0.15);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .modal-close-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    transform: scale(1.1);
+  }
+  
+  /* Mobile body */
+  .universal-modal-body {
+    padding: 1.5rem;
+    height: calc(100vh - 140px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1.5rem));
+  }
+  
+  /* Mobile footer */
+  .universal-modal-footer {
+    padding: 1.5rem;
+    padding-bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1.5rem));
+    border-radius: 0;
+    background: 
+      linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%);
+    backdrop-filter: blur(30px);
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+  }
+  
+  /* Mobile actions - stack vertically */
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 1rem;
+  }
+  
+  .modal-actions > button {
+    width: 100%;
+    min-height: 56px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 16px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .modal-actions > button:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Tablet méret - közepes fullscreen */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .universal-modal-overlay {
+    padding: 1rem;
+  }
+  
+  .universal-modal-content {
+    width: 100%;
+    height: calc(100vh - 2rem);
+    max-width: none;
+    max-height: none;
+    border-radius: 24px;
+  }
+}
+
+@keyframes sectionSlideIn {
+    padding: 0.75rem 1rem;
+    max-height: calc(85vh - 140px);
+  }
+  
+  .universal-modal-footer {
+    padding: 0.75rem 1rem 1.25rem;
+    border-radius: 0 0 20px 20px;
+  }
+  
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+  
+  .modal-actions > button {
+    width: 100%;
+    min-height: 48px;
+  }
+}
+
+/* Extra kis telefonok (< 360px) */
+@media (max-width: 360px) {
+  .universal-modal-overlay {
+    padding: 0.25rem 0.25rem 5.5rem 0.25rem;
+  }
+  
+  .universal-modal-content {
+    margin: 0.5rem 0;
+    max-height: 80vh;
+    border-radius: 16px;
+  }
+  
+  .universal-modal-header {
+    padding: 1rem 0.75rem 0.5rem;
+    border-radius: 16px 16px 0 0;
+  }
+  
+  .universal-modal-body {
+    padding: 0.5rem 0.75rem;
+    max-height: calc(75vh - 120px);
+  }
+  
+  .universal-modal-footer {
+    padding: 0.5rem 0.75rem 1rem;
+    border-radius: 0 0 16px 16px;
+  }
+  
+  .modal-close-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Landscape mode mobilon */
+@media (max-width: 768px) and (orientation: landscape) {
+  .universal-modal-content {
+    max-height: 95vh;
+  }
+  
+  .universal-modal-body {
+    max-height: calc(95vh - 140px);
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .universal-modal-overlay {
+    background: rgba(0, 0, 0, 0.98);
+  }
+  
+  .universal-modal-content {
+    border: 3px solid var(--text-primary, #1e293b);
+    box-shadow: 
+      0 0 30px rgba(99, 102, 241, 0.6),
+      0 32px 64px -12px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .universal-modal-content,
+  .modal-close-btn,
+  .collapse-arrow,
+  .loading-spinner {
+    animation: none;
+    transition: none;
+  }
+}

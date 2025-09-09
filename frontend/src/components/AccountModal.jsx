@@ -1,199 +1,302 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { TextField, NumberField, SelectField, DateField, CheckboxField, TagsField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
+
+// Validation schema for accounts
+const accountSchema = createSchema()
+  .field('name',
+    validationRules.required,
+    validationRules.minLength(2, 'Account name must be at least 2 characters')
+  )
+  .field('type',
+    validationRules.required
+  )
+  .field('goalAmount',
+    (value, allValues) => {
+      if (allValues.type === 'cél' && !value) {
+        return 'Goal amount is required for goal accounts';
+      }
+      if (value && parseFloat(value) <= 0) {
+        return 'Goal amount must be greater than 0';
+      }
+      return null;
+    }
+  )
+  .field('goalDate',
+    (value, allValues) => {
+      if (allValues.type === 'cél' && !value) {
+        return 'Goal date is required for goal accounts';
+      }
+      if (value && new Date(value) <= new Date()) {
+        return 'Goal date must be in the future';
+      }
+      return null;
+    }
+  );
 
 function AccountModal({ isOpen, onClose, onSave, accountData = null }) {
-  const [formData, setFormData] = useState({ name: '', type: 'cél', goalAmount: '', goalDate: '', showOnDashboard: false });
-  const [viewerIds, setViewerIds] = useState([]);
   const [familyMembers, setFamilyMembers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [monthlySaving, setMonthlySaving] = useState(0);
-  const { user, token,apiUrl } = useAuth();
+  const { user, token, apiUrl } = useAuth();
+  const isEdit = !!accountData;
 
+  // Initialize form validation
+  const {
+    values,
+    errors,
+    isSubmitting,
+    getFieldProps,
+    handleSubmit,
+    reset,
+    setValues,
+    setValue
+  } = useFormValidation({
+    name: '',
+    type: 'cél',
+    goalAmount: '',
+    goalDate: '',
+    showOnDashboard: false,
+    viewerIds: []
+  }, accountSchema);
 
-  // Mai dátum meghatározása a dátumválasztó korlátozásához
+  // Today's date for date picker constraint
   const today = new Date().toISOString().split('T')[0];
 
+  // Fetch family members
   useEffect(() => {
     const fetchMembers = async () => {
-      if (user) {
+      if (user && isOpen) {
         try {
           const response = await fetch(`${apiUrl}/api/families/${user.family_id}/users`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          setFamilyMembers(await response.json());
-        } catch (error) { console.error("Hiba a tagok lekérésekor:", error); }
+          const members = await response.json();
+          setFamilyMembers(members);
+        } catch (error) {
+          console.error("Error fetching family members:", error);
+        }
       }
     };
 
-    if (isOpen) {
-      fetchMembers();
-    }
+    fetchMembers();
   }, [isOpen, user, token, apiUrl]);
 
+  // Initialize form data when modal opens
   useEffect(() => {
     if (isOpen) {
       if (accountData) {
-        // Szerkesztés: adatok betöltése
-        setFormData({
-          name: accountData.name || '',
-          type: accountData.type || 'cél',
-          goalAmount: accountData.goal_amount || '',
-          goalDate: accountData.goal_date ? new Date(accountData.goal_date).toISOString().split('T')[0] : '',
-          showOnDashboard: accountData.show_on_dashboard || false,
-        });
-        setViewerIds(accountData.viewers.map(v => v.id));
+        // Editing existing account - use individual setValue calls
+        setValue('name', accountData.name || '');
+        setValue('type', accountData.type || 'cél');
+        setValue('goalAmount', accountData.goal_amount?.toString() || '');
+        setValue('goalDate', accountData.goal_date ? new Date(accountData.goal_date).toISOString().split('T')[0] : '');
+        setValue('showOnDashboard', accountData.show_on_dashboard || false);
+        setValue('viewerIds', accountData.viewers?.map(v => v.id) || []);
       } else {
-        // Új kassza: állapotok alaphelyzetbe állítása
-        setFormData({ name: '', type: 'cél', goalAmount: '', goalDate: '', showOnDashboard: false });
-        setViewerIds([]);
+        // New account - use individual setValue calls
+        setValue('name', '');
+        setValue('type', 'cél');
+        setValue('goalAmount', '');
+        setValue('goalDate', '');
+        setValue('showOnDashboard', false);
+        setValue('viewerIds', []);
       }
-      setSearchTerm('');
     }
-  }, [isOpen, accountData]);
+  }, [isOpen, accountData?.id]); // Only depend on stable values
 
+  // Calculate monthly saving requirement
   useEffect(() => {
-    if (formData.type === 'cél' && formData.goalAmount > 0 && formData.goalDate) {
-      const target = new Date(formData.goalDate);
+    if (values.type === 'cél' && values.goalAmount > 0 && values.goalDate) {
+      const target = new Date(values.goalDate);
       const now = new Date();
       if (target <= now) {
         setMonthlySaving(0);
         return;
       }
       const months = (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
-      setMonthlySaving(months > 0 ? formData.goalAmount / months : parseFloat(formData.goalAmount));
+      setMonthlySaving(months > 0 ? parseFloat(values.goalAmount) / months : parseFloat(values.goalAmount));
     } else {
       setMonthlySaving(0);
     }
-  }, [formData.goalAmount, formData.goalDate, formData.type]);
+  }, [values.goalAmount, values.goalDate, values.type]);
 
-  const handleFormChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleSave = () => {
-    if (!formData.name) {
-      alert('A kassza neve nem lehet üres!');
-      return;
+  // Handle form submission
+  const onSubmit = async (formData) => {
+    try {
+      const dataToSend = {
+        name: formData.name,
+        type: formData.type,
+        goal_amount: formData.goalAmount ? parseFloat(formData.goalAmount) : null,
+        goal_date: formData.goalDate || null,
+        show_on_dashboard: formData.showOnDashboard,
+        viewer_ids: formData.viewerIds
+      };
+      await onSave(dataToSend);
+      onClose();
+    } catch (error) {
+      console.error('Error saving account:', error);
     }
-    // Adatok átalakítása a backend által várt formátumra
-    const dataToSend = {
-      name: formData.name,
-      type: formData.type,
-      goal_amount: formData.goalAmount ? parseFloat(formData.goalAmount) : null,
-      goal_date: formData.goalDate || null,
-      show_on_dashboard: formData.showOnDashboard,
-      viewer_ids: viewerIds
-    };
-    onSave(dataToSend);
   };
 
-  const addViewer = (member) => {
-    if (!viewerIds.includes(member.id)) {
-      setViewerIds([...viewerIds, member.id]);
-    }
-    setSearchTerm('');
+  // Handle viewer management
+  const handleViewersChange = (selectedMemberNames) => {
+    const selectedIds = familyMembers
+      .filter(member => selectedMemberNames.includes(member.display_name))
+      .map(member => member.id);
+    setValue('viewerIds', selectedIds);
   };
 
-  const removeViewer = (memberId) => {
-    setViewerIds(viewerIds.filter(id => id !== memberId));
-  };
+  // Get options and display data
+  const accountTypeOptions = [
+    { value: 'cél', label: '🎯 Célkassza' },
+    { value: 'vész', label: '🚨 Vészkassza' }
+  ];
 
-  const selectedMembers = familyMembers.filter(m => viewerIds.includes(m.id));
-  const suggestedMembers = familyMembers.filter(m => 
-    !viewerIds.includes(m.id) && 
-    user && m.id !== user.id &&
-    m.display_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const selectedMemberNames = familyMembers
+    .filter(member => values.viewerIds.includes(member.id))
+    .map(member => member.display_name);
 
-  if (!isOpen) return null;
+  const availableMemberNames = familyMembers
+    .filter(member => user && member.id !== user.id)
+    .map(member => member.display_name);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{accountData ? 'Kassza Szerkesztése' : 'Új Kassza Létrehozása'}</h2>
-          <button className="modal-close-btn" onClick={onClose}>&times;</button>
-        </div>
+    <UniversalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={accountData ? 'Kassza Szerkesztése' : 'Új Kassza Létrehozása'}
+      subtitle={accountData ? 'Módosítsd a kassza beállításait' : 'Hozz létre egy új kasszát'}
+      size="medium"
+      priority="elevated"
+      loading={isSubmitting}
+      disabled={isSubmitting}
+    >
+      {/* Basic Account Information */}
+      <ModalSection 
+        title="💼 Kassza Alapadatok" 
+        icon="💼"
+        collapsible={false}
+      >
+        <TextField
+          {...getFieldProps('name')}
+          label="Kassza Neve"
+          placeholder="Pl. Nyaralás kassza, Autó kassza"
+          icon="📝"
+          maxLength={50}
+          required
+        />
         
-        <div className="form-group">
-          <label className="form-label">Kassza Neve</label>
-          <input className="form-input" type="text" name="name" value={formData.name} onChange={handleFormChange} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Típus</label>
-          <select className="form-input" name="type" value={formData.type} onChange={handleFormChange}>
-            <option value="cél">Célkassza</option>
-            <option value="vész">Vészkassza</option>
-          </select>
-        </div>
-        
-        {formData.type === 'cél' && (
-          <>
-            <div className="form-group">
-              <label className="form-label">Célösszeg (Ft)</label>
-              <input className="form-input" type="number" name="goalAmount" value={formData.goalAmount} onChange={handleFormChange} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Határidő</label>
-              <input className="form-input" type="date" name="goalDate" value={formData.goalDate} onChange={handleFormChange} min={today} />
-            </div>
-            {monthlySaving > 0 && (
-              <div className="modal-calculation">
-                ℹ️ A cél eléréséhez kb. <strong>{Math.ceil(monthlySaving).toLocaleString('hu-HU')} Ft</strong> félretételére van szükség havonta.
+        <SelectField
+          {...getFieldProps('type')}
+          label="Kassza Típusa"
+          placeholder="Válassz típust"
+          options={accountTypeOptions}
+          icon="🏷️"
+          required
+        />
+      </ModalSection>
+
+      {/* Goal Settings - Only for goal accounts */}
+      {values.type === 'cél' && (
+        <ModalSection 
+          title="🎯 Cél Beállítások" 
+          icon="🎯"
+          collapsible={false}
+        >
+          <NumberField
+            {...getFieldProps('goalAmount')}
+            label="Célösszeg (Ft)"
+            placeholder="0"
+            icon="💰"
+            min={1}
+            step={1}
+            required
+          />
+          
+          <DateField
+            {...getFieldProps('goalDate')}
+            label="Határidő"
+            subtitle="Mikor szeretnéd elérni a célt?"
+            icon="📅"
+            min={today}
+            required
+          />
+          
+          {monthlySaving > 0 && (
+            <div style={{
+              padding: '1rem',
+              background: 'rgba(99, 102, 241, 0.1)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              fontSize: '0.9375rem',
+              color: 'var(--text-primary, #1e293b)'
+            }}>
+              <span style={{ fontSize: '1.25rem' }}>💡</span>
+              <div>
+                <strong>Havi félretétel szükséglet:</strong><br/>
+                <span style={{ 
+                  fontSize: '1.125rem', 
+                  fontWeight: '700',
+                  color: 'var(--accent-primary, #6366f1)'
+                }}>
+                  {Math.ceil(monthlySaving).toLocaleString('hu-HU')} Ft
+                </span>
               </div>
-            )}
-          </>
-        )}
-        
-        <div className="form-group">
-          <label className="form-label">Megosztás (kik láthatják még rajtad kívül?)</label>
-          <div className="token-input-container">
-            <div className="tokens-area">
-              {selectedMembers.map(member => (
-                <div key={member.id} className="token">
-                  <span>{member.display_name}</span>
-                  <button className="token-remove-btn" onClick={() => removeViewer(member.id)}>&times;</button>
-                </div>
-              ))}
-            </div>
-            <input 
-              type="text"
-              className="token-input"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Név beírása a hozzáadáshoz..."
-            />
-          </div>
-          {searchTerm && suggestedMembers.length > 0 && (
-            <div className="suggestions-list">
-              {suggestedMembers.map(member => (
-                <div key={member.id} className="suggestion-item" onClick={() => addViewer(member)}>
-                  {member.display_name}
-                </div>
-              ))}
             </div>
           )}
-        </div>
+        </ModalSection>
+      )}
 
-        {user && ['Szülő', 'Családfő'].includes(user.role) && (
-          <div className="form-group">
-            <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-              <input type="checkbox" name="showOnDashboard" checked={formData.showOnDashboard} onChange={handleFormChange} />
-              Megjelenítés mindenki Dashboardján
-            </label>
-          </div>
-        )}
+      {/* Sharing Settings */}
+      <ModalSection 
+        title="👥 Megosztási Beállítások" 
+        icon="👥"
+        collapsible={true}
+      >
+        <FormField
+          type="tags"
+          value={selectedMemberNames}
+          onChange={handleViewersChange}
+          label="Kik láthatják a kasszát?"
+          placeholder="Családtag nevének begépelése..."
+          subtitle="Add hozzá azokat a családtagokat, akik láthatják ezt a kasszát"
+          options={availableMemberNames}
+          icon="👤"
+        />
         
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
-        </div>
-      </div>
-    </div>
+        {user && ['Szülő', 'Családfő'].includes(user.role) && (
+          <CheckboxField
+            {...getFieldProps('showOnDashboard')}
+            label="Megjelenítés mindenki Dashboard-ján"
+            subtitle="Ha bekapcsolod, ez a kassza minden családtag főoldalán látható lesz"
+          />
+        )}
+      </ModalSection>
+
+      <ModalActions align="space-between">
+        <button 
+          type="button" 
+          className="btn btn-secondary" 
+          onClick={onClose}
+          disabled={isSubmitting}
+        >
+          Mégse
+        </button>
+        <button 
+          type="button" 
+          className="btn btn-primary" 
+          onClick={() => handleSubmit(onSubmit)}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Mentés...' : (accountData ? 'Frissítés' : 'Kassza Létrehozása')}
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 

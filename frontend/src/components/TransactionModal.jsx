@@ -1,141 +1,399 @@
 import React, { useState, useEffect } from 'react';
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { NumberField, TextField, SelectField, DateField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
 
-function TransactionModal({ isOpen, onClose, onSave, onSaveRecurring, transactionType, accountName, categories, transactionData = null }) {
+// Validation schema for transactions
+const transactionSchema = createSchema()
+  .field('amount',
+    validationRules.required,
+    validationRules.number,
+    validationRules.min(0.01, 'Amount must be greater than 0')
+  )
+  .field('description',
+    validationRules.required,
+    validationRules.minLength(2, 'Description must be at least 2 characters')
+  )
+  .field('parentCategoryId',
+    (value, allValues) => {
+      if (allValues.transactionType === 'kiadás' && !value) {
+        return 'Category is required for expenses';
+      }
+      return null;
+    }
+  )
+  .field('frequency',
+    (value, allValues) => {
+      if (allValues.isRecurring && !value) {
+        return 'Frequency is required for recurring transactions';
+      }
+      return null;
+    }
+  )
+  .field('dayOfMonth',
+    (value, allValues) => {
+      if (allValues.isRecurring && allValues.frequency === 'havi') {
+        if (!value || value < 1 || value > 31) {
+          return 'Day of month must be between 1 and 31';
+        }
+      }
+      return null;
+    }
+  )
+  .field('dayOfWeek',
+    (value, allValues) => {
+      if (allValues.isRecurring && allValues.frequency === 'heti' && !value) {
+        return 'Day of week is required for weekly transactions';
+      }
+      return null;
+    }
+  )
+  .field('startDate',
+    (value, allValues) => {
+      if (allValues.isRecurring && !value) {
+        return 'Start date is required for recurring transactions';
+      }
+      return null;
+    }
+  );
+
+function TransactionModal({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  onSaveRecurring, 
+  transactionType, 
+  accountName, 
+  categories = [], 
+  transactionData = null 
+}) {
   const [activeTab, setActiveTab] = useState('single');
-  
-  // Külön állapotok a két fülnek a tiszta logika érdekében
-  const [singleData, setSingleData] = useState({
-    amount: '', description: '', parentCategoryId: '', subCategoryId: ''
-  });
-  
-  const [recurringData, setRecurringData] = useState({
-    amount: '', description: '', parentCategoryId: '', subCategoryId: '',
-    frequency: 'havi', dayOfMonth: new Date().getDate(), startDate: new Date().toISOString().split('T')[0]
-  });
+  const isEdit = !!transactionData;
 
+  // Initialize form validation
+  const {
+    values,
+    errors,
+    isSubmitting,
+    getFieldProps,
+    handleSubmit,
+    reset,
+    setValues,
+    setValue
+  } = useFormValidation({
+    amount: '',
+    description: '',
+    parentCategoryId: '',
+    subCategoryId: '',
+    frequency: 'havi',
+    dayOfMonth: new Date().getDate(),
+    dayOfWeek: '1',
+    startDate: new Date().toISOString().split('T')[0],
+    transactionType,
+    isRecurring: false
+  }, transactionSchema);
+
+  // Initialize form when modal opens
   useEffect(() => {
     if (isOpen) {
       setActiveTab('single');
       
-      const categoryId = transactionData?.category?.id;
-      const parentCategory = categories.find(c => c.children.some(child => child.id === categoryId));
+      if (transactionData) {
+        // Editing existing transaction
+        const categoryId = transactionData?.category?.id;
+        const parentCategory = categories.find(c => 
+          c.children?.some(child => child.id === categoryId)
+        );
 
-      // Szerkesztéskor csak az "Egyszeri" fület töltjük fel adatokkal
-      setSingleData({
-        amount: transactionData?.amount || '',
-        description: transactionData?.description || '',
-        parentCategoryId: parentCategory?.id.toString() || categoryId?.toString() || '',
-        subCategoryId: parentCategory ? categoryId.toString() : ''
-      });
-      // Az ismétlődő fület mindig alaphelyzetbe állítjuk
-      setRecurringData({
-        amount: '', description: '', parentCategoryId: '', subCategoryId: '',
-        frequency: 'havi', dayOfMonth: new Date().getDate(), startDate: new Date().toISOString().split('T')[0]
-      });
+        // Use individual setValue calls to avoid dependency issues
+        setValue('amount', transactionData.amount?.toString() || '');
+        setValue('description', transactionData.description || '');
+        setValue('parentCategoryId', parentCategory?.id?.toString() || categoryId?.toString() || '');
+        setValue('subCategoryId', parentCategory ? categoryId?.toString() : '');
+        setValue('frequency', 'havi');
+        setValue('dayOfMonth', new Date().getDate());
+        setValue('dayOfWeek', '1');
+        setValue('startDate', new Date().toISOString().split('T')[0]);
+        setValue('transactionType', transactionType);
+        setValue('isRecurring', false);
+      } else {
+        // New transaction - reset to defaults
+        setValue('amount', '');
+        setValue('description', '');
+        setValue('parentCategoryId', '');
+        setValue('subCategoryId', '');
+        setValue('frequency', 'havi');
+        setValue('dayOfMonth', new Date().getDate());
+        setValue('dayOfWeek', '1');
+        setValue('startDate', new Date().toISOString().split('T')[0]);
+        setValue('transactionType', transactionType);
+        setValue('isRecurring', false);
+      }
     }
-  }, [isOpen, transactionData, categories]);
+  }, [isOpen, transactionData?.id, transactionType]); // Only depend on stable values
 
-  const handleSingleChange = (e) => setSingleData({...singleData, [e.target.name]: e.target.value });
-  const handleRecurringChange = (e) => setRecurringData({...recurringData, [e.target.name]: e.target.value });
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setValue('isRecurring', tab === 'recurring');
+  };
 
-  const handleSave = () => {
-    if (activeTab === 'single') {
-      if (!singleData.amount || isNaN(parseFloat(singleData.amount))) { alert("Kérlek, adj meg egy érvényes összeget!"); return; }
-      const category_id = singleData.subCategoryId ? parseInt(singleData.subCategoryId) : (singleData.parentCategoryId ? parseInt(singleData.parentCategoryId) : null);
-      onSave({ description: singleData.description, amount: parseFloat(singleData.amount), type: transactionType, category_id });
-    } else {
-      if (!recurringData.amount || isNaN(parseFloat(recurringData.amount))) { alert("Kérlek, adj meg egy érvényes összeget!"); return; }
-      const category_id = recurringData.subCategoryId ? parseInt(recurringData.subCategoryId) : (recurringData.parentCategoryId ? parseInt(recurringData.parentCategoryId) : null);
-      onSaveRecurring({
-        description: recurringData.description, amount: parseFloat(recurringData.amount),
-        type: transactionType, category_id, frequency: recurringData.frequency,
-        day_of_month: parseInt(recurringData.dayOfMonth), start_date: recurringData.startDate
-      });
+  // Handle parent category change
+  const handleParentCategoryChange = (parentCategoryId) => {
+    setValue('parentCategoryId', parentCategoryId);
+    setValue('subCategoryId', ''); // Reset subcategory when parent changes
+  };
+
+  // Handle form submission
+  const onSubmit = async (formData) => {
+    try {
+      const categoryId = formData.subCategoryId 
+        ? parseInt(formData.subCategoryId) 
+        : (formData.parentCategoryId ? parseInt(formData.parentCategoryId) : null);
+
+      const baseData = {
+        description: formData.description,
+        amount: parseFloat(formData.amount),
+        type: transactionType,
+        category_id: categoryId
+      };
+
+      if (formData.isRecurring) {
+        const recurringData = {
+          ...baseData,
+          frequency: formData.frequency,
+          start_date: formData.startDate
+        };
+
+        if (formData.frequency === 'havi') {
+          recurringData.day_of_month = parseInt(formData.dayOfMonth);
+        } else if (formData.frequency === 'heti') {
+          recurringData.day_of_week = parseInt(formData.dayOfWeek);
+        }
+
+        await onSaveRecurring(recurringData);
+      } else {
+        await onSave(baseData);
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('Error saving transaction:', error);
     }
   };
 
-  if (!isOpen) return null;
+  // Get options for dropdowns
+  const parentCategoryOptions = categories.map(cat => ({
+    value: cat.id.toString(),
+    label: cat.name
+  }));
 
-  const singleSubCategories = categories.find(cat => cat.id === parseInt(singleData.parentCategoryId))?.children || [];
-  const recurringSubCategories = categories.find(cat => cat.id === parseInt(recurringData.parentCategoryId))?.children || [];
+  const subCategoryOptions = values.parentCategoryId 
+    ? (categories.find(cat => cat.id === parseInt(values.parentCategoryId))?.children || [])
+        .map(subCat => ({
+          value: subCat.id.toString(),
+          label: subCat.name
+        }))
+    : [];
+
+  const frequencyOptions = [
+    { value: 'napi', label: 'Naponta' },
+    { value: 'heti', label: 'Hetente' },
+    { value: 'havi', label: 'Havonta' },
+    { value: 'éves', label: 'Évente' }
+  ];
+
+  const dayOfWeekOptions = [
+    { value: '1', label: 'Hétfő' },
+    { value: '2', label: 'Kedd' },
+    { value: '3', label: 'Szerda' },
+    { value: '4', label: 'Csütörtök' },
+    { value: '5', label: 'Péntek' },
+    { value: '6', label: 'Szombat' },
+    { value: '7', label: 'Vasárnap' }
+  ];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{transactionType === 'bevétel' ? 'Bevétel' : 'Kiadás'} rögzítése</h2>
-          <p className="auth-subtitle" style={{margin: 0}}>{accountName}</p>
-        </div>
-        
-        {/* Szerkesztésnél egyelőre nem engedjük a füleket a bonyolultság elkerülése érdekében */}
-        {!transactionData && (
-          <div className="modal-tabs">
-            <button className={`modal-tab ${activeTab === 'single' ? 'active' : ''}`} onClick={() => setActiveTab('single')}>Egyszeri Tétel</button>
-            <button className={`modal-tab ${activeTab === 'recurring' ? 'active' : ''}`} onClick={() => setActiveTab('recurring')}>Rendszeres</button>
+    <UniversalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`${transactionType === 'bevétel' ? 'Bevétel' : 'Kiadás'} rögzítése`}
+      subtitle={accountName}
+      size="medium"
+      priority="elevated"
+      loading={isSubmitting}
+      disabled={isSubmitting}
+    >
+      {/* Tab Navigation for new transactions only */}
+      {!isEdit && (
+        <ModalSection title="📊 Tranzakció Típusa" icon="📊" collapsible={false}>
+          <div className="modal-tabs" style={{ 
+            display: 'flex', 
+            gap: '0.5rem',
+            marginBottom: '1rem'
+          }}>
+            <button 
+              type="button"
+              className={`modal-tab ${activeTab === 'single' ? 'active' : ''}`}
+              onClick={() => handleTabChange('single')}
+              style={{
+                flex: 1,
+                padding: '0.75rem 1rem',
+                border: activeTab === 'single' ? '2px solid var(--accent-primary, #6366f1)' : '2px solid rgba(148, 163, 184, 0.2)',
+                borderRadius: '12px',
+                background: activeTab === 'single' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                color: activeTab === 'single' ? 'var(--accent-primary, #6366f1)' : 'var(--text-secondary, #64748b)',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              💰 Egyszeri Tétel
+            </button>
+            <button 
+              type="button"
+              className={`modal-tab ${activeTab === 'recurring' ? 'active' : ''}`}
+              onClick={() => handleTabChange('recurring')}
+              style={{
+                flex: 1,
+                padding: '0.75rem 1rem',
+                border: activeTab === 'recurring' ? '2px solid var(--accent-primary, #6366f1)' : '2px solid rgba(148, 163, 184, 0.2)',
+                borderRadius: '12px',
+                background: activeTab === 'recurring' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                color: activeTab === 'recurring' ? 'var(--accent-primary, #6366f1)' : 'var(--text-secondary, #64748b)',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🔄 Rendszeres
+            </button>
           </div>
-        )}
+        </ModalSection>
+      )}
 
-        {/* Egyszeri Tétel Fül */}
-        <div className={`tab-content ${activeTab === 'single' ? 'active' : ''}`}>
-          <div className="form-group"><label className="form-label">Összeg (Ft)</label><input className="form-input" type="number" inputMode="decimal" name="amount" value={singleData.amount} onChange={handleSingleChange} autoFocus /></div>
-          <div className="form-group"><label className="form-label">Leírás</label><input className="form-input" type="text" name="description" value={singleData.description} onChange={handleSingleChange} placeholder="Pl. Heti bevásárlás"/></div>
-          {transactionType === 'kiadás' && (
-            <><div className="form-group"><label className="form-label">Főkategória</label><select className="form-input" name="parentCategoryId" value={singleData.parentCategoryId} onChange={handleSingleChange}><option value="">Válassz...</option>{categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}</select></div>
-            {singleData.parentCategoryId && singleSubCategories.length > 0 && <div className="form-group"><label className="form-label">Alkategória</label><select className="form-input" name="subCategoryId" value={singleData.subCategoryId} onChange={handleSingleChange}><option value="">Válassz...</option>{singleSubCategories.map(subCat => <option key={subCat.id} value={subCat.id}>{subCat.name}</option>)}</select></div>}</>
-          )}
-        </div>
-
-        {/* Ismétlődő Fül */}
-        <div className={`tab-content ${activeTab === 'recurring' ? 'active' : ''}`}>
-          <div className="form-group"><label className="form-label">Összeg (Ft)</label><input className="form-input" type="number" inputMode="decimal" name="amount" value={recurringData.amount} onChange={handleRecurringChange} /></div>
-          <div className="form-group"><label className="form-label">Leírás (minden hónapban ez lesz)</label><input className="form-input" type="text" name="description" value={recurringData.description} onChange={handleRecurringChange} placeholder="Pl. Netflix előfizetés"/></div>
-          {transactionType === 'kiadás' && (
-            <><div className="form-group"><label className="form-label">Főkategória</label><select className="form-input" name="parentCategoryId" value={recurringData.parentCategoryId} onChange={handleRecurringChange}><option value="">Válassz...</option>{categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}</select></div>
-            {recurringData.parentCategoryId && recurringSubCategories.length > 0 && <div className="form-group"><label className="form-label">Alkategória</label><select className="form-input" name="subCategoryId" value={recurringData.subCategoryId} onChange={handleRecurringChange}><option value="">Válassz...</option>{recurringSubCategories.map(subCat => <option key={subCat.id} value={subCat.id}>{subCat.name}</option>)}</select></div>}</>
-          )}
-             <div className="form-group">
-            <label className="form-label">Gyakoriság</label>
-            <select className="form-input" name="frequency" value={recurringData.frequency} onChange={handleRecurringChange}>
-              <option value="napi">Naponta</option>
-              <option value="heti">Hetente</option>
-              <option value="havi">Havonta</option>
-              <option value="éves">Évente</option>
-            </select>
-          </div>
-
- {/* Dinamikusan megjelenő mezők */}
-          {recurringData.frequency === 'heti' && (
-            <div className="form-group">
-              <label className="form-label">A hét napja:</label>
-              <select className="form-input" name="dayOfWeek" value={recurringData.dayOfWeek} onChange={handleRecurringChange}>
-                <option value="1">Hétfő</option>
-                <option value="2">Kedd</option>
-                <option value="3">Szerda</option>
-                <option value="4">Csütörtök</option>
-                <option value="5">Péntek</option>
-                <option value="6">Szombat</option>
-                <option value="7">Vasárnap</option>
-              </select>
-            </div>
-          )}
-
-          {recurringData.frequency === 'havi' && (
-            <div className="form-group">
-              <label className="form-label">A hónap napja:</label>
-              <input className="form-input" type="number" name="dayOfMonth" value={recurringData.dayOfMonth} onChange={handleRecurringChange} min="1" max="31" />
-            </div>
-          )}
-
-
-         <div className="form-group"><label className="form-label">Első végrehajtás dátuma:</label><input className="form-input" type="date" name="startDate" value={recurringData.startDate} onChange={handleRecurringChange} min={new Date().toISOString().split('T')[0]} /></div>
-        </div>
+      {/* Basic Transaction Data */}
+      <ModalSection 
+        title="💰 Tranzakció Adatok" 
+        icon="💰"
+        collapsible={false}
+      >
+        <NumberField
+          {...getFieldProps('amount')}
+          label="Összeg (Ft)"
+          placeholder="0"
+          icon="💵"
+          min={0.01}
+          step={0.01}
+          autoFocus
+          required
+        />
         
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
-        </div>
-      </div>
-    </div>
+        <TextField
+          {...getFieldProps('description')}
+          label="Leírás"
+          placeholder={values.isRecurring ? "Pl. Netflix előfizetés" : "Pl. Heti bevásárlás"}
+          subtitle={values.isRecurring ? "Ez fog megjelenni minden alkalommal" : "Rövid leírás a tranzakcióról"}
+          icon="📝"
+          maxLength={100}
+          required
+        />
+      </ModalSection>
+
+      {/* Category Selection for Expenses */}
+      {transactionType === 'kiadás' && (
+        <ModalSection 
+          title="🏷️ Kategorizálás" 
+          icon="🏷️"
+          collapsible={false}
+        >
+          <SelectField
+            {...getFieldProps('parentCategoryId')}
+            label="Főkategória"
+            placeholder="Válassz kategóriát..."
+            options={parentCategoryOptions}
+            onChange={handleParentCategoryChange}
+            icon="📁"
+            required
+          />
+          
+          {values.parentCategoryId && subCategoryOptions.length > 0 && (
+            <SelectField
+              {...getFieldProps('subCategoryId')}
+              label="Alkategória"
+              placeholder="Válassz alkategóriát..."
+              options={subCategoryOptions}
+              icon="📂"
+            />
+          )}
+        </ModalSection>
+      )}
+
+      {/* Recurring Transaction Settings */}
+      {values.isRecurring && (
+        <ModalSection 
+          title="⏰ Ismétlődési Beállítások" 
+          icon="⏰"
+          collapsible={false}
+        >
+          <SelectField
+            {...getFieldProps('frequency')}
+            label="Gyakoriság"
+            options={frequencyOptions}
+            icon="🔄"
+            required
+          />
+          
+          {values.frequency === 'heti' && (
+            <SelectField
+              {...getFieldProps('dayOfWeek')}
+              label="A hét napja"
+              options={dayOfWeekOptions}
+              icon="📅"
+              required
+            />
+          )}
+          
+          {values.frequency === 'havi' && (
+            <NumberField
+              {...getFieldProps('dayOfMonth')}
+              label="A hónap napja"
+              min={1}
+              max={31}
+              icon="📅"
+              required
+            />
+          )}
+          
+          <DateField
+            {...getFieldProps('startDate')}
+            label="Első végrehajtás dátuma"
+            min={new Date().toISOString().split('T')[0]}
+            icon="🗓️"
+            required
+          />
+        </ModalSection>
+      )}
+
+      <ModalActions align="space-between">
+        <button 
+          type="button" 
+          className="btn btn-secondary" 
+          onClick={onClose}
+          disabled={isSubmitting}
+        >
+          Mégse
+        </button>
+        <button 
+          type="button" 
+          className="btn btn-primary" 
+          onClick={() => handleSubmit(onSubmit)}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Mentés...' : (values.isRecurring ? 'Szabály létrehozása' : 'Tranzakció rögzítése')}
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 

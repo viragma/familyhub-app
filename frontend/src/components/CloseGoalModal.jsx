@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import './CloseGoalModal.css'; // Használjuk a korábban létrehozott, szép stíluslapot
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { NumberField, TextField, SelectField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
+
+const closeGoalSchema = createSchema()
+  .field('finalAmount', validationRules.required, validationRules.number, validationRules.min(0.01))
+  .field('description', validationRules.required, validationRules.minLength(2));
 
 function CloseGoalModal({ isOpen, onClose, onSubmit, account, categories, error: apiError }) {
-  const [finalAmount, setFinalAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [remainderDestinationAccountId, setRemainderDestinationAccountId] = useState('');
   const [availableAccounts, setAvailableAccounts] = useState([]);
-  const [error, setError] = useState('');
   const { user, token, apiUrl } = useAuth();
 
-  // Amikor a modal megnyílik, feltöltjük az alapértelmezett adatokkal
+  const { values, getFieldProps, handleSubmit, setValues, reset, setValue, isSubmitting } = useFormValidation({
+    finalAmount: '', description: '', categoryId: '', remainderDestinationAccountId: ''
+  }, closeGoalSchema);
+
   useEffect(() => {
     if (account && isOpen) {
-      // Alapértelmezetten a teljes egyenleget ajánljuk fel vásárlásnak
-      setFinalAmount(account.balance ? parseFloat(account.balance).toString() : '0');
-      setDescription(`Vásárlás: ${account.name.replace(/\[Teljesítve\]\s*/, '')}`);
-      setError('');
-      setCategoryId('');
-      setRemainderDestinationAccountId('');
+      setValues({
+        finalAmount: account.balance ? parseFloat(account.balance).toString() : '0',
+        description: `Vásárlás: ${account.name.replace(/\[Teljesítve\]\s*/, '')}`,
+        categoryId: '', remainderDestinationAccountId: ''
+      });
 
-      // Célkasszák lekérdezése a maradvány átutaláshoz
       const fetchAccounts = async () => {
         if (token) {
           try {
@@ -36,151 +38,154 @@ function CloseGoalModal({ isOpen, onClose, onSubmit, account, categories, error:
               );
               setAvailableAccounts(filtered);
               if (filtered.length > 0) {
-                setRemainderDestinationAccountId(filtered[0].id);
+                setValue('remainderDestinationAccountId', filtered[0].id);
               }
             }
-          } catch (err) {
-            console.error("Hiba a célkasszák lekérésekor:", err);
-          }
+          } catch (err) { console.error("Error fetching target accounts:", err); }
         }
       };
       fetchAccounts();
     }
-  }, [isOpen, account, token, apiUrl]);
+  }, [isOpen, account, token, apiUrl, setValues, setValue]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const amount = parseFloat(finalAmount);
+  const onFormSubmit = async (formData) => {
+    const amount = parseFloat(formData.finalAmount);
     const balance = parseFloat(account.balance);
-
-    if (!finalAmount || isNaN(amount) || amount <= 0) {
-      setError('Kérlek, adj meg egy érvényes, nullánál nagyobb összeget!');
-      return;
-    }
-    
     const remainder = balance - amount;
-    if (remainder > 0 && !remainderDestinationAccountId) {
-        setError('Kérlek, válassz egy kasszát a maradvány átutalásához!');
-        return;
+
+    if (remainder > 0 && !formData.remainderDestinationAccountId) {
+      throw new Error('Kérlek, válassz egy kasszát a maradvány átutalásához!');
     }
 
-    setError('');
-
-    // Adatok összekészítése a backend számára
-    onSubmit({
-      final_amount: amount,
-      description: description,
-      category_id: categoryId ? parseInt(categoryId, 10) : null,
-      remainder_destination_account_id: remainder > 0 ? parseInt(remainderDestinationAccountId, 10) : null,
+    await onSubmit({
+      final_amount: amount, description: formData.description,
+      category_id: formData.categoryId ? parseInt(formData.categoryId, 10) : null,
+      remainder_destination_account_id: remainder > 0 ? parseInt(formData.remainderDestinationAccountId, 10) : null,
     });
+    onClose();
   };
 
-  if (!isOpen || !account) return null;
+  if (!account) return null;
 
   const balance = parseFloat(account.balance);
-  const amount = parseFloat(finalAmount) || 0;
+  const amount = parseFloat(values.finalAmount) || 0;
   const difference = balance - amount;
 
+  const categoryOptions = categories
+    .filter(cat => !cat.parent_id)
+    .map(cat => ({ value: cat.id.toString(), label: cat.name }));
+
+  const accountOptions = availableAccounts.map(acc => ({
+    value: acc.id.toString(),
+    label: `${acc.name} (${acc.owner_user?.display_name || 'Közös'})`
+  }));
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content close-goal-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{account.name.replace(/\[Teljesítve\]\s*/, '')} Lezárása</h2>
-          <p className="modal-subtitle">
-            Add meg a vásárlás végleges adatait a kassza archiválásához.
-          </p>
+    <UniversalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`${account.name.replace(/\[Teljesítve\]\s*/, '')} Lezárása`}
+      subtitle="Add meg a vásárlás végleges adatait a kassza archiválásához"
+      size="medium"
+      loading={isSubmitting}
+    >
+      <ModalSection title="💰 Egyenleg Információ" icon="💰">
+        <div style={{
+          padding: '1rem', borderRadius: '12px', 
+          background: 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(21,128,61,0.05) 100%)',
+          border: '1px solid rgba(34,197,94,0.2)', marginBottom: '1rem'
+        }}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Elérhető egyenleg</span>
+            <strong style={{color: 'var(--success)', fontSize: '1.1rem', fontWeight: '700'}}>
+              {balance.toLocaleString('hu-HU')} Ft
+            </strong>
+          </div>
         </div>
-        
-        <div className="current-balance-info">
-          <span>Elérhető egyenleg</span>
-          <strong>{balance.toLocaleString('hu-HU')} Ft</strong>
-        </div>
+      </ModalSection>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="finalAmount">Vásárlás Végleges Összege</label>
-            <input
-              id="finalAmount"
-              className="form-input"
-              type="number"
-              value={finalAmount}
-              onChange={(e) => setFinalAmount(e.target.value)}
-              placeholder="Pl. 25000"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="description">Leírás</label>
-            <input
-              id="description"
-              className="form-input"
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Pl. Új bicikli"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="category">Kategória (Statisztikai célra)</label>
-            <select
-              id="category"
-              className="form-input"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              <option value="">Nincs kategória</option>
-              {categories
-                .filter(cat => !cat.parent_id) 
-                .map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-            </select>
-          </div>
+      <ModalSection title="🛒 Vásárlás Adatok" icon="🛒">
+        <NumberField
+          {...getFieldProps('finalAmount')}
+          label="Vásárlás Végleges Összege (Ft)"
+          min={0.01}
+          step={0.01}
+          placeholder="Pl. 25000"
+          required
+        />
+        <TextField
+          {...getFieldProps('description')}
+          label="Leírás"
+          placeholder="Pl. Új bicikli"
+          required
+        />
+        <SelectField
+          {...getFieldProps('categoryId')}
+          label="Kategória (Statisztikai célra)"
+          options={[{ value: '', label: 'Nincs kategória' }, ...categoryOptions]}
+        />
+      </ModalSection>
 
-          {/* Dinamikus szekció a maradvány vagy túlköltekezés kezelésére */}
-          {difference > 0 && (
-            <div className="remainder-section">
-              <p>A vásárlás után <strong>{difference.toLocaleString('hu-HU')} Ft</strong> maradvány keletkezik.</p>
-              <div className="form-group">
-                  <label className="form-label" htmlFor="remainder-destination">Hova utaljuk a maradványt?</label>
-                  <select
-                      id="remainder-destination"
-                      className="form-input"
-                      value={remainderDestinationAccountId}
-                      onChange={(e) => setRemainderDestinationAccountId(e.target.value)}
-                      required
-                  >
-                      {availableAccounts.length === 0 ? (
-                          <option disabled>Nincs elérhető célkassza...</option>
-                      ) : (
-                          availableAccounts.map(acc => (
-                              <option key={acc.id} value={acc.id}>{acc.name} ({acc.owner_user?.display_name || 'Közös'})</option>
-                          ))
-                      )}
-                  </select>
-              </div>
-            </div>
-          )}
-
-          {difference < 0 && (
-            <div className="remainder-section" style={{borderColor: 'var(--warning)'}}>
-                 <p>A vásárlás <strong>{Math.abs(difference).toLocaleString('hu-HU')} Ft</strong>-tal többe került. A rendszer megpróbálja a különbözetet levonni a kassza tulajdonosának ({account.owner_user?.display_name || 'Ismeretlen'}) személyes kasszájából.</p>
-            </div>
-          )}
-          
-          {(error || apiError) && <p className="modal-error-message">{error || apiError}</p>}
-
-          <div className="modal-actions">
-            <button type="button" onClick={onClose} className="btn btn-secondary">Mégse</button>
-            <button type="submit" className="btn btn-primary">Lezárás és Rögzítés</button>
+      {difference > 0 && (
+        <ModalSection title="💳 Maradvány Kezelés" icon="💳">
+          <div style={{
+            padding: '1rem', borderRadius: '12px',
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(29,78,216,0.05) 100%)',
+            border: '1px solid rgba(59,130,246,0.2)', marginBottom: '1rem'
+          }}>
+            <p style={{margin: 0, color: 'var(--text-primary)'}}>
+              A vásárlás után <strong style={{color: 'var(--accent-primary)'}}>
+              {difference.toLocaleString('hu-HU')} Ft</strong> maradvány keletkezik.
+            </p>
           </div>
-        </form>
-      </div>
-    </div>
+          <SelectField
+            {...getFieldProps('remainderDestinationAccountId')}
+            label="Hova utaljuk a maradványt?"
+            options={accountOptions}
+            required={difference > 0}
+          />
+        </ModalSection>
+      )}
+
+      {difference < 0 && (
+        <ModalSection title="⚠️ Többletköltés" icon="⚠️">
+          <div style={{
+            padding: '1rem', borderRadius: '12px',
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.05) 100%)',
+            border: '1px solid rgba(245,158,11,0.3)', marginBottom: '1rem'
+          }}>
+            <p style={{margin: 0, color: 'var(--text-primary)'}}>
+              A vásárlás <strong style={{color: 'var(--warning)'}}>
+              {Math.abs(difference).toLocaleString('hu-HU')} Ft</strong>-tal többe került.
+              A rendszer megpróbálja a különbözetet levonni a kassza tulajdonosának
+              ({account.owner_user?.display_name || 'Ismeretlen'}) személyes kasszájából.
+            </p>
+          </div>
+        </ModalSection>
+      )}
+
+      {apiError && (
+        <ModalSection>
+          <div style={{
+            padding: '1rem', borderRadius: '12px',
+            background: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(185,28,28,0.05) 100%)',
+            border: '1px solid rgba(239,68,68,0.3)', color: 'var(--error)'
+          }}>
+            {apiError}
+          </div>
+        </ModalSection>
+      )}
+
+      <ModalActions align="space-between">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
+          Mégse
+        </button>
+        <button type="button" className="btn btn-primary" onClick={() => handleSubmit(onFormSubmit)}>
+          Lezárás és Rögzítés
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
-};
+}
 
 export default CloseGoalModal;

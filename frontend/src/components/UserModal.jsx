@@ -1,75 +1,198 @@
 import React, { useState, useEffect } from 'react';
+import UniversalModal, { ModalSection, ModalActions } from './universal/UniversalModal';
+import FormField, { TextField, EmailField, PasswordField, SelectField } from './universal/FormField';
+import { useFormValidation, createSchema, validationRules } from './universal/ValidationEngine';
+
+// Validation schema for user form
+const userSchema = createSchema()
+  .field('name', 
+    validationRules.required,
+    validationRules.minLength(2, 'Name must be at least 2 characters')
+  )
+  .field('display_name',
+    validationRules.required,
+    validationRules.minLength(1, 'Display name is required')
+  )
+  .field('role',
+    validationRules.required
+  )
+  .field('pin',
+    (value, allValues) => {
+      // PIN only required for new users
+      if (!allValues.isEdit && !value) {
+        return 'PIN is required for new users';
+      }
+      if (value && value.length !== 4) {
+        return 'PIN must be exactly 4 digits';
+      }
+      if (value && !/^\d{4}$/.test(value)) {
+        return 'PIN must contain only numbers';
+      }
+      return null;
+    }
+  )
+  .field('email',
+    validationRules.email // Optional but must be valid if provided
+  );
 
 function UserModal({ isOpen, onClose, onSave, userData = null }) {
-  const [formData, setFormData] = useState({
-    name: '', display_name: '', role: 'Gyerek', pin: '', email: ''
-  });
+  const isEdit = !!userData;
+  
+  // Initialize form with validation
+  const {
+    values,
+    errors,
+    isSubmitting,
+    getFieldProps,
+    handleSubmit,
+    reset,
+    setValues
+  } = useFormValidation({
+    name: '',
+    display_name: '',
+    role: 'Gyerek',
+    pin: '',
+    email: '',
+    isEdit
+  }, userSchema);
 
-  // Ha a modal kap 'userData'-t (szerkesztés), töltsük fel az űrlapot
+  // Update form when userData changes
   useEffect(() => {
-    if (userData) {
-      setFormData({
-        name: userData.name || '',
-        display_name: userData.display_name || '',
-        role: userData.role || 'Gyerek',
-        pin: '', // A PIN-t biztonsági okokból sosem töltjük vissza
-        email: userData.email || ''
-      });
-    } else {
-      // Ha új felhasználót hozunk létre, ürítsük az űrlapot
-      setFormData({ name: '', display_name: '', role: 'Gyerek', pin: '', email: '' });
+    if (isOpen) {
+      if (userData) {
+        setValues({
+          name: userData.name || '',
+          display_name: userData.display_name || '',
+          role: userData.role || 'Gyerek',
+          pin: '', // Never populate PIN for security
+          email: userData.email || '',
+          isEdit: true
+        });
+      } else {
+        reset({
+          name: '',
+          display_name: '',
+          role: 'Gyerek',
+          pin: '',
+          email: '',
+          isEdit: false
+        });
+      }
     }
-  }, [userData, isOpen]);
+  }, [userData, isOpen, setValues, reset]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  // Handle form submission
+  const onSubmit = async (formData) => {
+    try {
+      const { isEdit, ...userData } = formData;
+      await onSave(userData);
+      onClose();
+    } catch (error) {
+      console.error('Error saving user:', error);
+    }
   };
 
-  const handleSave = () => {
-    onSave(formData);
-  };
-
-  if (!isOpen) return null;
+  // Role options
+  const roleOptions = [
+    { value: 'Családfő', label: 'Családfő' },
+    { value: 'Szülő', label: 'Szülő' },
+    { value: 'Tizenéves', label: 'Tizenéves' },
+    { value: 'Gyerek', label: 'Gyerek' }
+  ];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{userData ? 'Tag Szerkesztése' : 'Új Tag Hozzáadása'}</h2>
-          <button className="modal-close-btn" onClick={onClose}>&times;</button>
-        </div>
+    <UniversalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={userData ? 'Tag Szerkesztése' : 'Új Tag Hozzáadása'}
+      subtitle={userData ? 'Módosítsd a tag adatait' : 'Add hozzá az új családtagot'}
+      size="medium"
+      priority="elevated"
+      loading={isSubmitting}
+      disabled={isSubmitting}
+    >
+      <ModalSection 
+        title="👤 Személyes Adatok" 
+        icon="👤"
+        collapsible={false}
+      >
+        <TextField
+          {...getFieldProps('name')}
+          label="Teljes Név"
+          placeholder="Teljes név megadása"
+          autoComplete="name"
+          icon="👤"
+          required
+        />
         
-        <div className="form-group">
-          <label className="form-label">Teljes Név</label>
-          <input className="form-input" name="name" value={formData.name} onChange={handleChange} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Megjelenítendő Név</label>
-          <input className="form-input" name="display_name" value={formData.display_name} onChange={handleChange} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Szerepkör</label>
-          <select className="form-input" name="role" value={formData.role} onChange={handleChange}>
-            <option value="Szülő">Családfő</option>
-            <option value="Szülő">Szülő</option>
-            <option value="Tizenéves">Tizenéves</option>
-            <option value="Gyerek">Gyerek</option>
-          </select>
-        </div>
-        {/* A PIN mező csak új felhasználó esetén kötelező/látható */}
-        {!userData && (
-          <div className="form-group">
-            <label className="form-label">4-jegyű PIN</label>
-            <input className="form-input" name="pin" type="password" value={formData.pin} onChange={handleChange} maxLength="4" />
-          </div>
+        <TextField
+          {...getFieldProps('display_name')}
+          label="Megjelenítendő Név"
+          placeholder="Becenév vagy rövid név"
+          subtitle="Ez fog megjelenni az alkalmazásban"
+          autoComplete="nickname"
+          icon="✨"
+          required
+        />
+        
+        <SelectField
+          {...getFieldProps('role')}
+          label="Szerepkör"
+          placeholder="Válassz szerepkört"
+          options={roleOptions}
+          icon="🏷️"
+          required
+        />
+      </ModalSection>
+
+      <ModalSection 
+        title="🔐 Biztonsági Beállítások" 
+        icon="🔐"
+        collapsible={false}
+      >
+        {!isEdit && (
+          <PasswordField
+            {...getFieldProps('pin')}
+            label="4-jegyű PIN"
+            placeholder="••••"
+            subtitle="Ez lesz a bejelentkezési PIN kódja"
+            maxLength={4}
+            pattern="[0-9]*"
+            autoComplete="new-password"
+            icon="🔢"
+            required
+          />
         )}
         
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Mégse</button>
-          <button className="btn btn-primary" onClick={handleSave}>Mentés</button>
-        </div>
-      </div>
-    </div>
+        <EmailField
+          {...getFieldProps('email')}
+          label="Email cím"
+          placeholder="email@example.com"
+          subtitle="Opcionális - értesítések és helyreállítás"
+          autoComplete="email"
+          icon="📧"
+        />
+      </ModalSection>
+
+      <ModalActions align="space-between">
+        <button 
+          type="button" 
+          className="btn btn-secondary" 
+          onClick={onClose}
+          disabled={isSubmitting}
+        >
+          Mégse
+        </button>
+        <button 
+          type="button" 
+          className="btn btn-primary" 
+          onClick={() => handleSubmit(onSubmit)}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Mentés...' : (userData ? 'Frissítés' : 'Létrehozás')}
+        </button>
+      </ModalActions>
+    </UniversalModal>
   );
 }
 
