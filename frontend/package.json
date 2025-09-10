@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.50.1",
     "lucide-react": "^0.541.0",
     "prop-types": "^15.8.1",
     "react": "^19.1.1",

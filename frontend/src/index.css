@@ -1429,7 +1429,9 @@ body {
 
 .item-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem; /* Csökkentett térköz a gombok között */
+  align-items: center; /* Középre igazítás */
+  flex-shrink: 0; /* Megakadályozza a zsugorodást */
 }
 .action-btn-icon {
     background: none;
@@ -1437,10 +1439,19 @@ body {
     cursor: pointer;
     font-size: 1.2rem;
     color: var(--text-secondary);
-    transition: color 0.2s ease;
+    transition: all 0.2s ease;
+    padding: 0.25rem; /* Növeli a kattintható területet */
+    border-radius: 4px; /* Enyhén lekerekített sarkok */
+    min-width: 28px; /* Minimális szélesség */
+    min-height: 28px; /* Minimális magasság */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .action-btn-icon:hover {
     color: var(--text-primary);
+    background-color: rgba(0, 0, 0, 0.05); /* Enyhe háttér hover esetén */
+    transform: scale(1.1); /* Kis nagyítás hover esetén */
 }
 .account-card.active {
   border-color: var(--accent-primary);
@@ -1523,6 +1534,7 @@ body {
   padding: 1rem;
   cursor: pointer;
   text-align: center;
+  position: relative; /* Szükséges az abszolút pozícionált actions konténerhez */
 }
 
 .category-card-icon {
@@ -1547,10 +1559,13 @@ body {
   top: 0.5rem;
   right: 0.5rem;
   background-color: var(--bg-secondary);
-  border-radius: 20px;
+  border-radius: 8px;
   padding: 0.25rem;
   opacity: 0; /* Alapból rejtett */
   transition: all 0.3s ease;
+  gap: 0.25rem; /* Térköz a gombok között */
+  z-index: 10; /* Biztosítja, hogy felül legyenek */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Árnyék a jobb láthatóságért */
 }
 
 .category-card:hover .category-card-actions {
@@ -1576,6 +1591,8 @@ body {
   align-items: center;
   padding: 0.5rem;
   border-radius: 8px;
+  min-height: 44px; /* Minimális magasság az érintési támogatásért */
+  gap: 0.5rem; /* Térköz az elem tartalma és gombok között */
 }
 .subcategory-item:hover {
   background-color: color-mix(in srgb, var(--text-primary) 5%, transparent);
@@ -3368,9 +3385,21 @@ input:checked + .slider:before {
   .filter-chip,
   .action-btn-modern,
   .filter-btn,
-  .pagination-btn {
+  .pagination-btn,
+  .action-btn-icon {
     min-height: 44px;
     padding: 0.75rem 1rem;
+  }
+  
+  /* Külön szabály a kategória action gombokhoz */
+  .action-btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem; /* Nagyobb kattintható terület */
+  }
+  
+  .category-card-actions {
+    gap: 0.5rem; /* Nagyobb térköz mobil eszközökön */
   }
   
   .modern-transaction-card {
